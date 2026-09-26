@@ -84,9 +84,9 @@ export function waistbandHeight(chart, body) {
 function bandVerdict(ease, bands, stretchShift = 0) {
   const [t, s, g, l] = bands;
   if (ease < t - stretchShift) return 'tight';
-  if (ease < s) return 'snug';
-  if (ease < g) return 'good';
-  if (ease < l) return 'loose';
+  if (ease < s - stretchShift) return 'snug';
+  if (ease < g - stretchShift) return 'good';
+  if (ease < l - stretchShift) return 'loose';
   return 'very_loose';
 }
 
@@ -302,7 +302,7 @@ function summarize(regions, garment) {
   if (by.very_loose) parts.push(`very loose ${joinList(by.very_loose)}`);
   let text = parts.length ? parts.join('; ') + '.' : '';
   text = text.charAt(0).toUpperCase() + text.slice(1);
-  if (regions.length) text += ` Hem lands ${regions.length.lands_at}.`;
+  if (regions['length']) text += ` Hem lands ${regions['length'].lands_at}.`;
   if (regions.sleeve) text += ` Sleeves end ${regions.sleeve.lands_at}.`;
   if (regions.waist?.sits_at) text += ` Waistband sits ${regions.waist.sits_at}.`;
   if (regions.inseam) text += ` Leg ends ${regions.inseam.lands_at}.`;

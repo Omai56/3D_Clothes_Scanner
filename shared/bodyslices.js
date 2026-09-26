@@ -117,7 +117,7 @@ function clipLoopX(loop, bound) {
 function crossSections(positions, faces) {
   const perSlice = new Map(); // iy -> Map(edgeKey -> {x,z,nbrs:[]})
   const nTri = faces.length / 3;
-  const key = (a, b) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
+  const key = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
 
   for (let t = 0; t < nTri; t++) {
     const ia = faces[t * 3];

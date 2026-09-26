@@ -173,7 +173,7 @@ export class FitViewer {
         c.opacity = 0.88;
         return c;
       });
-      if (!Array.isArray(o.material) && mats.length === 1) o.material = o.material[0];
+      if (mats.length === 1) o.material = o.material[0];
     });
 
     this.meshyGroup.add(model);

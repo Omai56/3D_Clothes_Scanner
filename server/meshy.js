@@ -26,5 +26,5 @@ export async function getTask(taskId) {
     headers: headers(),
   });
   if (!r.ok) throw new Error(`Meshy ${r.status}`);
-  return r.json(); // { status, progress, model_urls, task_error }
+  return await r.json(); // { status, progress, model_urls, task_error }
 }

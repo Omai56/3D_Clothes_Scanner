@@ -115,7 +115,7 @@ const CURRENCY = { ca: 'CA$', us: '$', gb: '£', au: 'A$', in: '₹', jp: '¥' }
  * @returns the garment JSON
  */
 export async function importZara(url, { garmentsDir, imgDir, log = () => {} }) {
-  const { country, productId: wantedId } = parseZaraUrl(url);
+  const { country, lang, productId: wantedId } = parseZaraUrl(url);
   log('opening product page in headless browser…');
   const { storeId, locale, product } = await readProductPage(url);
   const color = product.colors.find((c) => c.productId === wantedId) ?? product.colors[0];
@@ -130,7 +130,7 @@ export async function importZara(url, { garmentsDir, imgDir, log = () => {} }) {
   let composition = compositionText(product.detailedComposition);
   if (!composition) {
     try {
-      const extra = await getJson(`https://www.zara.com/${country}/${(await parseZaraUrlSafe(url)).lang}/product/${productId}/extra-detail?ajax=true`);
+      const extra = await getJson(`https://www.zara.com/${country}/${lang}/product/${productId}/extra-detail?ajax=true`);
       composition = compositionFromExtraDetail(extra);
     } catch {
       /* optional */

@@ -106,8 +106,11 @@ app.get('/api/scan-session/:id', async (req, res) => {
   const existing = await readScan(sessionId);
   if (existing) return res.json({ ready: true, name: sessionId });
   try {
-    const r = await fetch(`https://platform.bodygram.com/api/orgs/${process.env.BODYGRAM_ORG_ID}/scans?limit=20`, {
-      headers: { Authorization: process.env.BODYGRAM_API_KEY },
+    const key = process.env.BODYGRAM_API_KEY;
+    const orgId = process.env.BODYGRAM_ORG_ID;
+    if (!key || !orgId) return res.json({ ready: false });
+    const r = await fetch(`https://platform.bodygram.com/api/orgs/${orgId}/scans?limit=20`, {
+      headers: { Authorization: key },
     });
     const { results = [] } = await r.json();
     const hit = results.find((s) => s.customScanId === sessionId);

@@ -82,8 +82,8 @@ test('real Zara slim tee (95/5 elastane): stretch allowance, shoulders not flagg
   const tee = load('zara-slim-tee');
   const r = fitReport(body, tee);
   for (const s of Object.values(r.sizes)) assert.doesNotMatch(s.regions.shoulder.label, /dropped/i);
-  // demo chest 91.4: M is 93 cm -> snug; XXL 116.8 -> loose or very loose
-  assert.equal(r.sizes.M.regions.chest.verdict, 'snug');
+  // demo chest 91.4: M is 93 cm (1.6 cm ease) -> good on high-stretch fabric; XXL 116.8 -> loose or very loose
+  assert.equal(r.sizes.M.regions.chest.verdict, 'good');
   assert.ok(['loose', 'very_loose'].includes(r.sizes.XXL.regions.chest.verdict));
   assert.ok(['M', 'L'].includes(r.recommended), `got ${r.recommended}`);
 });

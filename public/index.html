@@ -14,17 +14,24 @@
   </header>
 
   <h1>Your measurements</h1>
-  <p class="lede">Enter your body measurements in centimetres. We compare them to each size chart to find the size that fits you.</p>
+  <p class="lede">We compare these to each size chart to find the size that fits you, and show where.</p>
 
   <div class="measure-layout">
     <aside class="card figure-panel">
       <div class="figure-wrap" id="figure"></div>
-      <div class="figure-caption" id="caption"><b>Tap a field</b>to see where to measure</div>
+      <div class="figure-caption" id="caption"></div>
     </aside>
 
     <form class="card form-panel" id="form" novalidate>
+      <div class="form-head">
+        <div class="progress" id="progress" aria-live="polite"></div>
+        <div class="unit-toggle" role="group" aria-label="Units">
+          <button type="button" data-unit="cm" aria-pressed="true">cm</button>
+          <button type="button" data-unit="in" aria-pressed="false">in</button>
+        </div>
+      </div>
+      <div class="progress-bar"><i id="progressBar"></i></div>
       <div class="fields" id="fields"></div>
-      <p class="form-error" id="error" role="alert"></p>
       <div class="form-actions">
         <button class="btn primary" type="submit">Continue to clothes</button>
         <button class="btn ghost" type="button" id="demo">Fill with demo scan</button>
@@ -39,60 +46,112 @@
   const caption = document.getElementById('caption');
   const fieldsEl = document.getElementById('fields');
   const form = document.getElementById('form');
-  const errorEl = document.getElementById('error');
+  let unit = 'cm';
+  const k = () => (unit === 'in' ? Fit.CM_PER_IN : 1);
+  const fmt = v => String(Math.round(v * 10) / 10);
 
   figure.innerHTML = Fit.bodyFigure('Body outline, highlights the part you are measuring');
 
-  fieldsEl.innerHTML = Fit.FIELDS.map(f => `
+  fieldsEl.innerHTML = Fit.FIELDS.map((f, i) => `
     <label class="field" data-region="${f.key}">
-      <span class="label">${f.label}</span>
+      <span class="label"><span class="num">${i + 1}</span>${f.label}</span>
       <span class="hint">${f.hint}</span>
       <span class="input-wrap">
-        <input name="${f.key}" type="number" inputmode="decimal" step="0.1" min="${f.min}" max="${f.max}" placeholder=" " required>
+        <input name="${f.key}" type="number" inputmode="decimal" step="0.1" placeholder=" "
+          enterkeyhint="${i === Fit.FIELDS.length - 1 ? 'done' : 'next'}" aria-describedby="err-${f.key}">
         <span class="unit">cm</span>
       </span>
+      <span class="field-error" id="err-${f.key}"></span>
     </label>`).join('');
 
+  // Values are kept in cm; inputs show the chosen unit.
+  const inputFor = key => form.elements[key];
+  function readCm(key) { const v = parseFloat(inputFor(key).value); return Number.isFinite(v) ? v * k() : null; }
+  function writeCm(key, cm) { inputFor(key).value = cm == null ? '' : fmt(cm / k()); }
+
+  function checkField(f, show) {
+    const cm = readCm(f.key);
+    const label = inputFor(f.key).closest('.field');
+    let msg = '';
+    if (cm == null) msg = show ? 'Required' : '';
+    else if (cm < f.min || cm > f.max) msg = `Enter ${fmt(f.min / k())} to ${fmt(f.max / k())} ${unit}`;
+    label.classList.toggle('invalid', !!msg);
+    label.querySelector('.field-error').textContent = msg;
+    return cm != null && !msg;
+  }
+
+  function updateProgress() {
+    const done = Fit.FIELDS.filter(f => { const v = readCm(f.key); return v != null && v >= f.min && v <= f.max; }).length;
+    document.getElementById('progress').textContent = done === Fit.FIELDS.length ? 'All set' : `${done} of ${Fit.FIELDS.length} filled`;
+    document.getElementById('progressBar').style.width = (done / Fit.FIELDS.length * 100) + '%';
+  }
+
+  let active = null;
   function setActive(key) {
+    active = key;
     const f = Fit.FIELDS.find(x => x.key === key);
     if (!f) {
       figure.removeAttribute('data-active');
       caption.innerHTML = '<b>Tap a field</b>to see where to measure';
     } else {
       figure.dataset.active = key;
-      caption.innerHTML = `<b>${f.label}</b>${f.hint}`;
+      const cm = readCm(key);
+      caption.innerHTML = `<b>${f.label}${cm ? ` · ${fmt(cm / k())} ${unit}` : ''}</b>${f.hint}`;
     }
     figure.querySelectorAll('[data-region]').forEach(el => el.classList.toggle('active', el.dataset.region === key));
     fieldsEl.querySelectorAll('.field').forEach(el => el.classList.toggle('active', el.dataset.region === key));
   }
+  setActive(null);
 
   fieldsEl.addEventListener('focusin', e => { const l = e.target.closest('.field'); if (l) setActive(l.dataset.region); });
   fieldsEl.addEventListener('mouseover', e => {
     const l = e.target.closest('.field');
     if (l && !fieldsEl.contains(document.activeElement)) setActive(l.dataset.region);
   });
-  fieldsEl.addEventListener('focusout', () => setTimeout(() => { if (!fieldsEl.contains(document.activeElement)) setActive(null); }, 0));
+  fieldsEl.addEventListener('focusout', e => {
+    const l = e.target.closest('.field');
+    if (l) checkField(Fit.FIELDS.find(f => f.key === l.dataset.region), false);
+    setTimeout(() => { if (!fieldsEl.contains(document.activeElement)) setActive(null); }, 0);
+  });
   fieldsEl.addEventListener('mouseleave', () => { if (!fieldsEl.contains(document.activeElement)) setActive(null); });
+  fieldsEl.addEventListener('input', e => {
+    const l = e.target.closest('.field');
+    if (l && l.classList.contains('invalid')) checkField(Fit.FIELDS.find(f => f.key === l.dataset.region), false);
+    updateProgress();
+    if (active) setActive(active);
+  });
+  // Enter moves to the next field; on the last one it submits.
+  fieldsEl.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const i = Fit.FIELDS.findIndex(f => f.key === e.target.name);
+    if (i < 0 || i === Fit.FIELDS.length - 1) return;
+    e.preventDefault();
+    inputFor(Fit.FIELDS[i + 1].key).focus();
+  });
 
-  function fill(body) { for (const f of Fit.FIELDS) form.elements[f.key].value = body[f.key]; }
+  document.querySelector('.unit-toggle').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.dataset.unit === unit) return;
+    const cms = Object.fromEntries(Fit.FIELDS.map(f => [f.key, readCm(f.key)]));
+    unit = b.dataset.unit;
+    document.querySelectorAll('.unit-toggle button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    document.querySelectorAll('.input-wrap .unit').forEach(u => { u.textContent = unit; });
+    for (const f of Fit.FIELDS) writeCm(f.key, cms[f.key]);
+    Fit.FIELDS.forEach(f => { if (inputFor(f.key).closest('.field').classList.contains('invalid')) checkField(f, true); });
+    if (active) setActive(active);
+  });
+
+  function fill(body) { for (const f of Fit.FIELDS) writeCm(f.key, body[f.key]); Fit.FIELDS.forEach(f => checkField(f, false)); updateProgress(); }
   const saved = Fit.loadBody();
-  if (saved) fill(saved);
+  if (saved) fill(saved); else updateProgress();
 
-  document.getElementById('demo').addEventListener('click', () => { fill(Fit.DEMO_BODY); errorEl.textContent = ''; });
+  document.getElementById('demo').addEventListener('click', () => fill(Fit.DEMO_BODY));
 
   form.addEventListener('submit', e => {
     e.preventDefault();
-    const body = {};
-    for (const f of Fit.FIELDS) {
-      const input = form.elements[f.key];
-      const v = parseFloat(input.value);
-      if (!(v >= f.min && v <= f.max)) {
-        errorEl.textContent = `${f.label} should be between ${f.min} and ${f.max} cm.`;
-        input.focus();
-        return;
-      }
-      body[f.key] = v;
-    }
+    const bad = Fit.FIELDS.filter(f => !checkField(f, true));
+    if (bad.length) { inputFor(bad[0].key).focus(); return; }
+    const body = Object.fromEntries(Fit.FIELDS.map(f => [f.key, Math.round(readCm(f.key) * 10) / 10]));
     Fit.saveBody(body);
     location.href = 'shop.html';
   });

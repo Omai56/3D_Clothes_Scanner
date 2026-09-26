@@ -37,7 +37,7 @@
       <div>
         <div class="size-tabs" id="tabs" role="group" aria-label="Compare sizes"></div>
         <ul class="regions" id="regions"></ul>
-        <p class="ease-note">Numbers show garment minus body. Plus means extra room.</p>
+        <p class="ease-note">Tap a part to find it on the body. Numbers are garment minus body, so plus means extra room.</p>
         <div class="legend">
           <span><i style="background:var(--good)"></i>Good fit</span>
           <span><i style="background:var(--warn)"></i>Slightly tight or loose</span>
@@ -46,6 +46,16 @@
       </div>
     </div>
   </section>
+
+  <section class="card why">
+    <h2>Why this size</h2>
+    <ul id="why"></ul>
+  </section>
+
+  <div class="result-actions">
+    <a class="btn primary" href="shop.html">Try another item</a>
+    <a class="btn ghost" href="index.html">Edit measurements</a>
+  </div>
 </main>
 
 <script src="app.js"></script>
@@ -67,7 +77,8 @@
   document.getElementById('garmentImg').style.background = garment.bg;
   document.getElementById('brand').textContent = garment.brand;
   document.getElementById('name').textContent = garment.name;
-  document.getElementById('fabric').textContent = garment.fabric;
+  document.getElementById('fabric').textContent = `${garment.price} · ${garment.fabric}`;
+  document.getElementById('why').innerHTML = report.notes.map(n => `<li>${n}</li>`).join('');
   document.title = `${garment.name} · Your Fit`;
 
   const badge = document.getElementById('badge');
@@ -98,13 +109,34 @@
 
     document.getElementById('regions').innerHTML = res.regions.map(r => `
       <li class="lv-${r.level}">
-        <span class="swatch"></span>
-        <span class="rtext"><span class="rname">${r.label}</span><br><span class="rdetail">${fmtEase(r)}</span></span>
-        <span class="chip lv-${r.level}">${r.chip}</span>
+        <button type="button" class="region-row" data-region="${r.key}" aria-pressed="false">
+          <span class="swatch"></span>
+          <span class="rtext"><span class="rname">${r.label}</span><br><span class="rdetail">${fmtEase(r)}</span></span>
+          <span class="chip lv-${r.level}">${r.chip}</span>
+        </button>
       </li>`).join('');
-
+    focusRegion(focused);
     document.querySelectorAll('.size-tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === size)));
   }
+
+  // Tap a row (or the body) to show just that part on the figure; tap again to show all.
+  let focused = null;
+  const fitmap = document.querySelector('.fitmap');
+  function focusRegion(key) {
+    const known = key && fitmap.querySelector(`.region-row[data-region="${key}"]`);
+    focused = known ? key : null;
+    fitmap.toggleAttribute('data-focus', !!focused);
+    figure.querySelectorAll('.region').forEach(g => g.classList.toggle('focus', g.dataset.region === focused));
+    fitmap.querySelectorAll('.region-row').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.region === focused)));
+  }
+  document.getElementById('regions').addEventListener('click', e => {
+    const b = e.target.closest('.region-row');
+    if (b) focusRegion(focused === b.dataset.region ? null : b.dataset.region);
+  });
+  figure.addEventListener('click', e => {
+    const g = e.target.closest('.region');
+    focusRegion(g && g.dataset.region !== focused ? g.dataset.region : null);
+  });
 
   document.getElementById('tabs').innerHTML = Object.keys(garment.sizes).map(s => `
     <button class="size-tab" type="button" data-size="${s}" aria-pressed="false"

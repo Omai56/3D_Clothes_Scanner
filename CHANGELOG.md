@@ -55,3 +55,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Note:** the 6 garments' size charts and images are placeholders (hand-made numbers, drawn SVG). Replace with real `data/garments/*.json` in build step 2.
 **Why:** app flow (build step 5) needed a clickable demo for judges; works without live scanning or scraping.
 **Files:** `public/index.html`, `public/shop.html`, `public/result.html`, `public/app.js`, `public/styles.css`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Polish the three fit pages (standalone, own demo data)
+**By:** Claude (Opus 5.5)
+**What:**
+- Page 1: cm / inch toggle (values stored in cm), numbered fields, "x of 6 filled" progress bar, per-field error messages, Enter jumps to the next field, caption under the body shows the typed value.
+- Page 2: All / Tops / Bottoms filter; every card shows your best size with a coloured fit pill, plus price.
+- Page 3: tap a part in the list (or on the body) to show only that area on the body map; "Why this size" box explains what goes wrong one size down and one size up; "Try another item" and "Edit measurements" buttons.
+- `public/app.js`: garment category and price, size notes, summary wording no longer repeats the same adjective.
+
+**Why:** improve the pages on their own before combining with the main app. The earlier merge with main is kept on branch `backup-merged-with-main`.
+**Files:** `public/index.html`, `public/shop.html`, `public/result.html`, `public/app.js`, `public/styles.css`, `CHANGELOG.md`

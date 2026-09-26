@@ -14,9 +14,14 @@
   </header>
 
   <h1>Pick something to try on</h1>
-  <p class="lede">Tap an item to see which size fits you, and where.</p>
+  <p class="lede">Your best size is already worked out for every item. Tap one to see how it fits, and where.</p>
 
   <div class="card measure-chip" id="chip"></div>
+  <div class="filters" role="group" aria-label="Filter clothes">
+    <button type="button" data-cat="all" aria-pressed="true">All</button>
+    <button type="button" data-cat="top" aria-pressed="false">Tops</button>
+    <button type="button" data-cat="bottom" aria-pressed="false">Bottoms</button>
+  </div>
   <section class="grid" id="grid" aria-label="Clothes"></section>
 </main>
 
@@ -30,14 +35,31 @@
     Fit.FIELDS.map(f => `<span>${short[f.key]} <b>${Math.round(body[f.key])}</b></span>`).join('') +
     '<a href="index.html">Edit</a>';
 
-  document.getElementById('grid').innerHTML = Fit.GARMENTS.map(g => `
-    <a class="card garment" href="result.html?id=${encodeURIComponent(g.id)}">
-      <div class="img" style="background:${g.bg}">${Fit.garmentArt(g)}</div>
+  const LEVEL_WORD = { good: 'Great fit', warn: 'Good fit', bad: 'Closest fit' };
+  const grid = document.getElementById('grid');
+  grid.innerHTML = Fit.GARMENTS.map(g => {
+    const report = Fit.fitReport(g, body);
+    const worst = report.sizes[report.recommended].worst;
+    return `
+    <a class="card garment" data-cat="${g.category}" href="result.html?id=${encodeURIComponent(g.id)}"
+       aria-label="${g.brand} ${g.name}, your size ${report.recommended}">
+      <div class="img" style="background:${g.bg}">${Fit.garmentArt(g)}
+        <span class="size-pill lv-${worst}"><b>${report.recommended}</b>${LEVEL_WORD[worst]}</span>
+      </div>
       <div class="meta">
         <div class="brand">${g.brand}</div>
         <div class="name">${g.name}</div>
+        <div class="price">${g.price}</div>
       </div>
-    </a>`).join('');
+    </a>`;
+  }).join('');
+
+  document.querySelector('.filters').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    document.querySelectorAll('.filters button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    grid.querySelectorAll('.garment').forEach(c => { c.hidden = b.dataset.cat !== 'all' && c.dataset.cat !== b.dataset.cat; });
+  });
 </script>
 </body>
 </html>

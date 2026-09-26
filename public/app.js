@@ -122,37 +122,37 @@
   // rules: ease = garment - body. Inside `good` -> green, inside `ok` -> yellow, outside -> red.
   const GARMENTS = [
     {
-      id: 'crew-tee', name: 'Essential Crew Tee', brand: 'Zara', art: 'tee', color: '#2f4858', bg: '#e1eaee',
+      id: 'crew-tee', category: 'top', price: '$19.90', name: 'Essential Crew Tee', brand: 'Zara', art: 'tee', color: '#2f4858', bg: '#e1eaee',
       fabric: '100% cotton jersey, low stretch',
       rules: { chest: { good: [5, 14], ok: [1, 20] }, waist: { good: [4, 16], ok: [0, 24] }, shoulder: { good: [-1, 3], ok: [-3, 5] } },
       sizes: { S: { chest: 96, waist: 92, shoulder: 44 }, M: { chest: 102, waist: 98, shoulder: 46 }, L: { chest: 108, waist: 104, shoulder: 48 }, XL: { chest: 114, waist: 110, shoulder: 50 } },
     },
     {
-      id: 'oxford-shirt', name: 'Oxford Button-Down Shirt', brand: 'Hollister', art: 'shirt', color: '#8fb0d8', bg: '#e8eef6',
+      id: 'oxford-shirt', category: 'top', price: '$44.00', name: 'Oxford Button-Down Shirt', brand: 'Hollister', art: 'shirt', color: '#8fb0d8', bg: '#e8eef6',
       fabric: '100% cotton oxford, no stretch',
       rules: { chest: { good: [8, 16], ok: [3, 22] }, waist: { good: [6, 18], ok: [2, 26] }, shoulder: { good: [-1, 2], ok: [-3, 4] } },
       sizes: { S: { chest: 98, waist: 88, shoulder: 44.5 }, M: { chest: 104, waist: 94, shoulder: 46.5 }, L: { chest: 110, waist: 100, shoulder: 48.5 }, XL: { chest: 116, waist: 106, shoulder: 50.5 } },
     },
     {
-      id: 'club-hoodie', name: 'Club Fleece Hoodie', brand: 'Nike', art: 'hoodie', color: '#44464c', bg: '#ebebea',
+      id: 'club-hoodie', category: 'top', price: '$55.00', name: 'Club Fleece Hoodie', brand: 'Nike', art: 'hoodie', color: '#44464c', bg: '#ebebea',
       fabric: '80% cotton, 20% polyester fleece',
       rules: { chest: { good: [4, 16], ok: [-2, 22] }, waist: { good: [2, 18], ok: [-2, 26] }, shoulder: { good: [-2, 4], ok: [-4, 6] } },
       sizes: { S: { chest: 94, waist: 88, shoulder: 45 }, M: { chest: 100, waist: 94, shoulder: 47 }, L: { chest: 106, waist: 100, shoulder: 49 }, XL: { chest: 112, waist: 106, shoulder: 51 } },
     },
     {
-      id: 'puffer-jacket', name: 'Quilted Puffer Jacket', brand: 'Hollister', art: 'jacket', color: '#b5462f', bg: '#f5e6e0',
+      id: 'puffer-jacket', category: 'top', price: '$89.00', name: 'Quilted Puffer Jacket', brand: 'Hollister', art: 'jacket', color: '#b5462f', bg: '#f5e6e0',
       fabric: 'Nylon shell, recycled polyester fill',
       rules: { chest: { good: [12, 22], ok: [8, 28] }, waist: { good: [10, 26], ok: [4, 32] }, shoulder: { good: [0, 4], ok: [-2, 6] } },
       sizes: { S: { chest: 102, waist: 98, shoulder: 45 }, M: { chest: 108, waist: 104, shoulder: 47 }, L: { chest: 114, waist: 110, shoulder: 49 }, XL: { chest: 120, waist: 116, shoulder: 51 } },
     },
     {
-      id: 'slim-jeans', name: 'Slim Fit Jeans', brand: 'Zara', art: 'jeans', color: '#3a5a86', bg: '#e3e9f2',
+      id: 'slim-jeans', category: 'bottom', price: '$49.90', name: 'Slim Fit Jeans', brand: 'Zara', art: 'jeans', color: '#3a5a86', bg: '#e3e9f2',
       fabric: '98% cotton, 2% elastane',
       rules: { waist: { good: [0, 3], ok: [-2, 6] }, hip: { good: [2, 8], ok: [-1, 12] }, inseam: { good: [-2, 2], ok: [-5, 5] } },
       sizes: { S: { waist: 74, hip: 92, inseam: 76 }, M: { waist: 78, hip: 96, inseam: 77 }, L: { waist: 82, hip: 100, inseam: 80 }, XL: { waist: 86, hip: 104, inseam: 81 } },
     },
     {
-      id: 'relaxed-chinos', name: 'Relaxed Chino Trousers', brand: 'Nike', art: 'chinos', color: '#c2a676', bg: '#f3eee3',
+      id: 'relaxed-chinos', category: 'bottom', price: '$60.00', name: 'Relaxed Chino Trousers', brand: 'Nike', art: 'chinos', color: '#c2a676', bg: '#f3eee3',
       fabric: '97% cotton twill, 3% elastane',
       rules: { waist: { good: [0, 4], ok: [-2, 7] }, hip: { good: [6, 14], ok: [2, 20] }, inseam: { good: [-2, 2], ok: [-5, 5] } },
       sizes: { S: { waist: 76, hip: 100, inseam: 76 }, M: { waist: 80, hip: 104, inseam: 78 }, L: { waist: 84, hip: 108, inseam: 80 }, XL: { waist: 88, hip: 112, inseam: 82 } },
@@ -184,8 +184,9 @@
     const code = dir ? dir + (level === 'warn' ? 'Warn' : 'Bad') : 'good';
     return {
       key, label: t.label, noun: t.noun, ease: Math.round(ease * 10) / 10, level,
-      chip: p.chip[code], phrase: dir ? `${p[code]} ${t.where}` : null,
+      chip: p.chip[code], phrase: dir ? `${p[code]} ${t.where}` : null, adj: dir ? p[code] : null, where: t.where,
       distance: Math.abs(ease - (g0 + g1) / 2) / Math.max(1, g1 - g0),
+      goodMin: g0, goodMax: g1,
     };
   }
 
@@ -200,8 +201,32 @@
   function fitReport(g, body) {
     const sizes = {};
     for (const s of Object.keys(g.sizes)) sizes[s] = checkSize(g, body, s);
+    const order = Object.keys(g.sizes);
     const recommended = Object.values(sizes).sort((a, b) => a.penalty - b.penalty)[0].size;
-    return { recommended, sizes };
+    return { recommended, sizes, order, notes: whyNotes(sizes, order, recommended) };
+  }
+
+  // "Why this size": what goes wrong one size down and one size up.
+  function whyNotes(sizes, order, rec) {
+    const notes = [];
+    const i = order.indexOf(rec);
+    const issues = (s, dir) => sizes[s].regions.filter(r => r.level !== 'good' && (dir < 0 ? r.ease < r.goodMin : r.ease > r.goodMax)); 
+    if (i > 0) {
+      const down = order[i - 1], list = issues(down, -1);
+      notes.push(list.length ? `${down} would be ${phraseList(list)}.` : `${down} also fits, but ${rec} is more comfortable overall.`);
+    }
+    if (i < order.length - 1) {
+      const up = order[i + 1], list = issues(up, 1);
+      notes.push(list.length ? `${up} would be ${phraseList(list)}.` : `${up} also fits if you like a roomier feel.`);
+    }
+    return notes;
+  }
+
+  // "a little relaxed at the chest and at the waist" instead of repeating the adjective.
+  function phraseList(regions) {
+    const groups = new Map();
+    for (const r of regions) groups.set(r.adj, [...(groups.get(r.adj) || []), r.where]);
+    return joinList([...groups].map(([adj, wheres]) => `${adj} ${joinList(wheres)}`));
   }
 
   function joinList(items) {
@@ -215,7 +240,7 @@
     const issues = regions.filter(r => r.level !== 'good');
     const hasBad = issues.some(r => r.level === 'bad');
     if (!issues.length) return `${name} is a great match, fitting well through the ${joinList(good)}.`;
-    const issueText = joinList(issues.map(r => r.phrase));
+    const issueText = phraseList(issues);
     if (!good.length) return `${name} is the closest size, but it is ${issueText}.`;
     return `${name} fits well through the ${joinList(good)}, ${hasBad ? 'but is' : 'and is'} ${issueText}.`;
   }
@@ -231,7 +256,7 @@
   }
 
   window.Fit = {
-    FIELDS, DEMO_BODY, SIZE_NAMES, GARMENTS,
+    FIELDS, DEMO_BODY, SIZE_NAMES, GARMENTS, CM_PER_IN: 2.54,
     bodyFigure, garmentArt, getGarment, fitReport, saveBody, loadBody,
   };
 })();

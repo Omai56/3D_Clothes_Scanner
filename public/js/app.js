@@ -154,6 +154,7 @@ async function selectGarment(g) {
   state.meshyUrl = null;
   clearInterval(meshyTimer);
   if (viewer) viewer.clearGarmentModel();
+  showViewMode(false);
   const r = await fetch('/api/fit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -295,7 +296,21 @@ async function applyMeshyModel(url, garment) {
   if (!viewer || !state.report) return;
   const ev = state.report.sizes[state.size];
   await viewer.loadGarmentModel(url, garment, ev);
+  showViewMode(true);
 }
+
+// Look / Fit / Both toggle (only when a photo-real mesh is loaded)
+function showViewMode(on) {
+  const el = $('#view-mode');
+  el.hidden = !on;
+  if (on) el.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.mode === (viewer?.mode ?? 'look')));
+}
+$('#view-mode').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-mode]');
+  if (!btn || !viewer) return;
+  viewer.setMode(btn.dataset.mode);
+  showViewMode(true);
+});
 
 function setMeshyStatus(msg) {
   const el = $('#meshy-status');

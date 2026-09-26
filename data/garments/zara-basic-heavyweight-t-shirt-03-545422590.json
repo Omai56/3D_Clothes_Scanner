@@ -63,5 +63,10 @@
     "L": "in_stock",
     "XL": "in_stock",
     "XXL": "in_stock"
+  },
+  "model": {
+    "glb": "/models/zara-basic-heavyweight-t-shirt-03-545422590.glb",
+    "source": "Tripo3D web app, model v2.5 (legacy), from the flat product photo",
+    "generated": "2026-09-26"
   }
 }

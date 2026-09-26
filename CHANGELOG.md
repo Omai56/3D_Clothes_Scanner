@@ -152,3 +152,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `public/js/app.js` — if a garment JSON has `model.glb` (a GLB already in `public/models/`, e.g. made with `scripts/tripo-mesh.js` or downloaded by hand from the Tripo/Meshy web apps), the viewer loads it directly instead of starting a Meshy job.
 - Tripo API status: the key works but the API wallet has **0 credits** (the 200 free credits are web-app only; API task creation fails with code 2010). No mesh generated yet.
 **Files:** `public/js/app.js`, `.env.example`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 17:50 — First photo-real garment mesh (Tripo) + Look / Fit toggle
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/models/zara-basic-heavyweight-t-shirt-03-545422590.glb` — Daniel generated the tee from its flat product photo in the Tripo web app (model v2.5; v3.1 looked better but export needs a paid plan). Optimized with gltf-transform: 257k → 76k vertices, 16.7 MB → 5.6 MB (quantized, loads in three.js without extra decoders). Linked via `model.glb` in the garment JSON.
+- `public/js/viewer.js` `loadGarmentModel` — the mesh is sized from the **chart**: height = garment length on this body; width/depth scale by the selected size's chest (or hip) and length ratios vs the smallest size, so S and XL of the same mesh visibly differ. Materials forced to matte cloth (roughness/metalness maps dropped; AI exports look like latex otherwise). GLB is cached per URL so switching sizes is instant.
+- **Look / Fit toggle** on the viewer (`#view-mode`): Look = photo-real mesh, Fit = measured shell coloured by fit. The toggle appears only when a mesh exists; without one the shell shows as before. ("Both" was tried and dropped — the two surfaces interleave into a blotchy mess.)
+- `public/js/app.js` — garments with `model.glb` load it directly (no Meshy call); toggle wiring.
+
+**Verified:** headless phone screenshots — Look S vs XL differ in width and length; Fit view unchanged; no console errors; 24 tests pass.
+**Files:** `public/models/*.glb`, `data/garments/zara-basic-heavyweight-t-shirt-03-545422590.json`, `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `CHANGELOG.md`

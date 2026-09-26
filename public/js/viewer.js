@@ -121,62 +121,108 @@ export class FitViewer {
 
   clearGarmentModel() {
     this.meshyGroup.clear();
+    this.setMode(this.mode ?? 'look'); // no mesh -> shell visible again
   }
 
-  /** Load a Meshy GLB and position it on the body based on garment category and size evaluation. */
+  /**
+   * Load an AI-generated garment GLB (Tripo/Meshy, made from the flat product photo) and size it
+   * from the size chart: height = garment length, width = sleeve tip to sleeve tip (tops) or hip
+   * width (bottoms). So S and XL of the same mesh really differ. Shown in "look" mode; the
+   * measured shell is shown in "fit" mode (see setMode).
+   */
   async loadGarmentModel(url, garment, sizeEval) {
     this.meshyGroup.clear();
     if (!this.body) return;
 
-    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-    const gltf = await new Promise((resolve, reject) =>
-      new GLTFLoader().load(url, resolve, undefined, reject)
-    );
-    const model = gltf.scene;
-
-    const box = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
+    if (this._gltfUrl !== url) {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+      this._gltf = await new Promise((resolve, reject) => new GLTFLoader().load(url, resolve, undefined, reject));
+      this._gltfUrl = url;
+      // Measure the raw mesh once.
+      const box = new THREE.Box3().setFromObject(this._gltf.scene);
+      this._gltfSize = box.getSize(new THREE.Vector3());
+      this._gltfBox = box;
+    }
+    const model = this._gltf.scene;
+    const size = this._gltfSize;
+    const box = this._gltfBox;
 
     const b = this.body;
     const R = sizeEval.regions;
+    const chart = garment.sizes?.[sizeEval.size] ?? {};
 
-    let targetHeight, centerY;
+    // Height from the chart (garment length on this body); the mesh keeps its own proportions
+    // at the smallest size, and bigger sizes widen/lengthen by the chart's ratios.
+    const sizesArr = Object.values(garment.sizes ?? {});
+    const ref = sizesArr[0] ?? chart;
+    const widthKey = garment.category === 'top' ? 'chest' : 'hip';
+    const lengthKey = garment.category === 'top' ? 'length' : 'total_length';
+    const wRatio = ref[widthKey] && chart[widthKey] ? chart[widthKey] / ref[widthKey] : 1;
+    const lRatio = ref[lengthKey] && chart[lengthKey] ? chart[lengthKey] / ref[lengthKey] : 1;
+
+    let topY;
+    let heightM;
     if (garment.category === 'top') {
-      const neckY = b.backNeckHeight / 100;
+      topY = b.backNeckHeight / 100 + 0.01;
       const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
-      targetHeight = neckY - hemY;
-      centerY = (neckY + hemY) / 2;
+      heightM = topY - hemY;
     } else {
-      const waistbandY = b.waistHeight / 100;
-      const ankleY = (b.outerAnkleHeightR ?? 7) / 100;
-      targetHeight = waistbandY - ankleY;
-      centerY = (waistbandY + ankleY) / 2;
+      topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
+      const hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100, topY - (chart.total_length ?? b.waistHeight) / 100);
+      heightM = topY - hemY;
     }
 
-    const scale = (targetHeight > 0 ? targetHeight : 0.6) / (size.y || 1);
-    model.scale.setScalar(scale);
-    model.position.set(
-      -center.x * scale,
-      centerY - center.y * scale,
-      -center.z * scale
-    );
+    const sy = (heightM > 0 ? heightM : 0.6) / (size.y || 1);
+    const sx = sy * (wRatio / lRatio); // relative widening vs the smallest size
+    const sz = sy * Math.sqrt(wRatio / lRatio);
+    model.scale.set(sx, sy, sz);
+    // Top of the mesh at topY, centred on the body's vertical axis.
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    model.position.set(-cx * sx, topY - box.max.y * sy, -cz * sz);
 
+    // Fabric, not plastic: AI exports tend to come out glossy.
+    this._meshMaterials = [];
     model.traverse((o) => {
       if (!o.isMesh) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
-      o.material = mats.map((m) => {
-        const c = m.clone();
-        c.transparent = true;
-        c.opacity = 0.88;
-        return c;
-      });
-      if (mats.length === 1) o.material = o.material[0];
+      for (const m of mats) {
+        m.side = THREE.DoubleSide;
+        // AI exports ship roughness/metalness maps that read as latex; drop them for matte cloth.
+        m.roughnessMap = null;
+        m.metalnessMap = null;
+        if ('roughness' in m) m.roughness = 0.92;
+        if ('metalness' in m) m.metalness = 0;
+        if ('sheen' in m) m.sheen = 0.5;
+        if ('transmission' in m) m.transmission = 0;
+        if ('clearcoat' in m) m.clearcoat = 0;
+        m.envMapIntensity = 0.3;
+        this._meshMaterials.push(m);
+      }
     });
 
     this.meshyGroup.add(model);
+    this.setMode(this.mode ?? 'look');
+  }
+
+  /** 'look' = photo-real mesh, 'fit' = measured shell coloured by fit, 'both' = ghosted mesh over the coloured shell. */
+  setMode(mode) {
+    this.mode = mode;
+    const hasMesh = this.meshyGroup.children.length > 0;
+    this.meshyGroup.visible = hasMesh && mode !== 'fit';
+    this.garmentGroup.visible = !hasMesh || mode !== 'look';
+    const ghost = hasMesh && mode === 'both';
+    for (const m of this._meshMaterials ?? []) {
+      m.transparent = ghost;
+      m.opacity = ghost ? 0.35 : 1;
+      m.depthWrite = !ghost;
+      m.needsUpdate = true;
+    }
+    shellMaterial.opacity = 0.94;
+  }
+
+  get hasGarmentModel() {
+    return this.meshyGroup.children.length > 0;
   }
 
   _frame(category) {

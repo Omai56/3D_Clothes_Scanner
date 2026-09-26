@@ -78,5 +78,10 @@
     "32": "in_stock",
     "34": "in_stock",
     "36": "in_stock"
+  },
+  "model": {
+    "glb": "/models/zara-loose-fit-jeans-556169731.glb",
+    "source": "Tripo3D web app, model v2.5 (legacy), from the flat product photo; optimized with gltf-transform",
+    "generated": "2026-09-26"
   }
 }

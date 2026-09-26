@@ -177,3 +177,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Mesh centred on the torso's actual x/z centre. `window.__viewer` exposed for debugging.
 **Verified:** headless screenshots front (S, XL), back and side — body fully enclosed, sizes differ, no console errors; 24 tests pass.
 **Files:** `public/js/viewer.js`, `public/js/app.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 19:40 — Meshes for all three items; trousers reshaped onto the body
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/models/` — Tripo (v2.5, web export) meshes for the slim tee and the loose jeans (Daniel generated them; files were saved under swapped names and fixed by inspecting each mesh's proportions). Optimized with gltf-transform (quantize; jeans kept unsimplified because simplification cracked the dark denim texture). Linked via `model.glb` in each garment JSON.
+- `public/js/viewer.js` — **trousers deformer** (`_deformBottoms`): a flat-lay mesh is remapped vertex by vertex onto the body. Height: mesh hem → ankle-clamped hem, mesh crotch (detected as the highest band with no geometry on the centre line) → the height where the body's legs split, mesh top → waistband height from the rise. Cross-section: each vertex's position across the flat garment becomes an **angle** on the body's own ring at that height (front layer on the front half, back layer on the back half); rings are sampled smoothly in height and angle. Hips/waist: ring scaled to the chart circumference (or pushed out by the ease if larger). Legs: each leg wraps its own body leg, never narrower than the thigh (straight leg), blended into the hip mapping over the last 6 cm below the crotch. Sealed hems are cut open.
+- Fixed: recomputed normals were written into the file's quantized int16 buffer (black speckle) — normals are rebuilt as float32 on load.
+- Debug hook: `window.__debugBottoms = true` before load makes the viewer record per-height targets/extents (`__viewer.debugBottoms`).
+
+**Verified:** headless renders of the jeans front (29 vs 34), side and back — enclosed everywhere, sizes differ; slim tee front/side; heavyweight unchanged; no console errors; 24 tests pass.
+**Files:** `public/models/*.glb`, `data/garments/*.json`, `public/js/viewer.js`, `CHANGELOG.md`

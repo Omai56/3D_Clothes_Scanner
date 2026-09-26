@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildRings, armLine, parseObj, ringAt, RING_BINS } from '/shared/bodyslices.js';
+import { buildRings, armLine, parseObj, ringAt, ringCircumference, RING_BINS, SLICE_STEP } from '/shared/bodyslices.js';
 import { VERDICT_COLOR, effectiveInseam, waistbandHeight } from '/shared/fit.js';
 
 const TWO_PI = Math.PI * 2;
@@ -138,12 +138,14 @@ export class FitViewer {
       const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       this._gltf = await new Promise((resolve, reject) => new GLTFLoader().load(url, resolve, undefined, reject));
       this._gltfUrl = url;
+      bakeToWorld(this._gltf.scene); // positions in scene units, float32, node transforms reset
       // Measure the raw mesh once: bounding box + the width of its bottom and top bands
       // (a tee's hem / a pair of trousers' waistband — the parts with no sleeves in them).
       const box = new THREE.Box3().setFromObject(this._gltf.scene);
       this._gltfSize = box.getSize(new THREE.Vector3());
       this._gltfBox = box;
       this._gltfBands = measureBands(this._gltf.scene, box);
+      this._gltfSlices = null;
     }
     const model = this._gltf.scene;
     const size = this._gltfSize;
@@ -154,6 +156,14 @@ export class FitViewer {
     const R = sizeEval.regions;
     const chart = garment.sizes?.[sizeEval.size] ?? {};
     const isTop = garment.category === 'top';
+
+    if (!isTop) {
+      // Trousers: a flat-lay mesh is two flat slabs. Reshape it band by band around the body.
+      this._deformBottoms(model, box, R, chart);
+      this.meshyGroup.add(model);
+      this.setMode(this.mode ?? 'look');
+      return;
+    }
 
     // Vertical placement from the chart: garment length on this body.
     let topY;
@@ -220,6 +230,202 @@ export class FitViewer {
 
     this.meshyGroup.add(model);
     this.setMode(this.mode ?? 'look');
+  }
+
+  /**
+   * Reshape a flat-lay trousers mesh onto the body. Every vertex is remapped by its height band:
+   * above the mesh's crotch the band wraps the torso (width from the chart's waist/hip
+   * circumference, depth from the body); below it each leg wraps the corresponding body leg,
+   * straight from the thigh down. Sealed hems are cut open. Writes absolute positions.
+   */
+  _deformBottoms(model, box, R, chart) {
+    const b = this.body;
+    const NB = 64;
+    const h = box.max.y - box.min.y || 1;
+    const meshCx = (box.min.x + box.max.x) / 2;
+
+    // Per-band mesh statistics (once per mesh).
+    if (!this._gltfSlices) this._gltfSlices = sliceMesh(model, box, NB, meshCx);
+    const S = this._gltfSlices;
+
+    // Body targets.
+    const crotchY = b.insideLegHeight / 100;
+    const topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
+    const hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100 + 0.01, topY - (chart.total_length ?? b.waistHeight) / 100);
+    const kneeY = (b.kneeHeightR ?? 48) / 100;
+    const midThighY = (crotchY + kneeY) / 2;
+    const hipY = b.hipHeight / 100;
+    const easeHip = Math.max(MIN_GAP, cmEaseToRadius(R.hip?.ease_cm ?? R.waist?.ease_cm));
+    const easeWaist = Math.max(MIN_GAP, cmEaseToRadius(R.waist?.ease_cm ?? R.hip?.ease_cm));
+    const legEase = Math.max(MIN_GAP, cmEaseToRadius(R.thigh?.ease_cm ?? R.hip?.ease_cm) + 0.004);
+    const waistC = chart.waist ? (2 * chart.waist) / 100 : null;
+    const hipC = chart.hip ? (2 * chart.hip) / 100 : null;
+
+    const thighExt = { R: ringExtent(ringAt(this.rings.right, midThighY)), L: ringExtent(ringAt(this.rings.left, midThighY)) };
+    const legTop = this.rings.legTopY || crotchY;
+
+    const torsoTarget = (Y) => {
+      let ring = ringAt(this.rings.torso, Math.max(Y, legTop));
+      const ext = ringExtent(ring);
+      const ease = Y > hipY ? easeWaist : easeHip;
+      const td = ext ? (ext.zmax - ext.zmin) / 2 + ease + 0.01 : 0.12;
+      // chart circumference at this height: waist at the top, hip at hip height, hip below
+      let C = null;
+      if (waistC && hipC) {
+        const t = Math.min(1, Math.max(0, (Y - hipY) / Math.max(0.01, topY - hipY)));
+        C = hipC + (waistC - hipC) * t;
+      } else C = waistC ?? hipC;
+      let tw = ext ? (ext.xmax - ext.xmin) / 2 + ease : 0.18;
+      if (C) tw = Math.max(tw, Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - td * td)));
+      return { cx: ext ? (ext.xmin + ext.xmax) / 2 : 0, cz: ext ? (ext.zmin + ext.zmax) / 2 : 0, tw, td };
+    };
+    const legTarget = (side, Y) => {
+      const rings = side === 'R' ? this.rings.right : this.rings.left;
+      const ring = ringAt(rings, Math.min(Y, legTop - 0.005));
+      const ext = ringExtent(ring);
+      if (!ext) return null;
+      const th = thighExt[side] ?? ext;
+      // straight leg: never narrower than the thigh
+      const tw = Math.max(ext.xmax - ext.xmin, th.xmax - th.xmin) / 2 + legEase;
+      const td = Math.max(ext.zmax - ext.zmin, th.zmax - th.zmin) / 2 + legEase;
+      return { cx: (ext.xmin + ext.xmax) / 2, cz: (ext.zmin + ext.zmax) / 2, tw, td };
+    };
+
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const geo = o.geometry;
+      const orig = o.userData.origPos;
+      const pos = geo.attributes.position;
+      const out = pos.array;
+      const n = pos.count;
+      // Body targets are cached per 5 mm of height so the loop stays cheap and smooth.
+      const tCache = new Map();
+      const cached = (key, fn) => {
+        let v = tCache.get(key);
+        if (v === undefined) tCache.set(key, (v = fn()));
+        return v;
+      };
+      // Vertical mapping: mesh hem -> body hem, mesh crotch -> the height where the body's legs
+      // split, mesh top -> waistband. Piecewise so leg geometry never wraps the torso.
+      const vCrotch = S.crotchBand >= 0 ? (S.crotchBand + 1) / NB : null;
+      const mapY = (v) => {
+        if (vCrotch == null) return hemY + v * (topY - hemY);
+        if (v <= vCrotch) return hemY + (v / vCrotch) * (legTop - hemY);
+        return legTop + ((v - vCrotch) / (1 - vCrotch)) * (topY - legTop);
+      };
+      // Each vertex is placed by ANGLE on the body's own cross-section ring at its height:
+      // its position across the flat garment (u = -1..1) becomes an angle, front layer on the
+      // front half of the ring, back layer on the back half. The ring is pushed out by the ease
+      // (legs) or scaled to the chart's circumference (hips/waist). A flat mesh thus becomes a
+      // real tube that follows the body instead of a lens with thin edges.
+      const splitY = this.rings.crotchSplitY ?? crotchY;
+      const legRings = { R: this.rings.right, L: this.rings.left };
+      const BLEND = 0.06; // metres below the crotch where legs blend into the hip mapping
+      const chartC = (Y) => {
+        if (waistC && hipC) {
+          const t = Math.min(1, Math.max(0, (Y - hipY) / Math.max(0.01, topY - hipY)));
+          return hipC + (waistC - hipC) * t;
+        }
+        return waistC ?? hipC ?? null;
+      };
+      // Hip/waist target for a vertex: point on the torso ring (smoothly sampled) pushed out by
+      // the ease or scaled to the chart circumference, whichever is larger.
+      const torsoPoint = (Y, u, front, yk) => {
+        const t = cached('T' + yk, () => {
+          const Yc = Math.max(Y, splitY);
+          const ring = ringAt(this.rings.torso, Yc);
+          if (!ring) return null;
+          const C = chartC(Y);
+          return { Yc, s: C ? C / ringCircumference(ring) : 1, ease: Y > hipY ? easeWaist : easeHip };
+        });
+        if (!t) return null;
+        const theta = front ? Math.acos(u) : -Math.acos(u);
+        const smp = sampleRing(this.rings.torso, t.Yc, theta);
+        if (!smp) return null;
+        const r = Math.max(smp.r + t.ease, smp.r * t.s);
+        return [smp.cx + r * Math.cos(theta), smp.cz + r * Math.sin(theta)];
+      };
+      // Leg target: point on that leg's ring, never narrower than the thigh (straight leg), + ease.
+      const legPoint = (side, Y, u, front) => {
+        const theta = front ? Math.acos(u) : -Math.acos(u);
+        const smp = sampleRing(legRings[side], Math.min(Y, legTop - 0.005), theta);
+        if (!smp) return null;
+        const th = sampleRing(legRings[side], midThighY, theta);
+        const r = Math.max(smp.r, th ? th.r : 0) + legEase;
+        return [smp.cx + r * Math.cos(theta), smp.cz + r * Math.sin(theta)];
+      };
+      for (let i = 0; i < n; i++) {
+        const x = orig[i * 3];
+        const y = orig[i * 3 + 1];
+        const z = orig[i * 3 + 2];
+        const v = Math.min(0.9999, Math.max(0, (y - box.min.y) / h));
+        const band = Math.floor(v * NB);
+        const Y = mapY(v);
+        const yk = Math.round(Y * 200); // 5 mm buckets
+        const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
+        const uAll = clamp((x - ms.cx) / ms.hw, -1, 1);
+        const frontAll = z >= ms.cz;
+        let p = null;
+        if (band <= S.crotchBand) {
+          const side = x >= meshCx ? 'R' : 'L';
+          const ls = lerpStats(S.legs[side], v, NB) ?? S.nearestLeg(side, band);
+          if (ls) {
+            const u = clamp((x - ls.cx) / ls.hw, -1, 1);
+            p = legPoint(side, Y, u, z >= ls.cz);
+            // blend into the hip mapping just below the crotch so there is no shelf
+            if (p && Y > legTop - BLEND) {
+              const q = torsoPoint(Y, uAll, frontAll, yk);
+              if (q) {
+                const t = (Y - (legTop - BLEND)) / BLEND;
+                p = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+              }
+            }
+          }
+        }
+        if (!p) p = torsoPoint(Y, uAll, frontAll, yk);
+        out[i * 3] = p ? p[0] : x;
+        out[i * 3 + 1] = Y;
+        out[i * 3 + 2] = p ? p[1] : z;
+      }
+      pos.needsUpdate = true;
+      // debug: per-2cm extents of the deformed right half + the targets used
+      if (window.__debugBottoms) {
+        const rows = new Map();
+        for (let i = 0; i < n; i++) {
+          const Y = out[i * 3 + 1];
+          const k = Math.round(Y * 50) / 50;
+          const r = rows.get(k) ?? { Y: k, xmin: Infinity, xmax: -Infinity, zmin: Infinity, zmax: -Infinity, n: 0 };
+          const X = out[i * 3];
+          if (X >= 0) {
+            r.xmin = Math.min(r.xmin, X);
+            r.xmax = Math.max(r.xmax, X);
+            r.zmin = Math.min(r.zmin, out[i * 3 + 2]);
+            r.zmax = Math.max(r.zmax, out[i * 3 + 2]);
+            r.n++;
+          }
+          rows.set(k, r);
+        }
+        this.debugBottoms = {
+          legTop, crotchY, hemY, topY, hipY, crotchBand: S.crotchBand, vCrotch, legEase, easeHip,
+          rows: [...rows.values()].sort((a, b) => a.Y - b.Y).map((r) => ({
+            ...r,
+            torso: torsoTarget(r.Y),
+            legR: legTarget('R', r.Y),
+            bodyTorso: ringExtent(ringAt(this.rings.torso, r.Y)),
+            bodyLegR: ringExtent(ringAt(this.rings.right, r.Y)),
+          })),
+        };
+      }
+      // cut the sealed hem open: drop faces entirely within the bottom 1.5 % of the mesh
+      if (!o.userData.hemCut) {
+        openBottom(geo, orig, box.min.y + h * 0.015);
+        o.userData.hemCut = true;
+      }
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+    });
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
   }
 
   /** x/z extent of the body rings between two heights (metres). */
@@ -352,6 +558,195 @@ export class FitViewer {
 }
 
 // ---------- helpers ----------
+/** Bake node transforms into float32 positions and keep an untouched copy per mesh. */
+function bakeToWorld(scene) {
+  scene.updateMatrixWorld(true);
+  const meshes = [];
+  scene.traverse((o) => {
+    if (o.isMesh) meshes.push(o);
+  });
+  for (const o of meshes) {
+    const src = o.geometry.attributes.position;
+    const arr = new Float32Array(src.count * 3);
+    const v = new THREE.Vector3();
+    for (let i = 0; i < src.count; i++) {
+      v.fromBufferAttribute(src, i).applyMatrix4(o.matrixWorld);
+      arr[i * 3] = v.x;
+      arr[i * 3 + 1] = v.y;
+      arr[i * 3 + 2] = v.z;
+    }
+    o.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    o.userData.origPos = Float32Array.from(arr);
+    // Quantized (int16) normals can't hold recomputed floats; rebuild them as float32.
+    o.geometry.deleteAttribute('normal');
+    o.geometry.deleteAttribute('tangent');
+    o.geometry.computeVertexNormals();
+    o.geometry.computeBoundingBox();
+    o.geometry.computeBoundingSphere();
+  }
+  scene.traverse((o) => {
+    o.position.set(0, 0, 0);
+    o.quaternion.identity();
+    o.scale.set(1, 1, 1);
+  });
+  scene.updateMatrixWorld(true);
+}
+
+/** Absolute x/z extent of one body ring. */
+function ringExtent(ring) {
+  if (!ring) return null;
+  let xmin = Infinity;
+  let xmax = -Infinity;
+  let zmin = Infinity;
+  let zmax = -Infinity;
+  for (let j = 0; j < RING_BINS; j++) {
+    const ang = (j / RING_BINS) * TWO_PI - Math.PI;
+    const x = ring.cx + ring.r[j] * Math.cos(ang);
+    const z = ring.cz + ring.r[j] * Math.sin(ang);
+    if (x < xmin) xmin = x;
+    if (x > xmax) xmax = x;
+    if (z < zmin) zmin = z;
+    if (z > zmax) zmax = z;
+  }
+  return { xmin, xmax, zmin, zmax };
+}
+
+/**
+ * Per-height-band statistics of a trousers mesh: overall and per leg (split at the mesh centre
+ * line), plus the band where the two legs join (crotch): the highest band with no vertices near
+ * the centre line.
+ */
+function sliceMesh(scene, box, NB, meshCx) {
+  const h = box.max.y - box.min.y || 1;
+  const w = box.max.x - box.min.x || 1;
+  const mk = () => ({ xs: [], zs: [] });
+  const all = Array.from({ length: NB }, mk);
+  const legs = { R: Array.from({ length: NB }, mk), L: Array.from({ length: NB }, mk) };
+  const centreHit = new Uint8Array(NB);
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const p = o.userData.origPos;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i];
+      const y = p[i + 1];
+      const z = p[i + 2];
+      const band = Math.min(NB - 1, Math.max(0, Math.floor(((y - box.min.y) / h) * NB)));
+      for (const s of [all[band], legs[x >= meshCx ? 'R' : 'L'][band]]) {
+        s.xs.push(x);
+        s.zs.push(z);
+      }
+      if (Math.abs(x - meshCx) < w * 0.03) centreHit[band] = 1;
+    }
+  });
+  // Use percentiles, not extremes: the front of a flat-lay garment bulges (pockets, fly) while
+  // the back is flat, so the true back surface is well inside the raw z-range.
+  const pct = (arr, q) => {
+    arr.sort((a, b) => a - b);
+    return arr[Math.min(arr.length - 1, Math.max(0, Math.floor(q * (arr.length - 1))))];
+  };
+  const finish = (s) => {
+    if (s.xs.length < 6) return null;
+    const xlo = pct(s.xs, 0.01);
+    const xhi = pct(s.xs, 0.99);
+    const zlo = pct(s.zs, 0.04);
+    const zhi = pct(s.zs, 0.96);
+    return { cx: (xlo + xhi) / 2, cz: (zlo + zhi) / 2, hw: Math.max(1e-3, (xhi - xlo) / 2), hd: Math.max(1e-3, (zhi - zlo) / 2) };
+  };
+  const out = {
+    all: all.map(finish),
+    legs: { R: legs.R.map(finish), L: legs.L.map(finish) },
+    crotchBand: -1,
+  };
+  // crotch = highest band (below the top third) whose centre line is empty
+  for (let bnd = Math.floor(NB * 0.66); bnd >= 0; bnd--) {
+    if (!centreHit[bnd]) {
+      out.crotchBand = bnd;
+      break;
+    }
+  }
+  // legs may be fused (photo with legs together): then there is no leg region
+  if (out.crotchBand < 2) out.crotchBand = -1;
+  out.nearestLeg = (side, band) => {
+    for (let d = 1; d < NB; d++) {
+      if (out.legs[side][band - d]) return out.legs[side][band - d];
+      if (out.legs[side][band + d]) return out.legs[side][band + d];
+    }
+    return null;
+  };
+  out.nearestAll = (band) => {
+    for (let d = 1; d < NB; d++) {
+      if (out.all[band - d]) return out.all[band - d];
+      if (out.all[band + d]) return out.all[band + d];
+    }
+    return { cx: meshCx, cz: 0, hw: w / 2, hd: 0.05 };
+  };
+  return out;
+}
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+/**
+ * Smoothly sampled body ring: radius/centre interpolated between the two nearest 1 cm slices
+ * and between the two nearest angular bins, so deformed meshes don't show the ring grid.
+ */
+function sampleRing(ringsMap, Y, theta) {
+  const fy = Y / SLICE_STEP;
+  const i0 = Math.floor(fy);
+  const ty = fy - i0;
+  const a = ringsMap.get(i0) ?? ringAt(ringsMap, Y);
+  if (!a) return null;
+  const b = ringsMap.get(i0 + 1) ?? a;
+  const N = RING_BINS;
+  const fb = ((theta + Math.PI) / TWO_PI) * N;
+  let j0 = Math.floor(fb);
+  const tj = fb - j0;
+  j0 = ((j0 % N) + N) % N;
+  const j1 = (j0 + 1) % N;
+  const ra = a.r[j0] * (1 - tj) + a.r[j1] * tj;
+  const rb = b.r[j0] * (1 - tj) + b.r[j1] * tj;
+  return { r: ra * (1 - ty) + rb * ty, cx: a.cx * (1 - ty) + b.cx * ty, cz: a.cz * (1 - ty) + b.cz * ty };
+}
+
+/** Band statistics interpolated between band centres (no stair-steps between bands). */
+function lerpStats(arr, v, NB) {
+  const f = v * NB - 0.5;
+  const b0 = Math.max(0, Math.min(NB - 1, Math.floor(f)));
+  const b1 = Math.min(NB - 1, b0 + 1);
+  const t = Math.max(0, Math.min(1, f - b0));
+  const s0 = arr[b0];
+  const s1 = arr[b1];
+  if (s0 && s1) {
+    return {
+      cx: s0.cx + (s1.cx - s0.cx) * t,
+      cz: s0.cz + (s1.cz - s0.cz) * t,
+      hw: s0.hw + (s1.hw - s0.hw) * t,
+      hd: s0.hd + (s1.hd - s0.hd) * t,
+    };
+  }
+  return s0 ?? s1 ?? null;
+}
+
+/** Remove faces whose three vertices all sit below yCut (opens a sealed hem). */
+function openBottom(geo, orig, yCut) {
+  let index = geo.getIndex();
+  if (!index) {
+    const n = geo.attributes.position.count;
+    const arr = n > 65535 ? new Uint32Array(n) : new Uint16Array(n);
+    for (let i = 0; i < n; i++) arr[i] = i;
+    index = new THREE.BufferAttribute(arr, 1);
+  }
+  const src = index.array;
+  const keep = [];
+  for (let i = 0; i < src.length; i += 3) {
+    const a = src[i];
+    const b = src[i + 1];
+    const c = src[i + 2];
+    if (orig[a * 3 + 1] < yCut && orig[b * 3 + 1] < yCut && orig[c * 3 + 1] < yCut) continue;
+    keep.push(a, b, c);
+  }
+  geo.setIndex(keep.length > 65535 ? new THREE.Uint32BufferAttribute(keep, 1) : new THREE.Uint16BufferAttribute(keep, 1));
+}
+
 /** Width/depth of a mesh's bottom and top 12% (in its own units). */
 function measureBands(scene, box) {
   const h = box.max.y - box.min.y;

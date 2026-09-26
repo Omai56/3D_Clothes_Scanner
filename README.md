@@ -34,7 +34,7 @@ Alternatives: `ngrok http 3000` (needs a free ngrok account) or `cloudflared tun
 | Step | What happens | Where |
 |---|---|---|
 | Body | Bodygram hosted scanner (2 photos) → 35 measurements + 3D body (OBJ). Saved bodies live in `data/scans/`. | `server/bodygram.js`, `scripts/run-stats-scan.js` |
-| Item | Paste a link (best-effort import) or pick a saved item with a size chart. | `server/importer.js`, `data/garments/*.json` |
+| Item | **Paste a Zara link → live import** of name, photos, composition, per-size stock and the full size chart (cm). Zara's page is read by the installed Chrome headlessly (their bot protection blocks plain requests, but a real browser on a home IP is fine); the chart + composition endpoints answer plain requests. Imported items are saved to `data/garments/` and appear under Saved items. Other stores: best-effort name/photo only. | `server/zara.js`, `server/zara-map.js`, `server/importer.js`, `data/garments/*.json` |
 | Fit | Garment vs body per region → ease in cm → tight / snug / good / relaxed → best size + explanation. | `shared/fit.js` |
 | 3D | Body sliced into 1 cm outlines; a garment shell is built from the size chart (offset by ease, cut at real length) and coloured by fit. | `shared/bodyslices.js`, `public/js/viewer.js` |
 

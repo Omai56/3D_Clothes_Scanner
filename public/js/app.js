@@ -124,15 +124,25 @@ $('#import-form').addEventListener('submit', async (e) => {
   const st = $('#import-status');
   st.hidden = false;
   st.className = 'status';
-  st.textContent = 'Fetching product page…';
+  st.textContent = 'Pulling the product page, size chart and photos… (10–20 s)';
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
   try {
     const r = await fetch('/api/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error);
+    if (data.imported) {
+      st.textContent = `Imported “${data.garment.name}” with ${Object.keys(data.garment.sizes).length} sizes.`;
+      await loadGarments();
+      await selectGarment(data.garment);
+      return;
+    }
     st.textContent = `Found “${data.name}”. This store doesn't expose its size chart, so pick the matching saved item below.`;
   } catch (err) {
     st.className = 'status err';
     st.textContent = `${err.message} Pick a saved item below instead.`;
+  } finally {
+    btn.disabled = false;
   }
 });
 

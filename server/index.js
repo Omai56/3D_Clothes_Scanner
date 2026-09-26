@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { fitReport, bodyLandmarks } from '../shared/fit.js';
 import { createScanToken, scannerUrl, getScan, measurementsToCm, saveScanFiles } from './bodygram.js';
 import { importProduct } from './importer.js';
+import { importZara } from './zara.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -126,14 +127,24 @@ app.get('/api/garments/:id', async (req, res) => {
   res.json(g);
 });
 
-// Try to pull a product from a store link. Falls back with a clear error so the UI can offer saved items.
+// Pull a product from a store link. Zara gets the full live import (chart + photos + composition);
+// other stores get a best-effort name/photo. Errors are clear so the UI can offer saved items.
 app.post('/api/import', async (req, res) => {
   const url = String(req.body?.url ?? '').trim();
   if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: 'Paste a full product link (https://...)' });
   try {
+    if (/(^|\.)zara\.com$/i.test(new URL(url).hostname)) {
+      const garment = await importZara(url, {
+        garmentsDir: GARMENTS_DIR,
+        imgDir: path.join(ROOT, 'public', 'img'),
+        log: (m) => console.log('[zara import]', m),
+      });
+      return res.json({ imported: true, garment });
+    }
     const result = await importProduct(url);
-    res.json(result);
+    res.json({ imported: false, ...result });
   } catch (e) {
+    console.error('[import]', e.message);
     res.status(502).json({ error: String(e.message) });
   }
 });

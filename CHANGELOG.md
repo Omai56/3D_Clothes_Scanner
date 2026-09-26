@@ -118,3 +118,18 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **By:** Claude (Fable 5.1)
 **What:** `data/garments/zara-loose-jeans.json` — added Zara's description (mid-rise, straight leg hip to ankle, rigid raw denim, model height 187 cm) and `rise_style: mid`, `leg_style: straight`. No inseam is published for this item; it remains estimated as total length − front rise.
 **Files:** `data/garments/zara-loose-jeans.json`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 16:30 — Live Zara import (paste a link → chart, photos, composition)
+**By:** Claude (Fable 5.1)
+**What:**
+- `server/zara.js` — pasting a zara.com product link now imports it live in ~5 s: the installed Chrome is driven headlessly to read the product page (`window.zara.viewPayload`: name, colour, price, description, photos, composition, per-size stock), then Zara's plain-request endpoints give the **full size chart in cm** (`size-measure-guide`) and composition (`extra-detail`). Saves `data/garments/<id>.json` + up to 3 photos in `public/img/` (flat product shot first). Falls back to a clear error (e.g. no measurements published) so the UI offers saved items.
+- `server/zara-map.js` — pure mapping of Zara's table titles (incl. machine-translated "Front tow hook" = front rise, "Backfire" = back rise), composition → stretch level, category detection, garment JSON builder.
+- `public/js/app.js` — after a successful import the app jumps straight to the fit screen for that item.
+- `tests/zara-map.test.js` + fixture `tests/fixtures/zara-size-measure-guide-tee.json` (24 tests pass).
+- Both tees re-imported live: `zara-basic-heavyweight-t-shirt-03-545422590`, `zara-basic-slim-fit-t-shirt-01-555813546` (chart straight from Zara in cm; hand-typed versions moved to `data/garments/examples/`). Loose jeans stay hand-typed until we have their link.
+- `package.json` — `puppeteer-core` dependency (uses the machine's Chrome/Edge; `CHROME_PATH` override in `.env`).
+
+**Note:** the live import works from a laptop/home IP. Cloud IPs are likely to be blocked by Zara's bot protection, so run the server locally for the demo.
+**Files:** `server/zara.js`, `server/zara-map.js`, `server/index.js`, `public/js/app.js`, `tests/zara-map.test.js`, `tests/fixtures/`, `data/garments/`, `public/img/`, `README.md`, `package.json`, `package-lock.json`, `CHANGELOG.md`

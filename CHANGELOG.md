@@ -165,3 +165,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Verified:** headless phone screenshots — Look S vs XL differ in width and length; Fit view unchanged; no console errors; 24 tests pass.
 **Files:** `public/models/*.glb`, `data/garments/zara-basic-heavyweight-t-shirt-03-545422590.json`, `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 18:20 — Garment mesh calibrated to body + chart (fixes body poking through the back)
+**By:** Claude (Fable 5.1)
+**What:** `public/js/viewer.js` `loadGarmentModel` now sizes each axis from what we actually know:
+- **Length** from the chart (garment length on this body).
+- **Depth** from the body: front-to-back extent of the torso rings over the covered height range + ease + margin. A mesh made from a flat photo has no real depth, which is why the back showed through before.
+- **Width** from the chart: circumference = 2 × flat width; worn, the garment is ~an ellipse with that perimeter and the depth above, so the visible width is the ellipse's major axis (56 cm flat ≈ 42 cm worn for S; XL ≈ 48 cm). The mesh's own hem width (measured from its bottom 12% of vertices) is scaled to that, so sleeves scale along.
+- Mesh centred on the torso's actual x/z centre. `window.__viewer` exposed for debugging.
+**Verified:** headless screenshots front (S, XL), back and side — body fully enclosed, sizes differ, no console errors; 24 tests pass.
+**Files:** `public/js/viewer.js`, `public/js/app.js`, `CHANGELOG.md`

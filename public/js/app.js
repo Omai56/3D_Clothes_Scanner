@@ -223,6 +223,7 @@ async function renderFit() {
   if (!viewer) {
     const { FitViewer } = await import('/js/viewer.js');
     viewer = new FitViewer($('#viewer'));
+    window.__viewer = viewer; // for debugging / screenshots
   }
   let loading = $('#viewer .viewer-loading');
   if (viewer._objUrl !== state.scan.objUrl) {

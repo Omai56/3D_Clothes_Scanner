@@ -138,48 +138,65 @@ export class FitViewer {
       const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       this._gltf = await new Promise((resolve, reject) => new GLTFLoader().load(url, resolve, undefined, reject));
       this._gltfUrl = url;
-      // Measure the raw mesh once.
+      // Measure the raw mesh once: bounding box + the width of its bottom and top bands
+      // (a tee's hem / a pair of trousers' waistband — the parts with no sleeves in them).
       const box = new THREE.Box3().setFromObject(this._gltf.scene);
       this._gltfSize = box.getSize(new THREE.Vector3());
       this._gltfBox = box;
+      this._gltfBands = measureBands(this._gltf.scene, box);
     }
     const model = this._gltf.scene;
     const size = this._gltfSize;
     const box = this._gltfBox;
+    const bands = this._gltfBands;
 
     const b = this.body;
     const R = sizeEval.regions;
     const chart = garment.sizes?.[sizeEval.size] ?? {};
+    const isTop = garment.category === 'top';
 
-    // Height from the chart (garment length on this body); the mesh keeps its own proportions
-    // at the smallest size, and bigger sizes widen/lengthen by the chart's ratios.
-    const sizesArr = Object.values(garment.sizes ?? {});
-    const ref = sizesArr[0] ?? chart;
-    const widthKey = garment.category === 'top' ? 'chest' : 'hip';
-    const lengthKey = garment.category === 'top' ? 'length' : 'total_length';
-    const wRatio = ref[widthKey] && chart[widthKey] ? chart[widthKey] / ref[widthKey] : 1;
-    const lRatio = ref[lengthKey] && chart[lengthKey] ? chart[lengthKey] / ref[lengthKey] : 1;
-
+    // Vertical placement from the chart: garment length on this body.
     let topY;
-    let heightM;
-    if (garment.category === 'top') {
+    let hemY;
+    if (isTop) {
       topY = b.backNeckHeight / 100 + 0.01;
-      const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
-      heightM = topY - hemY;
+      hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
     } else {
       topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
-      const hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100, topY - (chart.total_length ?? b.waistHeight) / 100);
-      heightM = topY - hemY;
+      hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100, topY - (chart.total_length ?? b.waistHeight) / 100);
     }
-
+    const heightM = topY - hemY;
     const sy = (heightM > 0 ? heightM : 0.6) / (size.y || 1);
-    const sx = sy * (wRatio / lRatio); // relative widening vs the smallest size
-    const sz = sy * Math.sqrt(wRatio / lRatio);
+
+    // Depth from the body: a mesh made from a flat photo has no real depth, so wrap it around the
+    // body's actual front-to-back extent (plus the ease) over the covered height range.
+    const ext = this._bodyExtent(isTop ? [this.rings.torso] : [this.rings.torso, this.rings.right, this.rings.left], hemY, topY);
+    const easeR = Math.max(MIN_GAP, cmEaseToRadius(isTop ? R.chest?.ease_cm : R.hip?.ease_cm ?? R.waist?.ease_cm));
+    const depthM = ext ? ext.zmax - ext.zmin + 2 * (easeR + 0.015) : size.z * sy;
+    const sz = depthM / (size.z || 1);
+
+    // Width from the chart: the garment's circumference is 2 x its flat width. Worn, it forms
+    // roughly an ellipse with that perimeter and the depth above, so its visible width is the
+    // ellipse's major axis (a 56 cm flat tee reads ~42 cm wide on the body). This is what makes
+    // S and XL differ.
+    const flatWidthCm = isTop ? chart.chest ?? chart.hem : chart.hip ?? chart.waist;
+    const bandWidth = isTop ? bands.bottom.width : bands.top.width;
+    let sx = sy;
+    if (flatWidthCm && bandWidth > 0.05) {
+      const C = (2 * flatWidthCm) / 100; // circumference, metres
+      const bHalf = depthM / 2;
+      const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - bHalf ** 2));
+      const wornWidth = Math.max(2 * aHalf, (ext ? ext.xmax - ext.xmin : 0) + 2 * easeR);
+      sx = wornWidth / bandWidth;
+    }
     model.scale.set(sx, sy, sz);
-    // Top of the mesh at topY, centred on the body's vertical axis.
+
+    // Top of the mesh at topY; centred on the body's torso in x/z.
     const cx = (box.min.x + box.max.x) / 2;
     const cz = (box.min.z + box.max.z) / 2;
-    model.position.set(-cx * sx, topY - box.max.y * sy, -cz * sz);
+    const bodyCx = ext ? (ext.xmin + ext.xmax) / 2 : 0;
+    const bodyCz = ext ? (ext.zmin + ext.zmax) / 2 : 0;
+    model.position.set(bodyCx - cx * sx, topY - box.max.y * sy, bodyCz - cz * sz);
 
     // Fabric, not plastic: AI exports tend to come out glossy.
     this._meshMaterials = [];
@@ -203,6 +220,29 @@ export class FitViewer {
 
     this.meshyGroup.add(model);
     this.setMode(this.mode ?? 'look');
+  }
+
+  /** x/z extent of the body rings between two heights (metres). */
+  _bodyExtent(ringMaps, yBottom, yTop) {
+    let xmin = Infinity;
+    let xmax = -Infinity;
+    let zmin = Infinity;
+    let zmax = -Infinity;
+    for (const rings of ringMaps) {
+      for (const ring of rings.values()) {
+        if (ring.y < yBottom || ring.y > yTop) continue;
+        for (let j = 0; j < RING_BINS; j++) {
+          const ang = (j / RING_BINS) * TWO_PI - Math.PI;
+          const x = ring.cx + ring.r[j] * Math.cos(ang);
+          const z = ring.cz + ring.r[j] * Math.sin(ang);
+          if (x < xmin) xmin = x;
+          if (x > xmax) xmax = x;
+          if (z < zmin) zmin = z;
+          if (z > zmax) zmax = z;
+        }
+      }
+    }
+    return Number.isFinite(xmin) ? { xmin, xmax, zmin, zmax } : null;
   }
 
   /** 'look' = photo-real mesh, 'fit' = measured shell coloured by fit, 'both' = ghosted mesh over the coloured shell. */
@@ -312,6 +352,35 @@ export class FitViewer {
 }
 
 // ---------- helpers ----------
+/** Width/depth of a mesh's bottom and top 12% (in its own units). */
+function measureBands(scene, box) {
+  const h = box.max.y - box.min.y;
+  const lowCut = box.min.y + h * 0.12;
+  const highCut = box.max.y - h * 0.12;
+  const acc = { bottom: { xmin: Infinity, xmax: -Infinity, zmin: Infinity, zmax: -Infinity }, top: { xmin: Infinity, xmax: -Infinity, zmin: Infinity, zmax: -Infinity } };
+  const v = new THREE.Vector3();
+  scene.updateMatrixWorld(true);
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i += 3) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      const band = v.y <= lowCut ? acc.bottom : v.y >= highCut ? acc.top : null;
+      if (!band) continue;
+      if (v.x < band.xmin) band.xmin = v.x;
+      if (v.x > band.xmax) band.xmax = v.x;
+      if (v.z < band.zmin) band.zmin = v.z;
+      if (v.z > band.zmax) band.zmax = v.z;
+    }
+  });
+  for (const k of ['bottom', 'top']) {
+    const a = acc[k];
+    a.width = Number.isFinite(a.xmin) ? a.xmax - a.xmin : 0;
+    a.depth = Number.isFinite(a.zmin) ? a.zmax - a.zmin : 0;
+  }
+  return acc;
+}
+
 const colorCache = new Map();
 function col(verdict) {
   const hex = VERDICT_COLOR[verdict] ?? VERDICT_COLOR.good;

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Your Fit · FitCheck</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <a class="logo" href="index.html">Fit<span>Check</span></a>
+    <div class="steps" aria-label="Step 3 of 3"><i class="on"></i><i class="on"></i><i class="on"></i><span>3 / 3</span></div>
+  </header>
+
+  <a class="back" href="shop.html">&larr; All clothes</a>
+  <div id="notice"></div>
+
+  <section class="card result-hero">
+    <div class="img" id="garmentImg"></div>
+    <div class="head">
+      <div class="brand" id="brand"></div>
+      <h1 id="name"></h1>
+    </div>
+    <div class="badge-row"><div class="size-badge" id="badge"></div></div>
+    <div class="verdict">
+      <p class="summary" id="summary" aria-live="polite"></p>
+      <p class="fabric" id="fabric"></p>
+    </div>
+  </section>
+
+  <section class="card fitmap">
+    <h2>Fit on your body</h2>
+    <p class="sub" id="sub"></p>
+    <div class="fitmap-body">
+      <div id="figure"></div>
+      <div>
+        <div class="size-tabs" id="tabs" role="group" aria-label="Compare sizes"></div>
+        <ul class="regions" id="regions"></ul>
+        <p class="ease-note">Numbers show garment minus body. Plus means extra room.</p>
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>Good fit</span>
+          <span><i style="background:var(--warn)"></i>Slightly tight or loose</span>
+          <span><i style="background:var(--bad)"></i>Too tight or too loose</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+<script>
+  const garment = Fit.getGarment(new URLSearchParams(location.search).get('id'));
+  if (!garment) location.replace('shop.html');
+
+  const saved = Fit.loadBody();
+  const body = saved || Fit.DEMO_BODY;
+  if (!saved) {
+    document.getElementById('notice').innerHTML =
+      '<p class="notice">Showing results for the demo body. <a href="index.html">Enter your measurements</a> for your own fit.</p>';
+  }
+
+  const report = Fit.fitReport(garment, body);
+  const rec = report.sizes[report.recommended];
+
+  document.getElementById('garmentImg').innerHTML = Fit.garmentArt(garment);
+  document.getElementById('garmentImg').style.background = garment.bg;
+  document.getElementById('brand').textContent = garment.brand;
+  document.getElementById('name').textContent = garment.name;
+  document.getElementById('fabric').textContent = garment.fabric;
+  document.title = `${garment.name} · Your Fit`;
+
+  const badge = document.getElementById('badge');
+  badge.innerHTML = `<span class="dot">${report.recommended}</span>Recommended: ${Fit.SIZE_NAMES[report.recommended]}`;
+  badge.classList.toggle('bad', rec.worst === 'bad');
+
+  const figure = document.getElementById('figure');
+  figure.innerHTML = Fit.bodyFigure('Body outline coloured by fit');
+
+  function fmtEase(r) {
+    const sign = r.ease > 0 ? '+' : '';
+    return `${sign}${r.ease} cm`;
+  }
+
+  function show(size) {
+    const res = report.sizes[size];
+    document.getElementById('summary').textContent = res.summary;
+    document.getElementById('sub').textContent = size === report.recommended
+      ? `Size ${size}, our recommendation for you.`
+      : `Size ${size}. We recommend ${report.recommended}.`;
+
+    const levels = Object.fromEntries(res.regions.map(r => [r.key, r.level]));
+    figure.querySelectorAll('.region').forEach(g => {
+      g.classList.remove('lv-good', 'lv-warn', 'lv-bad');
+      const lv = levels[g.dataset.region];
+      if (lv) g.classList.add('lv-' + lv);
+    });
+
+    document.getElementById('regions').innerHTML = res.regions.map(r => `
+      <li class="lv-${r.level}">
+        <span class="swatch"></span>
+        <span class="rtext"><span class="rname">${r.label}</span><br><span class="rdetail">${fmtEase(r)}</span></span>
+        <span class="chip lv-${r.level}">${r.chip}</span>
+      </li>`).join('');
+
+    document.querySelectorAll('.size-tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === size)));
+  }
+
+  document.getElementById('tabs').innerHTML = Object.keys(garment.sizes).map(s => `
+    <button class="size-tab" type="button" data-size="${s}" aria-pressed="false"
+      aria-label="Size ${Fit.SIZE_NAMES[s]}${s === report.recommended ? ', recommended' : ''}">
+      ${s}${s === report.recommended ? '<span class="rec"></span>' : ''}
+    </button>`).join('');
+  document.getElementById('tabs').addEventListener('click', e => {
+    const b = e.target.closest('.size-tab');
+    if (b) show(b.dataset.size);
+  });
+
+  show(report.recommended);
+</script>
+</body>
+</html>

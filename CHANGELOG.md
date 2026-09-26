@@ -39,3 +39,19 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Why:** Step 1 of the build order — verified credentials (Org ID `org_4b3RJOjsEEqtn2k4sbbVPT` works) and captured a reusable body so all further development runs from the saved file.
 **Files:** `package.json`, `package-lock.json`, `server/bodygram.js`, `scripts/run-stats-scan.js`, `data/scans/demo.json`, `data/scans/demo.obj`, `PLAN.md`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Three-page fit flow (measurements → pick clothes → fit result)
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/index.html` — page 1: form for height, chest, waist, hips, inseam, shoulder width (cm). A body outline beside it highlights the part being filled in, with a tape-measure line. "Fill with demo scan" loads the numbers from `data/scans/demo.json`. Submit saves to the browser and goes to page 2.
+- `public/shop.html` — page 2: card grid of 6 demo items (image, brand, name). Tapping one opens page 3.
+- `public/result.html` — page 3: body outline coloured per region (green good, yellow slightly tight/loose, red too tight/loose), one-sentence English summary, "Recommended: <size>" badge, garment image. S/M/L/XL tabs to compare sizes.
+- `public/app.js` — shared body SVG, demo garment catalogue, fit check (ease = garment − body per region → verdict, recommended size, summary).
+- `public/styles.css` — shared styles, phone-first, dark mode.
+- `server/index.js` — Express static server for `public/` (`npm start`, port 3000).
+
+**Note:** the 6 garments' size charts and images are placeholders (hand-made numbers, drawn SVG). Replace with real `data/garments/*.json` in build step 2.
+**Why:** app flow (build step 5) needed a clickable demo for judges; works without live scanning or scraping.
+**Files:** `public/index.html`, `public/shop.html`, `public/result.html`, `public/app.js`, `public/styles.css`, `server/index.js`, `CHANGELOG.md`

@@ -35,7 +35,7 @@ const BANDS = {
   chest: [0, 6, 16, 28],
   waist_top: [0, 6, 16, 28],
   hem: [0, 4, 14, 26],
-  shoulder: [-2, 0, 3, 7],
+  shoulder: [-2.5, -1, 3, 7],
   arm: [0, 3, 10, 18],
   waist: [-1, 2, 6, 12],
   hip: [0, 3, 9, 16],
@@ -55,18 +55,30 @@ export const REGION_DEFS = {
     sleeve: { chartKey: 'sleeve', kind: 'sleeve', label: 'Sleeves' },
   },
   bottom: {
-    waist: { chartKey: 'waist', bodyKey: 'waistGirth', kind: 'girth', heightKey: 'waistHeight', label: 'Waist' },
+    waist: { chartKey: 'waist', kind: 'waistband', label: 'Waist' },
     hip: { chartKey: 'hip', bodyKey: 'hipGirth', kind: 'girth', heightKey: 'hipHeight', label: 'Hips' },
     thigh: { chartKey: 'thigh', bodyKey: 'thighGirthR', kind: 'girth', heightKey: null, label: 'Thighs' },
     inseam: { chartKey: 'inseam', kind: 'inseam', label: 'Inseam' },
   },
 };
 
-/** A garment is cut with dropped shoulders when its shoulder seam is nearly as wide as its chest (checked on the smallest size). */
-export function isDroppedShoulder(garment) {
-  if (garment.shoulder_style) return garment.shoulder_style === 'dropped';
-  const first = Object.values(garment.sizes ?? {})[0];
-  return !!(first && first.shoulder != null && first.chest != null && first.shoulder >= first.chest * 0.9);
+/**
+ * Inseam of a bottoms size. Zara often gives total length (outseam) + front rise instead of an
+ * inseam; outseam minus rise is a close estimate.
+ */
+export function effectiveInseam(chart) {
+  if (chart.inseam != null) return chart.inseam;
+  if (chart.total_length != null && chart.rise != null) return Math.round((chart.total_length - chart.rise + 1) * 10) / 10;
+  return null;
+}
+
+/** Height (cm from ground) where a bottoms' waistband sits: front rise above the crotch, never above the natural waist. */
+export function waistbandHeight(chart, body) {
+  const crotch = body.insideLegHeight;
+  const waist = body.waistHeight;
+  if (chart.rise == null || crotch == null) return waist;
+  const h = crotch + chart.rise * 0.88; // rise is measured along the curve, so it stands a bit less than its length
+  return waist != null ? Math.min(h, waist) : h;
 }
 
 function bandVerdict(ease, bands, stretchShift = 0) {
@@ -148,7 +160,7 @@ export function evaluateSize(body, garment, size) {
   const regions = {};
 
   for (const [region, def] of Object.entries(defs)) {
-    const v = chart[def.chartKey];
+    const v = def.kind === 'inseam' ? effectiveInseam(chart) : chart[def.chartKey];
     if (v == null) continue;
 
     if (def.kind === 'girth') {
@@ -185,15 +197,17 @@ export function evaluateSize(body, garment, size) {
       const bodyV = body[def.bodyKey];
       if (bodyV == null) continue;
       const ease = v - bodyV;
-      // Dropped shoulder: the seam is cut as wide as the chest on purpose and sits on the upper
-      // arm. That's the design, not a bad fit, so don't call it "loose".
-      const dropped = region === 'shoulder' && ease > 5 && isDroppedShoulder(garment);
+      // Dropped shoulder: the seam is cut nearly as wide as the chest on purpose and sits well
+      // past the wearer's shoulders. That's the design, not a bad fit, so don't call it "loose".
+      const dropped =
+        region === 'shoulder' && ease > 5 && (garment.shoulder_style === 'dropped' || (chart.chest != null && v >= chart.chest * 0.9));
       regions[region] = {
         label: dropped ? 'Shoulders (dropped)' : def.label,
         garment_cm: round(v),
         body_cm: round(bodyV),
         ease_cm: round(ease),
-        verdict: dropped ? 'good' : bandVerdict(ease, BANDS[region], 0),
+        // knit fabric gives a little across the shoulders too, so allow half the stretch allowance
+        verdict: dropped ? 'good' : bandVerdict(ease, BANDS[region], stretchShift / 2),
         height_cm: body.backNeckHeight,
         ...(dropped ? { note: 'Dropped-shoulder cut: the seam sits on the upper arm by design.' } : {}),
       };
@@ -203,14 +217,30 @@ export function evaluateSize(body, garment, size) {
     } else if (def.kind === 'sleeve') {
       const r = sleeveVerdict(v, garment.sleeve_type ?? 'short', body);
       regions[region] = { label: def.label, garment_cm: v, ...r };
+    } else if (def.kind === 'waistband') {
+      // Compare the waistband to the body girth at the height where the waistband actually sits.
+      const h = waistbandHeight(chart, body);
+      const bodyV = girthAtHeight(body, h);
+      if (bodyV == null) continue;
+      const garmentV = chartGirth(v, garment);
+      const ease = garmentV - bodyV;
+      regions[region] = {
+        label: def.label,
+        garment_cm: round(garmentV),
+        body_cm: round(bodyV),
+        ease_cm: round(ease),
+        verdict: bandVerdict(ease, BANDS.waist, stretchShift),
+        height_cm: round(h),
+        sits_at: h >= (body.waistHeight ?? 0) - 1.5 ? 'at the natural waist' : h >= (body.topHipHeight ?? 0) ? 'below the waist' : 'on the hips',
+      };
     } else if (def.kind === 'inseam') {
       const bodyV = body.insideLegHeight;
       if (bodyV == null) continue;
       const ease = v - bodyV;
       let verdict = 'good';
       let lands_at = 'at the ankle';
-      if (ease < -6) [verdict, lands_at] = ['tight', 'above the ankle'];
-      else if (ease < -2.5) [verdict, lands_at] = ['snug', 'just above the ankle'];
+      if (ease < -8) [verdict, lands_at] = ['tight', 'well above the ankle'];
+      else if (ease < -2.5) [verdict, lands_at] = ['snug', 'just above the ankle (cropped look)'];
       else if (ease > 8) [verdict, lands_at] = ['very_loose', 'bunching on the shoe'];
       else if (ease > 3) [verdict, lands_at] = ['loose', 'over the shoe'];
       regions[region] = { label: def.label, garment_cm: v, body_cm: round(bodyV), ease_cm: round(ease), lands_at, verdict };
@@ -274,6 +304,7 @@ function summarize(regions, garment) {
   text = text.charAt(0).toUpperCase() + text.slice(1);
   if (regions.length) text += ` Hem lands ${regions.length.lands_at}.`;
   if (regions.sleeve) text += ` Sleeves end ${regions.sleeve.lands_at}.`;
+  if (regions.waist?.sits_at) text += ` Waistband sits ${regions.waist.sits_at}.`;
   if (regions.inseam) text += ` Leg ends ${regions.inseam.lands_at}.`;
   return text.trim();
 }

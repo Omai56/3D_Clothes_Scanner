@@ -98,3 +98,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Result for Daniel (real scan × real chart):** S recommended; chest +25 cm (relaxed — boxy cut), upper arm relaxed, hem at the hip, sleeves mid upper arm. M/L very loose in the chest.
 **Files:** `data/garments/zara-heavyweight-tee.json`, `public/img/zara-heavyweight-tee*.png`, `shared/fit.js`, `public/js/viewer.js`, `public/js/app.js`, `server/index.js`, `tests/fit.test.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 15:35 — Three real Zara items, cloth-like 3D shell, waistband/rise logic
+**By:** Claude (Fable 5.1)
+**What:**
+- Real items from product pages (inches → cm, garment measured flat): `zara-heavyweight-tee` (composition confirmed 100% cotton), **new** `zara-slim-tee` (95% cotton 5% elastane → high stretch), **new** `zara-loose-jeans` (100% cotton; Zara's "Front tow hook"/"Backfire" = front/back rise). Real product photos. The two approximate demo charts moved to `data/garments/examples/` (not shown in the app).
+- `shared/fit.js`: bottoms now derive **inseam = total length − rise** when no inseam is given; the **waistband is compared to the body girth at the height the waistband actually sits** (crotch + rise, capped at the natural waist) and the summary says where it sits; dropped-shoulder check per size (shoulder ≥ 90% of chest width); stretch allowance also applied (half) to shoulders; shoulder "good" band starts at −1 cm; cropped-leg wording.
+- `public/js/viewer.js`: **cloth hangs straight down from the widest point** (chest for tops, mid-thigh for bottoms) instead of hugging the waist/calves; **crew neckline** cut into the top edge; legs coloured by width (thigh/hip) not by length; fabric-like sheen material (MeshPhysicalMaterial).
+- Tests: 19 pass (`npm test`), incl. real-chart checks for both new items.
+
+**Daniel's results (real scan × real charts):** heavyweight tee **S** (boxy cut, relaxed), slim tee **L** (M very close), loose jeans **29** (waistband at natural waist, cropped ankle-length leg).
+**Files:** `data/garments/`, `public/img/zara-*.png`, `shared/fit.js`, `public/js/viewer.js`, `tests/fit.test.js`, `PLAN.md`, `CHANGELOG.md`

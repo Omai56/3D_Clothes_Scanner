@@ -124,18 +124,19 @@ Secrets go in `.env` (gitignored). `.env.example` lists the variable names.
 3. ~~**Fit check** — function + unit test with the saved scan and garment.~~ ✅ `shared/fit.js`, `npm test`
 4. ~~**3D fit view** — OBJ viewer + garment shell + size buttons + fit colors.~~ ✅ `public/js/viewer.js`
 5. ~~**App flow** — scan page → paste link / pick item → results.~~ ✅ `public/`
-6. **Live Zara pull** — best-effort import exists; Zara blocks it. Next: real size charts for the demo items (copy from the product pages by hand), real product photos.
-7. **Realism test** — render → photo-like image. Keep only if it holds the shape. (not started)
-8. **Phone over HTTPS** (`npx localtunnel --port 3000`), do a real phone scan, rehearse the demo, record a backup video.
+6. ~~**Real charts** — 3 real Zara items (heavyweight tee, slim tee, loose jeans) entered from the product pages' PRODUCT MEASUREMENTS + composition.~~ ✅ Live Zara pull stays blocked (bot protection); charts are entered by hand from screenshots.
+7. **Realism test** — render → photo-like image. Keep only if it holds the shape. (not started; the 3D shell now hangs like cloth, has a neckline and a fabric sheen)
+8. ~~Real phone scan~~ ✅ (Daniel, via the app) · **Rehearse the demo, record a backup video.**
 
 ## Minimum to demo
 - [x] A body (saved scan) loads in 3D and rotates
-- [ ] At least 3 garments with **real** size charts (3 exist with approximate charts)
+- [x] At least 3 garments with **real** size charts
 - [x] Fit check recommends a size and explains tight/loose spots
 - [x] Switching sizes visibly changes the garment on the body
 - [x] Whole flow runs without depending on live Zara or live scanning
-- [ ] Real phone scan of the demo person works end to end
-- [ ] Real product photos on the item cards
+- [x] Real phone scan of the demo person works end to end
+- [x] Real product photos on the item cards
+- [ ] Demo rehearsed on the phone over the tunnel; backup video recorded
 
 ## Risks
 | Risk | Plan B |

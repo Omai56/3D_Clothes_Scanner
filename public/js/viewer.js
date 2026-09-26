@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
-import { buildRings, armLine, parseObj, RING_BINS } from '/shared/bodyslices.js';
-import { VERDICT_COLOR } from '/shared/fit.js';
+import { buildRings, armLine, parseObj, ringAt, RING_BINS } from '/shared/bodyslices.js';
+import { VERDICT_COLOR, effectiveInseam, waistbandHeight } from '/shared/fit.js';
 
 const TWO_PI = Math.PI * 2;
 const MIN_GAP = 0.006; // metres: shell never sits closer than this so it stays visible
@@ -138,7 +138,9 @@ export class FitViewer {
     if (!anchors.length) anchors.push({ y: hemY, delta: 0.01, color: col('good') });
     anchors.sort((a, c) => a.y - c.y);
 
-    const mesh = ringsToMesh(this.rings.torso, hemY, topY, anchors);
+    // Cloth hangs straight down from the chest rather than following the waist curve;
+    // a crew neck dips ~7 cm at the front.
+    const mesh = ringsToMesh(this.rings.torso, hemY, topY, anchors, { hangFromY: b.bustHeight / 100, neckDip: 0.07 });
     if (mesh) this.garmentGroup.add(mesh);
 
     // sleeves
@@ -166,10 +168,10 @@ export class FitViewer {
     const chart = garment.sizes[ev.size] ?? {};
     const crotchY = b.insideLegHeight / 100;
     const splitY = this.rings.legTopY || crotchY; // where the two leg shells meet the torso shell
-    const waistbandY = Math.min(b.waistHeight / 100 + 0.02, chart.rise ? crotchY + chart.rise / 100 : b.waistHeight / 100);
+    const waistbandY = waistbandHeight(chart, b) / 100;
     const ankleY = (b.outerAnkleHeightR ?? 7) / 100 + 0.01;
     // Hem never goes below the ankle: a too-long leg bunches on the shoe rather than covering the foot.
-    const hemY = Math.max(ankleY, crotchY - (chart.inseam ?? b.insideLegHeight) / 100);
+    const hemY = Math.max(ankleY, crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100);
     const kneeY = (b.kneeHeightR ?? 48) / 100;
     const midThighY = (crotchY + kneeY) / 2;
 
@@ -186,16 +188,16 @@ export class FitViewer {
     const torso = ringsToMesh(this.rings.torso, splitY, waistbandY, torsoAnchors);
     if (torso) this.garmentGroup.add(torso);
 
-    // legs: hem -> split
-    const legColorLow = col(R.inseam?.verdict ?? R.thigh?.verdict ?? 'good');
+    // legs: hem -> split. Coloured by width (thigh, else hip) — the leg *length* is shown by
+    // where the hem stops, not by colour. Below the thigh the fabric hangs straight down.
+    const legColor = col(R.thigh?.verdict ?? R.hip?.verdict ?? 'good');
     const legAnchors = [
-      { y: hemY, delta: thighDelta * 0.9, color: legColorLow },
-      { y: kneeY, delta: thighDelta * 0.9, color: legColorLow },
-      { y: midThighY, delta: thighDelta, color: col(R.thigh?.verdict ?? 'good') },
+      { y: hemY, delta: thighDelta, color: legColor },
+      { y: midThighY, delta: thighDelta, color: legColor },
       { y: splitY, delta: hipDelta, color: col(R.hip?.verdict ?? 'good') },
     ].sort((a, c) => a.y - c.y);
     for (const rings of [this.rings.right, this.rings.left]) {
-      const m = ringsToMesh(rings, hemY, splitY + 0.012, legAnchors);
+      const m = ringsToMesh(rings, hemY, splitY + 0.012, legAnchors, { hangFromY: midThighY });
       if (m) this.garmentGroup.add(m);
     }
   }
@@ -229,17 +231,26 @@ function interpAnchors(anchors, y) {
   return last;
 }
 
-const shellMaterial = new THREE.MeshStandardMaterial({
+// Cloth-like: physical material with sheen reads as fabric rather than plastic.
+const shellMaterial = new THREE.MeshPhysicalMaterial({
   vertexColors: true,
   side: THREE.DoubleSide,
   transparent: true,
-  opacity: 0.9,
-  roughness: 0.75,
+  opacity: 0.94,
+  roughness: 0.9,
   metalness: 0,
+  sheen: 0.8,
+  sheenRoughness: 0.7,
+  sheenColor: new THREE.Color(0xffffff),
 });
 
-/** Build a shell mesh from body rings between yBottom..yTop, offset & coloured by anchors. */
-function ringsToMesh(ringsMap, yBottom, yTop, anchors) {
+/**
+ * Build a shell mesh from body rings between yBottom..yTop, offset & coloured by anchors.
+ * opts.hangFromY: below this height the cloth hangs straight down from that ring (it never
+ *                 pulls in tighter than the widest point above it).
+ * opts.neckDip:   front neckline drop in metres at the top edge (crew neck).
+ */
+function ringsToMesh(ringsMap, yBottom, yTop, anchors, opts = {}) {
   const keys = [...ringsMap.keys()].sort((a, c) => a - c);
   const rings = keys.map((k) => ringsMap.get(k)).filter((r) => r.y >= yBottom - 0.011 && r.y <= yTop + 0.011);
   if (rings.length < 2) return null;
@@ -248,6 +259,17 @@ function ringsToMesh(ringsMap, yBottom, yTop, anchors) {
   list[0].y = Math.max(yBottom, 0.005);
   list[list.length - 1].y = yTop;
 
+  // Hanging outline: radii of the widest ring + its ease, applied around each lower ring's own
+  // centre (so it follows a leg that angles outward instead of poking through it).
+  let hang = null;
+  if (opts.hangFromY != null) {
+    const hr = ringAt(ringsMap, opts.hangFromY);
+    if (hr) {
+      const hoff = Math.max(interpAnchors(anchors, hr.y).delta, MIN_GAP);
+      hang = { y: hr.y, r: Array.from(hr.r, (v) => v + hoff) };
+    }
+  }
+
   const N = RING_BINS;
   const pos = new Float32Array(list.length * N * 3);
   const colors = new Float32Array(list.length * N * 3);
@@ -255,12 +277,24 @@ function ringsToMesh(ringsMap, yBottom, yTop, anchors) {
   for (const ring of list) {
     const { delta, color } = interpAnchors(anchors, ring.y);
     const off = Math.max(delta, MIN_GAP);
+    const below = hang && ring.y < hang.y;
     for (let j = 0; j < N; j++) {
       const ang = (j / N) * TWO_PI - Math.PI;
-      const r = ring.r[j] + off;
-      pos[p] = ring.cx + r * Math.cos(ang);
-      pos[p + 1] = ring.y;
-      pos[p + 2] = ring.cz + r * Math.sin(ang);
+      // Below the widest point the cloth never pulls in tighter than that point's outline.
+      const r = below ? Math.max(ring.r[j] + off, hang.r[j]) : ring.r[j] + off;
+      const x = ring.cx + r * Math.cos(ang);
+      const z = ring.cz + r * Math.sin(ang);
+      let y = ring.y;
+      if (opts.neckDip) {
+        // +z is the front of the avatar. Curve the top edge down at the front, a little at the back.
+        const front = Math.max(0, Math.sin(ang));
+        const back = Math.max(0, -Math.sin(ang));
+        const cut = yTop - opts.neckDip * Math.pow(front, 1.5) - 0.015 * Math.pow(back, 2);
+        if (y > cut) y = cut;
+      }
+      pos[p] = x;
+      pos[p + 1] = y;
+      pos[p + 2] = z;
       colors[p] = color.r;
       colors[p + 1] = color.g;
       colors[p + 2] = color.b;

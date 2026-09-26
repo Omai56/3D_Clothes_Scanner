@@ -1,0 +1,24 @@
+{
+  "id": "zara-loose-jeans",
+  "name": "Loose Fit Jeans",
+  "brand": "Zara",
+  "url": "https://www.zara.com/ca/en/",
+  "price": "CA$ 69.90",
+  "category": "bottom",
+  "fabric": "100% cotton (Regenagri certified)",
+  "stretch": "none",
+  "images": ["/img/zara-loose-jeans.png"],
+  "source": "Zara product page PRODUCT MEASUREMENTS, 2026-09-26, converted from inches (garment measured flat). Zara labels: 'Front tow hook' = front rise, 'Backfire' = back rise.",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "waist / hip = width measured flat (half circumference); total_length = waistband to hem (outseam); rise = front rise, crotch seam to top of waistband; back_rise = back rise. No inseam given: inseam is derived as total_length - rise.",
+  "sizes": {
+    "28": { "waist": 35.1, "hip": 49.0, "total_length": 106.4, "rise": 31.0, "back_rise": 35.1 },
+    "29": { "waist": 37.1, "hip": 51.1, "total_length": 106.9, "rise": 32.0, "back_rise": 36.1 },
+    "30": { "waist": 39.1, "hip": 53.1, "total_length": 107.4, "rise": 33.0, "back_rise": 37.1 },
+    "31": { "waist": 40.9, "hip": 55.1, "total_length": 108.0, "rise": 34.0, "back_rise": 38.1 },
+    "32": { "waist": 42.9, "hip": 56.9, "total_length": 108.5, "rise": 35.1, "back_rise": 39.1 },
+    "34": { "waist": 45.0, "hip": 58.9, "total_length": 109.0, "rise": 36.1, "back_rise": 39.9 },
+    "36": { "waist": 47.0, "hip": 61.0, "total_length": 109.5, "rise": 37.1, "back_rise": 40.9 }
+  }
+}

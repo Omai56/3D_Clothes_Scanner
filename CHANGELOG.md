@@ -57,3 +57,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Verified:** headless Chrome at phone size (390×844): full flow runs with no console errors; S tee = snug shoulders/green body, XL = blue and visibly larger/longer; jeans 32 = green, 36 = blue waist; hoodie = relaxed body, snug sleeves.
 **Known limits:** chest ring runs through the shoulder mass (≈17% over Bodygram's bust girth) — visual only, fit math uses Bodygram's numbers directly. Live Zara import blocked; size charts are hand-entered.
 **Files:** `shared/`, `public/`, `server/`, `data/garments/`, `tests/`, `package.json`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 13:55 — README, plan checklist, line endings
+**By:** Claude (Fable 5.1)
+**What:**
+- `README.md` — how to run, how to open on a phone over HTTPS (`npx localtunnel --port 3000`), how it works, how to add a garment.
+- `PLAN.md` — build order / demo checklist updated with what's done and what's left.
+- `.gitattributes` — LF line endings for everyone (stops the CRLF warnings on Windows).
+
+**Note:** GitHub reports the repo was renamed to `Omai56/Fitting.Room`. The local remote still points at the old name (redirects work); run `git remote set-url origin https://github.com/Omai56/Fitting.Room.git` to update it.
+**Files:** `README.md`, `PLAN.md`, `.gitattributes`, `CHANGELOG.md`

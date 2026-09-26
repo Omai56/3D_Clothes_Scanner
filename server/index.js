@@ -5,7 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { fitReport, bodyLandmarks } from '../shared/fit.js';
-import { createScanToken, scannerUrl, getScan, measurementsToCm } from './bodygram.js';
+import { createScanToken, scannerUrl, getScan, measurementsToCm, saveScanFiles } from './bodygram.js';
 import { importProduct } from './importer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -46,17 +46,15 @@ async function listScans() {
   const out = [];
   for (const f of files) {
     const s = await readScan(f.replace(/\.json$/, ''));
-    if (s) out.push({ name: s.name, id: s.id, createdAt: s.createdAt, input: s.input, label: s.name === 'demo' ? 'Demo body (175 cm)' : s.name });
+    if (!s) continue;
+    const pretty = s.name.charAt(0).toUpperCase() + s.name.slice(1);
+    const label = s.name === 'demo' ? 'Demo body (175 cm)' : s.input?.photos ? `${pretty} (phone scan)` : pretty;
+    out.push({ name: s.name, id: s.id, createdAt: s.createdAt, input: s.input, label });
   }
   return out.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
 }
 
-async function saveScanEntry(name, entry) {
-  const obj = Buffer.from(entry.avatar.data, 'base64').toString('utf8');
-  await fs.writeFile(path.join(SCANS_DIR, `${name}.obj`), obj);
-  const { avatar, ...rest } = entry;
-  await fs.writeFile(path.join(SCANS_DIR, `${name}.json`), JSON.stringify({ ...rest, avatarFile: `${name}.obj` }, null, 2));
-}
+const saveScanEntry = (name, entry) => saveScanFiles(SCANS_DIR, name, entry);
 
 async function listGarments() {
   const files = (await fs.readdir(GARMENTS_DIR)).filter((f) => f.endsWith('.json'));

@@ -69,3 +69,18 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Note:** GitHub reports the repo was renamed to `Omai56/Fitting.Room`. The local remote still points at the old name (redirects work); run `git remote set-url origin https://github.com/Omai56/Fitting.Room.git` to update it.
 **Files:** `README.md`, `PLAN.md`, `.gitattributes`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 14:20 — Daniel's real phone scan saved + scan-saving cleanup
+**By:** Claude (Fable 5.1)
+**What:**
+- `data/scans/daniel.json` + `daniel.obj` — Daniel's real Bodygram photo scan from the phone (178 cm / 63 kg, 35 measurements + body composition). Done through the app's "Scan me with the camera" flow → the hosted scanner works end to end on a phone.
+- `scripts/save-scan.js` — download any existing scan (by id or `--latest`) into `data/scans/` without using quota.
+- `server/bodygram.js` `saveScanFiles()` — one shared saver (server polling + script) that also normalises `input` to cm/kg so saved bodies show their height/weight in the list.
+- Removed the duplicate `scan-90afef5d` files the server had saved for the same scan.
+- Saved-body labels: "Daniel (phone scan)".
+
+**Verified:** app screenshot with Daniel's body — tee S = green, best fit; M = relaxed blue. Torso rings within 6% of Bodygram girths (waist/hip/thigh).
+**Scans used:** 2 of 5 (demo + daniel). 3 left.
+**Files:** `data/scans/daniel.*`, `scripts/save-scan.js`, `server/bodygram.js`, `server/index.js`, `CHANGELOG.md`

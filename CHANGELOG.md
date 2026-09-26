@@ -133,3 +133,12 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Note:** the live import works from a laptop/home IP. Cloud IPs are likely to be blocked by Zara's bot protection, so run the server locally for the demo.
 **Files:** `server/zara.js`, `server/zara-map.js`, `server/index.js`, `public/js/app.js`, `tests/zara-map.test.js`, `tests/fixtures/`, `data/garments/`, `public/img/`, `README.md`, `package.json`, `package-lock.json`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 16:50 — Loose jeans imported live; Tripo3D key + mesh scripts
+**By:** Claude (Fable 5.1)
+**What:**
+- `data/garments/zara-loose-fit-jeans-556169731.json` + photos — live import from the product link (Indigo, CA$69.90, 100% cotton, sizes 28–36 in cm). The hand-typed jeans moved to `data/garments/examples/`. **All three demo items are now straight from Zara.**
+- `server/tripo.js`, `scripts/tripo-mesh.js` — Tripo3D image-to-3D helper (upload photo → `image_to_model` task → poll → download GLB to `public/models/`). Experiment for a photo-real garment mesh; `TRIPO_API_KEY` in `.env` (not committed).
+**Files:** `data/garments/`, `public/img/zara-loose-fit-jeans-*.jpg`, `server/tripo.js`, `scripts/tripo-mesh.js`, `.env.example`, `CHANGELOG.md`

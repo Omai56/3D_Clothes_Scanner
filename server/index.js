@@ -8,17 +8,20 @@ import { fitReport, bodyLandmarks } from '../shared/fit.js';
 import { createScanToken, scannerUrl, getScan, measurementsToCm, saveScanFiles } from './bodygram.js';
 import { importProduct } from './importer.js';
 import { importZara } from './zara.js';
+import { startImageTo3D, getTask as getMeshyTask } from './meshy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SCANS_DIR = path.join(ROOT, 'data', 'scans');
 const GARMENTS_DIR = path.join(ROOT, 'data', 'garments');
+const MODELS_DIR = path.join(ROOT, 'data', 'models');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(ROOT, 'public')));
 app.use('/shared', express.static(path.join(ROOT, 'shared')));
 app.use('/scans', express.static(SCANS_DIR)); // .obj files
+app.use('/models', express.static(MODELS_DIR)); // .glb files from Meshy
 
 // ---------- helpers ----------
 const safeName = (s) => /^[\w-]{1,64}$/.test(s);
@@ -146,6 +149,52 @@ app.post('/api/import', async (req, res) => {
   } catch (e) {
     console.error('[import]', e.message);
     res.status(502).json({ error: String(e.message) });
+  }
+});
+
+// ---------- meshy image-to-3D ----------
+
+// Start a Meshy image-to-3D job. Returns { taskId } or { modelUrl, cached: true } if already done.
+app.post('/api/meshy', async (req, res) => {
+  if (!process.env.MESHY_API_KEY) return res.status(503).json({ error: 'Meshy not configured (add MESHY_API_KEY to .env).' });
+  const { garment_id, image_url } = req.body ?? {};
+  if (!image_url) return res.status(400).json({ error: 'need image_url' });
+  if (garment_id && safeName(garment_id)) {
+    try {
+      await fs.access(path.join(MODELS_DIR, `${garment_id}.glb`));
+      return res.json({ modelUrl: `/models/${garment_id}.glb`, cached: true });
+    } catch { /* not cached yet */ }
+  }
+  try {
+    const taskId = await startImageTo3D(image_url);
+    res.json({ taskId });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
+// Poll a Meshy task. When done, downloads the GLB locally and returns its URL.
+app.get('/api/meshy/:taskId', async (req, res) => {
+  if (!process.env.MESHY_API_KEY) return res.status(503).json({ error: 'Meshy not configured.' });
+  const { taskId } = req.params;
+  const garment_id = req.query.garment_id ?? '';
+  try {
+    const task = await getMeshyTask(taskId);
+    if (task.status === 'FAILED') return res.json({ status: 'FAILED', error: task.task_error?.message ?? 'generation failed' });
+    if (task.status !== 'SUCCEEDED') return res.json({ status: task.status, progress: task.progress ?? 0 });
+    const glbUrl = task.model_urls?.glb;
+    if (!glbUrl) return res.status(502).json({ error: 'No GLB in Meshy result.' });
+    let modelUrl = glbUrl;
+    if (safeName(garment_id)) {
+      await fs.mkdir(MODELS_DIR, { recursive: true });
+      const localPath = path.join(MODELS_DIR, `${garment_id}.glb`);
+      const buf = await (await fetch(glbUrl)).arrayBuffer();
+      await fs.writeFile(localPath, Buffer.from(buf));
+      modelUrl = `/models/${garment_id}.glb`;
+    }
+    res.json({ status: 'SUCCEEDED', modelUrl });
+  } catch (e) {
+    res.status(502).json({ error: e.message });
   }
 });
 

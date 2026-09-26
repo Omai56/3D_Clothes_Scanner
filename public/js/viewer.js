@@ -49,7 +49,8 @@ export class FitViewer {
 
     this.bodyGroup = new THREE.Group();
     this.garmentGroup = new THREE.Group();
-    this.scene.add(this.bodyGroup, this.garmentGroup);
+    this.meshyGroup = new THREE.Group();
+    this.scene.add(this.bodyGroup, this.garmentGroup, this.meshyGroup);
 
     this.resize();
     this.ro = new ResizeObserver(() => this.resize());
@@ -74,6 +75,7 @@ export class FitViewer {
     this._objUrl = objUrl;
     this.bodyGroup.clear();
     this.garmentGroup.clear();
+    this.meshyGroup.clear();
 
     const text = await (await fetch(objUrl)).text();
     const group = new OBJLoader().parse(text);
@@ -115,6 +117,66 @@ export class FitViewer {
     if (garment.category === 'top') this._buildTop(garment, sizeEval);
     else this._buildBottom(garment, sizeEval);
     this._frame(garment.category);
+  }
+
+  clearGarmentModel() {
+    this.meshyGroup.clear();
+  }
+
+  /** Load a Meshy GLB and position it on the body based on garment category and size evaluation. */
+  async loadGarmentModel(url, garment, sizeEval) {
+    this.meshyGroup.clear();
+    if (!this.body) return;
+
+    const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+    const gltf = await new Promise((resolve, reject) =>
+      new GLTFLoader().load(url, resolve, undefined, reject)
+    );
+    const model = gltf.scene;
+
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    const b = this.body;
+    const R = sizeEval.regions;
+
+    let targetHeight, centerY;
+    if (garment.category === 'top') {
+      const neckY = b.backNeckHeight / 100;
+      const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
+      targetHeight = neckY - hemY;
+      centerY = (neckY + hemY) / 2;
+    } else {
+      const waistbandY = b.waistHeight / 100;
+      const ankleY = (b.outerAnkleHeightR ?? 7) / 100;
+      targetHeight = waistbandY - ankleY;
+      centerY = (waistbandY + ankleY) / 2;
+    }
+
+    const scale = (targetHeight > 0 ? targetHeight : 0.6) / (size.y || 1);
+    model.scale.setScalar(scale);
+    model.position.set(
+      -center.x * scale,
+      centerY - center.y * scale,
+      -center.z * scale
+    );
+
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      o.material = mats.map((m) => {
+        const c = m.clone();
+        c.transparent = true;
+        c.opacity = 0.88;
+        return c;
+      });
+      if (!Array.isArray(o.material) && mats.length === 1) o.material = o.material[0];
+    });
+
+    this.meshyGroup.add(model);
   }
 
   _frame(category) {

@@ -6,9 +6,11 @@ const state = {
   garment: null,
   report: null,
   size: null,
+  meshyUrl: null, // cached GLB URL for the current garment
 };
 let viewer = null;
 let pollTimer = null;
+let meshyTimer = null;
 
 // ---------- navigation ----------
 const screens = { body: $('#screen-body'), item: $('#screen-item'), fit: $('#screen-fit') };
@@ -149,6 +151,9 @@ $('#import-form').addEventListener('submit', async (e) => {
 async function selectGarment(g) {
   if (!state.scan?.name) return show('body');
   state.garment = g;
+  state.meshyUrl = null;
+  clearInterval(meshyTimer);
+  if (viewer) viewer.clearGarmentModel();
   const r = await fetch('/api/fit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -169,6 +174,7 @@ async function selectGarment(g) {
   state.size = data.report.recommended;
   show('fit');
   await renderFit();
+  if (g.images?.[0]) kickOffMeshy(g);
 }
 
 // ---------- step 3: fit ----------
@@ -224,6 +230,7 @@ async function renderFit() {
   try {
     await viewer.loadBody(state.scan.objUrl, state.scan.measurements_cm);
     viewer.showFit(g, ev);
+    if (state.meshyUrl) await viewer.loadGarmentModel(state.meshyUrl, g, ev);
   } finally {
     loading?.remove();
   }
@@ -239,6 +246,59 @@ function overallLabel(ev, rep) {
   const w = worstVerdict(ev);
   if (ev.size === rep.recommended) return 'Best fit';
   return { tight: 'Too tight', very_loose: 'Too big', loose: 'Relaxed', snug: 'Snug', good: 'Fits' }[w];
+}
+
+// ---------- meshy image-to-3D ----------
+async function kickOffMeshy(garment) {
+  clearInterval(meshyTimer);
+  const imageUrl = garment.images?.[0];
+  if (!imageUrl) return;
+
+  setMeshyStatus('Generating 3D model…');
+  try {
+    const r = await fetch('/api/meshy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ garment_id: garment.id, image_url: imageUrl }),
+    });
+    const data = await r.json();
+    if (!r.ok) { setMeshyStatus(''); return; }
+    if (data.cached) { await applyMeshyModel(data.modelUrl, garment); return; }
+
+    const taskId = data.taskId;
+    meshyTimer = setInterval(async () => {
+      try {
+        const pr = await fetch(`/api/meshy/${taskId}?garment_id=${encodeURIComponent(garment.id)}`);
+        const pd = await pr.json();
+        if (pd.status === 'SUCCEEDED') {
+          clearInterval(meshyTimer);
+          await applyMeshyModel(pd.modelUrl, garment);
+        } else if (pd.status === 'FAILED') {
+          clearInterval(meshyTimer);
+          setMeshyStatus('');
+        } else {
+          setMeshyStatus(`Generating 3D model… ${pd.progress ?? 0}%`);
+        }
+      } catch { /* network hiccup, keep polling */ }
+    }, 5000);
+  } catch {
+    setMeshyStatus('');
+  }
+}
+
+async function applyMeshyModel(url, garment) {
+  setMeshyStatus('');
+  state.meshyUrl = url;
+  if (!viewer || !state.report) return;
+  const ev = state.report.sizes[state.size];
+  await viewer.loadGarmentModel(url, garment, ev);
+}
+
+function setMeshyStatus(msg) {
+  const el = $('#meshy-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = !msg;
 }
 
 $('#btn-another').addEventListener('click', () => show('item'));

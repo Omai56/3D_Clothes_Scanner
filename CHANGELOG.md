@@ -39,3 +39,21 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Why:** Step 1 of the build order — verified credentials (Org ID `org_4b3RJOjsEEqtn2k4sbbVPT` works) and captured a reusable body so all further development runs from the saved file.
 **Files:** `package.json`, `package-lock.json`, `server/bodygram.js`, `scripts/run-stats-scan.js`, `data/scans/demo.json`, `data/scans/demo.obj`, `PLAN.md`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 13:40 — Working end-to-end app: fit engine + 3D fit view + phone UI
+**By:** Claude (Fable 5.1)
+**What:**
+- `shared/fit.js` — fit engine. Doubles flat chart widths, computes ease per region (chest/waist/hem/shoulders/length/sleeves for tops; waist/hip/thigh/inseam for bottoms), verdicts tight/snug/good/relaxed/very loose with fabric-stretch allowance, size recommendation, plain-English summary + notes.
+- `shared/bodyslices.js` — cuts the Bodygram OBJ into 1 cm outline loops (exact mesh/plane intersection), separates torso / arms / legs, clips the fused arm roots above the armpit. Torso rings match Bodygram's own waist & hip girths within 8%.
+- `public/js/viewer.js` — three.js viewer: body + garment "shell" built from the size chart (offset = ease/2π per region, cut at real hem/sleeve length, colour by verdict), sleeves as tubes along the arms, legs for bottoms, orbit/pinch controls.
+- `public/index.html`, `public/css/style.css`, `public/js/app.js` — phone-first 3-step flow: Body (camera scan via Bodygram hosted scanner, or saved body) → Item (paste link or saved item) → Fit (size chips with BEST badge, 3D view, per-region breakdown).
+- `server/index.js` — Express API: `/api/scans`, `/api/scan-session` (+ polling), `/api/garments`, `/api/import`, `/api/fit`; serves `public/`, `shared/`, `data/scans/*.obj`.
+- `server/importer.js` — best-effort product import from a store link (og/JSON-LD). Zara returns a bot-protection shell → clear error, UI falls back to saved items.
+- `data/garments/*.json` — 3 demo items (tee, oversized hoodie, slim jeans) with **approximate** size charts marked DEMO DATA.
+- `tests/` — 16 tests (fit engine + body slicing), `npm test`.
+
+**Verified:** headless Chrome at phone size (390×844): full flow runs with no console errors; S tee = snug shoulders/green body, XL = blue and visibly larger/longer; jeans 32 = green, 36 = blue waist; hoodie = relaxed body, snug sleeves.
+**Known limits:** chest ring runs through the shoulder mass (≈17% over Bodygram's bust girth) — visual only, fit math uses Bodygram's numbers directly. Live Zara import blocked; size charts are hand-entered.
+**Files:** `shared/`, `public/`, `server/`, `data/garments/`, `tests/`, `package.json`, `CHANGELOG.md`

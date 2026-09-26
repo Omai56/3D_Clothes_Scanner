@@ -1,0 +1,21 @@
+{
+  "id": "zara-heavyweight-tee",
+  "name": "Heavyweight Cotton T-Shirt",
+  "brand": "Zara",
+  "url": "https://www.zara.com/",
+  "category": "top",
+  "sleeve_type": "short",
+  "fabric": "100% cotton",
+  "stretch": "low",
+  "images": ["/img/tee.svg"],
+  "source": "DEMO DATA — approximate size chart, replace with the real chart from the product page",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "chest/waist/hem = width measured flat (half circumference); length = back neck to hem; shoulder = seam to seam; sleeve = shoulder seam to cuff",
+  "sizes": {
+    "S":  { "chest": 51, "hem": 51, "length": 70, "shoulder": 46, "sleeve": 21 },
+    "M":  { "chest": 54, "hem": 54, "length": 72, "shoulder": 48, "sleeve": 22 },
+    "L":  { "chest": 57, "hem": 57, "length": 74, "shoulder": 50, "sleeve": 23 },
+    "XL": { "chest": 60, "hem": 60, "length": 76, "shoulder": 52, "sleeve": 24 }
+  }
+}

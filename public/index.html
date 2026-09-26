@@ -1,101 +1,108 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Your Measurements · FitCheck</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <title>FitCheck</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M9 10l4-2 3 3 3-3 4 2 3 5-3 2v9H9v-9l-3-2z' fill='%2330a46c'/%3E%3C/svg%3E" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
-<main class="page">
   <header class="topbar">
-    <a class="logo" href="index.html">Fit<span>Check</span></a>
-    <div class="steps" aria-label="Step 1 of 3"><i class="on"></i><i></i><i></i><span>1 / 3</span></div>
+    <button id="back" class="icon-btn" hidden aria-label="Back">‹</button>
+    <div class="brand">FitCheck</div>
+    <ol class="steps" id="steps">
+      <li data-step="body">Body</li>
+      <li data-step="item">Item</li>
+      <li data-step="fit">Fit</li>
+    </ol>
   </header>
 
-  <h1>Your measurements</h1>
-  <p class="lede">Enter your body measurements in centimetres. We compare them to each size chart to find the size that fits you.</p>
+  <main id="app">
+    <!-- Step 1: body -->
+    <section id="screen-body" class="screen">
+      <h1>Your body</h1>
+      <p class="lead">Scan yourself once. We use your real measurements and 3D body for every item.</p>
 
-  <div class="measure-layout">
-    <aside class="card figure-panel">
-      <div class="figure-wrap" id="figure"></div>
-      <div class="figure-caption" id="caption"><b>Tap a field</b>to see where to measure</div>
-    </aside>
-
-    <form class="card form-panel" id="form" novalidate>
-      <div class="fields" id="fields"></div>
-      <p class="form-error" id="error" role="alert"></p>
-      <div class="form-actions">
-        <button class="btn primary" type="submit">Continue to clothes</button>
-        <button class="btn ghost" type="button" id="demo">Fill with demo scan</button>
+      <button id="btn-scan" class="card action">
+        <span class="card-title">Scan me with the camera</span>
+        <span class="card-sub">Opens the Bodygram scanner. Two photos, about a minute.</span>
+      </button>
+      <div id="scan-wait" class="notice" hidden>
+        <div class="spinner"></div>
+        <div>
+          <strong>Waiting for your scan…</strong><br />
+          <span id="scan-wait-text">Finish the scan in the other tab, then come back here.</span>
+        </div>
       </div>
-    </form>
-  </div>
-</main>
 
-<script src="app.js"></script>
-<script>
-  const figure = document.getElementById('figure');
-  const caption = document.getElementById('caption');
-  const fieldsEl = document.getElementById('fields');
-  const form = document.getElementById('form');
-  const errorEl = document.getElementById('error');
+      <h2>Or use a saved body</h2>
+      <div id="saved-scans" class="list"></div>
 
-  figure.innerHTML = Fit.bodyFigure('Body outline, highlights the part you are measuring');
+      <div id="body-summary" class="panel" hidden>
+        <div class="panel-title">Measurements</div>
+        <div id="body-measurements" class="measure-grid"></div>
+        <button id="btn-body-next" class="primary">Continue</button>
+      </div>
+    </section>
 
-  fieldsEl.innerHTML = Fit.FIELDS.map(f => `
-    <label class="field" data-region="${f.key}">
-      <span class="label">${f.label}</span>
-      <span class="hint">${f.hint}</span>
-      <span class="input-wrap">
-        <input name="${f.key}" type="number" inputmode="decimal" step="0.1" min="${f.min}" max="${f.max}" placeholder=" " required>
-        <span class="unit">cm</span>
-      </span>
-    </label>`).join('');
+    <!-- Step 2: item -->
+    <section id="screen-item" class="screen" hidden>
+      <h1>Pick an item</h1>
+      <form id="import-form" class="import">
+        <input id="import-url" type="url" inputmode="url" placeholder="Paste a product link (e.g. Zara)…" />
+        <button type="submit" class="primary small">Get</button>
+      </form>
+      <p id="import-status" class="status" hidden></p>
 
-  function setActive(key) {
-    const f = Fit.FIELDS.find(x => x.key === key);
-    if (!f) {
-      figure.removeAttribute('data-active');
-      caption.innerHTML = '<b>Tap a field</b>to see where to measure';
-    } else {
-      figure.dataset.active = key;
-      caption.innerHTML = `<b>${f.label}</b>${f.hint}`;
-    }
-    figure.querySelectorAll('[data-region]').forEach(el => el.classList.toggle('active', el.dataset.region === key));
-    fieldsEl.querySelectorAll('.field').forEach(el => el.classList.toggle('active', el.dataset.region === key));
-  }
+      <h2>Saved items</h2>
+      <div id="garments" class="grid"></div>
+    </section>
 
-  fieldsEl.addEventListener('focusin', e => { const l = e.target.closest('.field'); if (l) setActive(l.dataset.region); });
-  fieldsEl.addEventListener('mouseover', e => {
-    const l = e.target.closest('.field');
-    if (l && !fieldsEl.contains(document.activeElement)) setActive(l.dataset.region);
-  });
-  fieldsEl.addEventListener('focusout', () => setTimeout(() => { if (!fieldsEl.contains(document.activeElement)) setActive(null); }, 0));
-  fieldsEl.addEventListener('mouseleave', () => { if (!fieldsEl.contains(document.activeElement)) setActive(null); });
+    <!-- Step 3: fit -->
+    <section id="screen-fit" class="screen" hidden>
+      <div class="fit-head">
+        <img id="fit-img" alt="" />
+        <div>
+          <div id="fit-brand" class="muted"></div>
+          <h1 id="fit-name"></h1>
+          <div id="fit-fabric" class="muted small"></div>
+        </div>
+      </div>
 
-  function fill(body) { for (const f of Fit.FIELDS) form.elements[f.key].value = body[f.key]; }
-  const saved = Fit.loadBody();
-  if (saved) fill(saved);
+      <div class="sizes" id="sizes"></div>
 
-  document.getElementById('demo').addEventListener('click', () => { fill(Fit.DEMO_BODY); errorEl.textContent = ''; });
+      <div class="viewer-wrap">
+        <div id="viewer"></div>
+        <div class="legend">
+          <span><i style="background:#e5484d"></i>Tight</span>
+          <span><i style="background:#f5b301"></i>Snug</span>
+          <span><i style="background:#30a46c"></i>Good</span>
+          <span><i style="background:#3e8fe0"></i>Relaxed</span>
+        </div>
+        <div class="hint">Drag to rotate · pinch to zoom</div>
+      </div>
 
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const body = {};
-    for (const f of Fit.FIELDS) {
-      const input = form.elements[f.key];
-      const v = parseFloat(input.value);
-      if (!(v >= f.min && v <= f.max)) {
-        errorEl.textContent = `${f.label} should be between ${f.min} and ${f.max} cm.`;
-        input.focus();
-        return;
-      }
-      body[f.key] = v;
-    }
-    Fit.saveBody(body);
-    location.href = 'shop.html';
-  });
-</script>
+      <div class="panel">
+        <div id="fit-verdict" class="verdict"></div>
+        <p id="fit-summary" class="summary"></p>
+        <ul id="fit-regions" class="regions"></ul>
+        <ul id="fit-notes" class="notes"></ul>
+      </div>
+
+      <button id="btn-another" class="secondary">Try another item</button>
+    </section>
+  </main>
+
+  <script type="module" src="/js/app.js"></script>
 </body>
 </html>

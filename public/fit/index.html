@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Your Measurements · FitCheck</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <a class="logo" href="index.html">Fit<span>Check</span></a>
+    <div class="steps" aria-label="Step 1 of 3"><i class="on"></i><i></i><i></i><span>1 / 3</span></div>
+  </header>
+
+  <h1>Your measurements</h1>
+  <p class="lede">Pick a saved body scan or type your measurements in centimetres. We compare them to each real size chart to find the size that fits you.</p>
+
+  <div class="measure-layout">
+    <aside class="card figure-panel">
+      <div class="figure-wrap" id="figure"></div>
+      <div class="figure-caption" id="caption"><b>Tap a field</b>to see where to measure</div>
+    </aside>
+
+    <form class="card form-panel" id="form" novalidate>
+      <div class="scan-pick" id="scanPick" hidden>
+        <div class="scan-pick-title">Use a saved body scan</div>
+        <div class="scan-chips" id="scanChips"></div>
+        <div class="or"><span>or type your own</span></div>
+      </div>
+      <div class="fields" id="fields"></div>
+      <p class="form-error" id="error" role="alert"></p>
+      <div class="form-actions">
+        <button class="btn primary" type="submit">Continue to clothes</button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="fit-ui.js"></script>
+<script>
+  const figure = document.getElementById('figure');
+  const caption = document.getElementById('caption');
+  const fieldsEl = document.getElementById('fields');
+  const form = document.getElementById('form');
+  const errorEl = document.getElementById('error');
+
+  figure.innerHTML = Fit.bodyFigure('Body outline, highlights the part you are measuring');
+
+  fieldsEl.innerHTML = Fit.FIELDS.map(f => `
+    <label class="field" data-region="${f.key}">
+      <span class="label">${f.label}</span>
+      <span class="hint">${f.hint}</span>
+      <span class="input-wrap">
+        <input name="${f.key}" type="number" inputmode="decimal" step="0.1" min="${f.min}" max="${f.max}" placeholder=" " required>
+        <span class="unit">cm</span>
+      </span>
+    </label>`).join('');
+
+  function setActive(key) {
+    const f = Fit.FIELDS.find(x => x.key === key);
+    if (!f) {
+      figure.removeAttribute('data-active');
+      caption.innerHTML = '<b>Tap a field</b>to see where to measure';
+    } else {
+      figure.dataset.active = key;
+      caption.innerHTML = `<b>${f.label}</b>${f.hint}`;
+    }
+    figure.querySelectorAll('[data-region]').forEach(el => el.classList.toggle('active', el.dataset.region === key));
+    fieldsEl.querySelectorAll('.field').forEach(el => el.classList.toggle('active', el.dataset.region === key));
+  }
+
+  fieldsEl.addEventListener('focusin', e => { const l = e.target.closest('.field'); if (l) setActive(l.dataset.region); });
+  fieldsEl.addEventListener('mouseover', e => {
+    const l = e.target.closest('.field');
+    if (l && !fieldsEl.contains(document.activeElement)) setActive(l.dataset.region);
+  });
+  fieldsEl.addEventListener('focusout', () => setTimeout(() => { if (!fieldsEl.contains(document.activeElement)) setActive(null); }, 0));
+  fieldsEl.addEventListener('mouseleave', () => { if (!fieldsEl.contains(document.activeElement)) setActive(null); });
+
+  let picked = null; // { scan, label } when the numbers came from a saved scan
+  const chips = document.getElementById('scanChips');
+
+  function fill(values) { for (const f of Fit.FIELDS) form.elements[f.key].value = values[f.key]; }
+  function markChip(name) { chips.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scan === name))); }
+
+  const saved = Fit.loadBody();
+  if (saved) { fill(saved.values); if (saved.source === 'scan') picked = { scan: saved.scan, label: saved.label }; }
+
+  Fit.getScans().then(scans => {
+    if (!scans.length) return;
+    chips.innerHTML = scans.map(s => `<button type="button" class="scan-chip" data-scan="${Fit.esc(s.name)}" aria-pressed="false">${Fit.esc(s.label)}</button>`).join('');
+    document.getElementById('scanPick').hidden = false;
+    if (picked) markChip(picked.scan);
+  }).catch(() => { /* no server data: typing still works */ });
+
+  chips.addEventListener('click', async e => {
+    const b = e.target.closest('.scan-chip');
+    if (!b) return;
+    try {
+      const scan = await Fit.getScan(b.dataset.scan);
+      fill(Fit.valuesFromScan(scan));
+      picked = { scan: scan.name, label: b.textContent };
+      markChip(scan.name);
+      errorEl.textContent = '';
+    } catch (err) { errorEl.textContent = err.message; }
+  });
+  fieldsEl.addEventListener('input', () => { picked = null; markChip(null); });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const body = {};
+    for (const f of Fit.FIELDS) {
+      const input = form.elements[f.key];
+      const v = parseFloat(input.value);
+      if (!(v >= f.min && v <= f.max)) {
+        errorEl.textContent = `${f.label} should be between ${f.min} and ${f.max} cm.`;
+        input.focus();
+        return;
+      }
+      body[f.key] = v;
+    }
+    Fit.saveBody(picked ? { source: 'scan', scan: picked.scan, label: picked.label, values: body } : { source: 'manual', values: body });
+    location.href = 'shop.html';
+  });
+</script>
+</body>
+</html>

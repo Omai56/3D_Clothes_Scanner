@@ -1,0 +1,20 @@
+{
+  "id": "zara-slim-jeans",
+  "name": "Slim Fit Jeans",
+  "brand": "Zara",
+  "url": "https://www.zara.com/",
+  "category": "bottom",
+  "fabric": "98% cotton, 2% elastane",
+  "stretch": "low",
+  "images": ["/img/jeans.svg"],
+  "source": "DEMO DATA — approximate size chart, replace with the real chart from the product page",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "waist/hip/thigh = width measured flat (half circumference); inseam = crotch to hem; rise = crotch to top of waistband (front)",
+  "sizes": {
+    "30": { "waist": 39.0, "hip": 47.0, "thigh": 29.0, "inseam": 78, "rise": 26 },
+    "32": { "waist": 41.5, "hip": 49.5, "thigh": 30.5, "inseam": 79, "rise": 27 },
+    "34": { "waist": 44.0, "hip": 52.0, "thigh": 32.0, "inseam": 80, "rise": 28 },
+    "36": { "waist": 46.5, "hip": 54.5, "thigh": 33.5, "inseam": 81, "rise": 29 }
+  }
+}

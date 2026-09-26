@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Your Fit · FitCheck</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <a class="logo" href="index.html">Fit<span>Check</span></a>
+    <div class="steps" aria-label="Step 3 of 3"><i class="on"></i><i class="on"></i><i class="on"></i><span>3 / 3</span></div>
+  </header>
+
+  <a class="back" href="shop.html">&larr; All clothes</a>
+  <div id="notice"></div>
+
+  <section class="card result-hero">
+    <div class="img" id="garmentImg"></div>
+    <div class="head">
+      <div class="brand" id="brand"></div>
+      <h1 id="name"></h1>
+    </div>
+    <div class="badge-row"><div class="size-badge" id="badge"></div></div>
+    <div class="verdict">
+      <p class="summary" id="summary" aria-live="polite"></p>
+      <p class="fabric" id="fabric"></p>
+    </div>
+  </section>
+
+  <section class="card fitmap">
+    <h2>Fit on your body</h2>
+    <p class="sub" id="sub"></p>
+    <div class="size-tabs" id="tabs" role="group" aria-label="Compare sizes"></div>
+    <div class="fitmap-body">
+      <div id="figure"></div>
+      <div>
+        <ul class="regions" id="regions"></ul>
+        <p class="ease-note">Room is garment minus body, in cm. The body map colours the worst result in each area.</p>
+        <ul class="notes" id="notes"></ul>
+        <div class="legend">
+          <span><i style="background:var(--good)"></i>Good fit</span>
+          <span><i style="background:var(--warn)"></i>Slightly snug or relaxed</span>
+          <span><i style="background:var(--bad)"></i>Too tight or too loose</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="fit-ui.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const garmentId = new URLSearchParams(location.search).get('id');
+  const saved = Fit.loadBody();
+  if (!saved) $('notice').innerHTML = '<p class="notice">Showing results for the demo body. <a href="index.html">Add your measurements</a> for your own fit.</p>';
+  else if (saved.source === 'manual') $('notice').innerHTML = '<p class="notice">Based on your typed measurements. A body scan adds arm and thigh sizes for a sharper result.</p>';
+
+  const figure = $('figure');
+  figure.innerHTML = Fit.bodyFigure('Body outline coloured by fit');
+  $('summary').textContent = 'Checking the fit…';
+
+  Promise.all([Fit.getGarment(garmentId), Fit.runFit(saved, garmentId)]).then(([garment, { report }]) => {
+    const img = garment.images?.[0];
+    $('garmentImg').innerHTML = img ? `<img src="${Fit.esc(img)}" alt="${Fit.esc(garment.name)}">` : '';
+    $('brand').textContent = garment.brand;
+    $('name').textContent = garment.name;
+    $('fabric').textContent = [garment.fabric, Fit.isSampleChart(garment) ? 'Sample size chart' : garment.price].filter(Boolean).join(' · ');
+    document.title = `${garment.name} · Your Fit`;
+
+    const rec = report.recommended;
+    const recView = Fit.describeSize(report.sizes[rec]);
+    const worst = Object.values(recView.areas).includes('bad') ? 'bad' : 'good';
+    const badge = $('badge');
+    badge.innerHTML = `<span class="dot">${Fit.esc(rec)}</span>Recommended: ${Fit.esc(Fit.sizeName(rec))}`;
+    badge.classList.toggle('bad', worst === 'bad');
+    $('notes').innerHTML = (report.notes || []).map(n => `<li>${Fit.esc(n.replace(/\s+—\s+/g, ', '))}</li>`).join('');
+
+    function show(size) {
+      const view = size === rec ? recView : Fit.describeSize(report.sizes[size]);
+      $('summary').textContent = view.summary;
+      $('sub').textContent = size === rec ? `Size ${size}, our recommendation for you.` : `Size ${size}. We recommend ${rec}.`;
+      figure.querySelectorAll('.region').forEach(g => {
+        g.classList.remove('lv-good', 'lv-warn', 'lv-bad');
+        const lv = view.areas[g.dataset.region];
+        if (lv) g.classList.add('lv-' + lv);
+      });
+      $('regions').innerHTML = view.regions.map(r => `
+        <li class="lv-${r.level}"${r.note ? ` title="${Fit.esc(r.note)}"` : ''}>
+          <span class="swatch"></span>
+          <span class="rtext"><span class="rname">${Fit.esc(r.label)}</span><br><span class="rdetail">${Fit.esc(r.detail)}</span></span>
+          <span class="chip lv-${r.level}">${Fit.esc(r.chip)}</span>
+        </li>`).join('');
+      document.querySelectorAll('.size-tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === size)));
+    }
+
+    const order = report.size_order || Object.keys(report.sizes);
+    $('tabs').innerHTML = order.map(s => `
+      <button class="size-tab" type="button" data-size="${Fit.esc(s)}" aria-pressed="false"
+        aria-label="Size ${Fit.esc(Fit.sizeName(s))}${s === rec ? ', recommended' : ''}">
+        ${Fit.esc(s)}${s === rec ? '<span class="rec"></span>' : ''}
+      </button>`).join('');
+    $('tabs').addEventListener('click', e => { const b = e.target.closest('.size-tab'); if (b) show(b.dataset.size); });
+    show(rec);
+  }).catch(err => {
+    $('summary').textContent = `Could not check the fit: ${err.message}`;
+  });
+</script>
+</body>
+</html>

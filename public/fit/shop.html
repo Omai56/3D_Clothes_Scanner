@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Choose Clothes · FitCheck</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <a class="logo" href="index.html">Fit<span>Check</span></a>
+    <div class="steps" aria-label="Step 2 of 3"><i class="on"></i><i class="on"></i><i></i><span>2 / 3</span></div>
+  </header>
+
+  <h1>Pick something to try on</h1>
+  <p class="lede">Tap an item to see which size fits you, and where.</p>
+
+  <div class="card measure-chip" id="chip"></div>
+  <section class="grid" id="grid" aria-label="Clothes"></section>
+</main>
+
+<script src="fit-ui.js"></script>
+<script>
+  const saved = Fit.loadBody();
+  const short = { height: 'Height', chest: 'Chest', waist: 'Waist', hip: 'Hips', inseam: 'Inseam', shoulder: 'Shoulders' };
+  document.getElementById('chip').innerHTML = saved
+    ? (saved.source === 'scan' ? `<span><b>${Fit.esc(saved.label)}</b></span>` : '') +
+      Fit.FIELDS.map(f => `<span>${short[f.key]} <b>${Math.round(saved.values[f.key])}</b></span>`).join('') + '<a href="index.html">Edit</a>'
+    : '<span>Using the demo body.</span><a href="index.html">Add yours</a>';
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '<p class="lede">Loading clothes…</p>';
+  Fit.getGarments().then(list => {
+    grid.innerHTML = list.map(g => `
+      <a class="card garment" href="result.html?id=${encodeURIComponent(g.id)}">
+        <div class="img">${g.images?.[0] ? `<img src="${Fit.esc(g.images[0])}" alt="${Fit.esc(g.name)}" loading="lazy">` : ''}
+          ${Fit.isSampleChart(g) ? '<span class="tag">Sample chart</span>' : ''}</div>
+        <div class="meta">
+          <div class="brand">${Fit.esc(g.brand)}</div>
+          <div class="name">${Fit.esc(g.name)}</div>
+        </div>
+      </a>`).join('');
+  }).catch(err => { grid.innerHTML = `<p class="form-error">Could not load clothes: ${Fit.esc(err.message)}</p>`; });
+</script>
+</body>
+</html>

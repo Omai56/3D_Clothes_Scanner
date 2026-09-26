@@ -84,3 +84,17 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Verified:** app screenshot with Daniel's body — tee S = green, best fit; M = relaxed blue. Torso rings within 6% of Bodygram girths (waist/hip/thigh).
 **Scans used:** 2 of 5 (demo + daniel). 3 left.
 **Files:** `data/scans/daniel.*`, `scripts/save-scan.js`, `server/bodygram.js`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 14:50 — Real Zara size chart for the heavyweight tee + fit-engine upgrades
+**By:** Claude (Fable 5.1)
+**What:**
+- `data/garments/zara-heavyweight-tee.json` — real chart from the product page (Basic Heavyweight T-Shirt /03, ref 1887/410/800, S–XXL), converted from inches to cm. Real product photos in `public/img/zara-heavyweight-tee*.png`. Fabric composition still to confirm.
+- `shared/fit.js` — new **upper arm** region (chart `arm_width` vs `upperArmGirthR`); **dropped-shoulder detection** (shoulder seam ≥ 90% of chest width on the smallest size → shoulders reported as "good (dropped)" with a note instead of "loose"), decided once per garment so all sizes agree. Optional `shoulder_style` override in the garment JSON.
+- `public/js/viewer.js` — sleeve tube width now comes from the chart's arm width when available, coloured by the upper-arm verdict.
+- `public/js/app.js` — default body is now the newest phone scan; if a saved body disappears the app refreshes the list instead of failing with "need scan name"; `server/index.js` returns a clear 404 for a missing body.
+- `tests/fit.test.js` — chart-driven expectations + dropped-shoulder/upper-arm test (17 tests pass).
+
+**Result for Daniel (real scan × real chart):** S recommended; chest +25 cm (relaxed — boxy cut), upper arm relaxed, hem at the hip, sleeves mid upper arm. M/L very loose in the chest.
+**Files:** `data/garments/zara-heavyweight-tee.json`, `public/img/zara-heavyweight-tee*.png`, `shared/fit.js`, `public/js/viewer.js`, `public/js/app.js`, `server/index.js`, `tests/fit.test.js`, `CHANGELOG.md`

@@ -36,6 +36,7 @@ const BANDS = {
   waist_top: [0, 6, 16, 28],
   hem: [0, 4, 14, 26],
   shoulder: [-2, 0, 3, 7],
+  arm: [0, 3, 10, 18],
   waist: [-1, 2, 6, 12],
   hip: [0, 3, 9, 16],
   thigh: [0, 2, 7, 13],
@@ -49,6 +50,7 @@ export const REGION_DEFS = {
     waist_top: { chartKey: 'waist', bodyKey: 'waistGirth', kind: 'girth', heightKey: 'waistHeight', label: 'Waist' },
     hem: { chartKey: 'hem', bodyKey: null, kind: 'girth_at_hem', label: 'Hem' },
     shoulder: { chartKey: 'shoulder', bodyKey: 'acrossBackShoulderWidth', kind: 'linear', label: 'Shoulders' },
+    arm: { chartKey: 'arm_width', bodyKey: 'upperArmGirthR', kind: 'girth', heightKey: null, label: 'Upper arm' },
     length: { chartKey: 'length', kind: 'top_length', label: 'Length' },
     sleeve: { chartKey: 'sleeve', kind: 'sleeve', label: 'Sleeves' },
   },
@@ -59,6 +61,13 @@ export const REGION_DEFS = {
     inseam: { chartKey: 'inseam', kind: 'inseam', label: 'Inseam' },
   },
 };
+
+/** A garment is cut with dropped shoulders when its shoulder seam is nearly as wide as its chest (checked on the smallest size). */
+export function isDroppedShoulder(garment) {
+  if (garment.shoulder_style) return garment.shoulder_style === 'dropped';
+  const first = Object.values(garment.sizes ?? {})[0];
+  return !!(first && first.shoulder != null && first.chest != null && first.shoulder >= first.chest * 0.9);
+}
 
 function bandVerdict(ease, bands, stretchShift = 0) {
   const [t, s, g, l] = bands;
@@ -176,13 +185,17 @@ export function evaluateSize(body, garment, size) {
       const bodyV = body[def.bodyKey];
       if (bodyV == null) continue;
       const ease = v - bodyV;
+      // Dropped shoulder: the seam is cut as wide as the chest on purpose and sits on the upper
+      // arm. That's the design, not a bad fit, so don't call it "loose".
+      const dropped = region === 'shoulder' && ease > 5 && isDroppedShoulder(garment);
       regions[region] = {
-        label: def.label,
+        label: dropped ? 'Shoulders (dropped)' : def.label,
         garment_cm: round(v),
         body_cm: round(bodyV),
         ease_cm: round(ease),
-        verdict: bandVerdict(ease, BANDS[region], 0),
+        verdict: dropped ? 'good' : bandVerdict(ease, BANDS[region], 0),
         height_cm: body.backNeckHeight,
+        ...(dropped ? { note: 'Dropped-shoulder cut: the seam sits on the upper arm by design.' } : {}),
       };
     } else if (def.kind === 'top_length') {
       const r = topLengthVerdict(v, body);

@@ -142,7 +142,10 @@ app.post('/api/import', async (req, res) => {
 app.post('/api/fit', async (req, res) => {
   const { scan, measurements_cm, garment_id, garment } = req.body ?? {};
   let body = measurements_cm;
-  if (!body && scan) body = (await readScan(scan))?.measurements_cm;
+  if (!body && scan) {
+    body = (await readScan(scan))?.measurements_cm;
+    if (!body) return res.status(404).json({ error: `saved body "${scan}" not found — reload and pick a body again` });
+  }
   if (!body) return res.status(400).json({ error: 'need scan name or measurements_cm' });
   const g = garment ?? (await readGarment(garment_id));
   if (!g) return res.status(404).json({ error: 'garment not found' });

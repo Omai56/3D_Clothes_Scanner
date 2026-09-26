@@ -47,7 +47,12 @@ async function loadSavedScans() {
 async function selectScan(name, btn) {
   document.querySelectorAll('#saved-scans .card').forEach((c) => c.classList.remove('selected'));
   btn?.classList.add('selected');
-  const scan = await (await fetch(`/api/scans/${name}`)).json();
+  const res = await fetch(`/api/scans/${name}`);
+  if (!res.ok) {
+    await loadSavedScans();
+    return alert('That saved body is no longer available. Please pick another.');
+  }
+  const scan = await res.json();
   state.scan = scan;
   sessionStorage.setItem('scan', name);
   const m = scan.measurements_cm;
@@ -132,7 +137,7 @@ $('#import-form').addEventListener('submit', async (e) => {
 });
 
 async function selectGarment(g) {
-  if (!state.scan) return show('body');
+  if (!state.scan?.name) return show('body');
   state.garment = g;
   const r = await fetch('/api/fit', {
     method: 'POST',
@@ -140,6 +145,15 @@ async function selectGarment(g) {
     body: JSON.stringify({ scan: state.scan.name, garment_id: g.id }),
   });
   const data = await r.json();
+  if (r.status === 404 && data.error?.includes('body')) {
+    // The saved body disappeared (renamed/removed on the server): refresh the list and go back.
+    state.scan = null;
+    sessionStorage.removeItem('scan');
+    $('#body-summary').hidden = true;
+    await loadSavedScans();
+    show('body');
+    return alert('That saved body is no longer available. Please pick a body again.');
+  }
   if (!r.ok) return alert(data.error);
   state.report = data.report;
   state.size = data.report.recommended;
@@ -228,8 +242,10 @@ function esc(s) {
   show('body');
   const scans = await loadSavedScans();
   loadGarments();
+  // Prefer: the body used earlier this session → the newest real phone scan → the demo body.
   const remembered = sessionStorage.getItem('scan');
-  const pick = scans.find((s) => s.name === remembered) ?? scans.find((s) => s.name === 'demo');
+  const pick =
+    scans.find((s) => s.name === remembered) ?? scans.find((s) => s.input?.photos) ?? scans.find((s) => s.name === 'demo') ?? scans[0];
   if (pick) {
     const card = [...document.querySelectorAll('#saved-scans .card')][scans.indexOf(pick)];
     await selectScan(pick.name, card);

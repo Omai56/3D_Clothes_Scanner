@@ -17,9 +17,18 @@ test('demo body has the measurements the fit engine needs', () => {
 test('flat chart widths are doubled before comparing to body girths', () => {
   const tee = load('zara-heavyweight-tee');
   const m = evaluateSize(body, tee, 'M');
-  assert.equal(m.regions.chest.garment_cm, 108); // 54 flat -> 108 circumference
+  assert.equal(m.regions.chest.garment_cm, Math.round(tee.sizes.M.chest * 2 * 10) / 10);
   assert.equal(m.regions.chest.body_cm, 91.4);
-  assert.equal(m.regions.chest.ease_cm, 16.6);
+  assert.equal(m.regions.chest.ease_cm, Math.round((tee.sizes.M.chest * 2 - 91.4) * 10) / 10);
+});
+
+test('real Zara heavyweight tee: dropped shoulders are not reported as loose; upper arm is checked', () => {
+  const tee = load('zara-heavyweight-tee');
+  const s = evaluateSize(body, tee, 'S');
+  assert.equal(s.regions.shoulder.verdict, 'good');
+  assert.match(s.regions.shoulder.label, /dropped/i);
+  assert.ok(s.regions.arm, 'upper arm region missing');
+  assert.equal(s.regions.arm.garment_cm, Math.round(tee.sizes.S.arm_width * 2 * 10) / 10);
 });
 
 test('bigger sizes are never tighter than smaller ones', () => {

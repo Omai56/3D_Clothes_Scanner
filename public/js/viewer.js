@@ -145,11 +145,15 @@ export class FitViewer {
     const sleeveCm = garment.sizes[ev.size]?.sleeve;
     if (sleeveCm && R.sleeve) {
       const chestDelta = anchors.find((a) => a.color === col(R.chest?.verdict))?.delta ?? 0.01;
-      const radius = (b.upperArmGirthR ?? 30) / 100 / TWO_PI + 0.012 + Math.max(0, chestDelta) * 0.4;
+      // Sleeve width from the chart when the store gives it (flat width x2 = circumference).
+      const armWidth = garment.sizes[ev.size]?.arm_width;
+      const radius = armWidth
+        ? Math.max((armWidth * 2) / 100 / TWO_PI, (b.upperArmGirthR ?? 30) / 100 / TWO_PI + MIN_GAP)
+        : (b.upperArmGirthR ?? 30) / 100 / TWO_PI + 0.012 + Math.max(0, chestDelta) * 0.4;
       for (const side of ['R', 'L']) {
         const arm = this.arms[side];
         if (!arm) continue;
-        const tube = sleeveTube(arm, sleeveCm / 100, radius, col(R.sleeve.verdict));
+        const tube = sleeveTube(arm, sleeveCm / 100, radius, col(R.arm?.verdict ?? R.sleeve.verdict));
         if (tube) this.garmentGroup.add(tube);
       }
     }

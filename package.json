@@ -1,0 +1,17 @@
+{
+  "name": "3d-clothes-scanner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Measurement-based virtual fit: body scan + product size chart -> which size fits, shown on your own 3D body",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test tests/",
+    "scan:stats": "node scripts/run-stats-scan.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}

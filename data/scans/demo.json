@@ -1,0 +1,191 @@
+{
+  "createdAt": 1790451370,
+  "customScanId": "demo",
+  "id": "scan_4AKbV4RnoDDeEivKO5L7Vv",
+  "input": {
+    "heightCm": 175,
+    "weightKg": 70,
+    "age": 22,
+    "gender": "male"
+  },
+  "measurements": [
+    {
+      "name": "acrossBackShoulderWidth",
+      "unit": "mm",
+      "value": 467
+    },
+    {
+      "name": "backNeckHeight",
+      "unit": "mm",
+      "value": 1484
+    },
+    {
+      "name": "backNeckPointToGroundContoured",
+      "unit": "mm",
+      "value": 1525
+    },
+    {
+      "name": "backNeckPointToWaist",
+      "unit": "mm",
+      "value": 436
+    },
+    {
+      "name": "backNeckPointToWristLengthR",
+      "unit": "mm",
+      "value": 818
+    },
+    {
+      "name": "bellyWaistDepth",
+      "unit": "mm",
+      "value": 206
+    },
+    {
+      "name": "bellyWaistGirth",
+      "unit": "mm",
+      "value": 794
+    },
+    {
+      "name": "bellyWaistHeight",
+      "unit": "mm",
+      "value": 1021
+    },
+    {
+      "name": "bellyWaistWidth",
+      "unit": "mm",
+      "value": 293
+    },
+    {
+      "name": "bustGirth",
+      "unit": "mm",
+      "value": 914
+    },
+    {
+      "name": "bustHeight",
+      "unit": "mm",
+      "value": 1254
+    },
+    {
+      "name": "calfGirthR",
+      "unit": "mm",
+      "value": 369
+    },
+    {
+      "name": "forearmGirthR",
+      "unit": "mm",
+      "value": 267
+    },
+    {
+      "name": "hipGirth",
+      "unit": "mm",
+      "value": 935
+    },
+    {
+      "name": "hipHeight",
+      "unit": "mm",
+      "value": 862
+    },
+    {
+      "name": "insideLegHeight",
+      "unit": "mm",
+      "value": 797
+    },
+    {
+      "name": "insideLegLengthR",
+      "unit": "mm",
+      "value": 734
+    },
+    {
+      "name": "kneeGirthR",
+      "unit": "mm",
+      "value": 393
+    },
+    {
+      "name": "kneeHeightR",
+      "unit": "mm",
+      "value": 481
+    },
+    {
+      "name": "midThighGirthR",
+      "unit": "mm",
+      "value": 481
+    },
+    {
+      "name": "neckBaseGirth",
+      "unit": "mm",
+      "value": 412
+    },
+    {
+      "name": "neckGirth",
+      "unit": "mm",
+      "value": 378
+    },
+    {
+      "name": "outerAnkleHeightR",
+      "unit": "mm",
+      "value": 65
+    },
+    {
+      "name": "outerArmLengthR",
+      "unit": "mm",
+      "value": 594
+    },
+    {
+      "name": "outseamR",
+      "unit": "mm",
+      "value": 1010
+    },
+    {
+      "name": "outsideLegLengthR",
+      "unit": "mm",
+      "value": 1076
+    },
+    {
+      "name": "shoulderToElbowR",
+      "unit": "mm",
+      "value": 322
+    },
+    {
+      "name": "thighGirthR",
+      "unit": "mm",
+      "value": 562
+    },
+    {
+      "name": "topHipGirth",
+      "unit": "mm",
+      "value": 841
+    },
+    {
+      "name": "topHipHeight",
+      "unit": "mm",
+      "value": 956
+    },
+    {
+      "name": "underBustGirth",
+      "unit": "mm",
+      "value": 848
+    },
+    {
+      "name": "upperArmGirthR",
+      "unit": "mm",
+      "value": 285
+    },
+    {
+      "name": "waistGirth",
+      "unit": "mm",
+      "value": 779
+    },
+    {
+      "name": "waistHeight",
+      "unit": "mm",
+      "value": 1051
+    },
+    {
+      "name": "wristGirthR",
+      "unit": "mm",
+      "value": 165
+    }
+  ],
+  "memberId": "key_2KMxvjbDHwntP30N74lRcD",
+  "status": "success",
+  "avatarFile": "demo.obj"
+}

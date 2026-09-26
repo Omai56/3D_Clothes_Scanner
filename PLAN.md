@@ -7,6 +7,8 @@ Scan your body, paste a clothing link, and see **which size actually fits and wh
 
 ---
 
+**Platform:** a web app used on the phone (mobile browser, portrait). Must be served over HTTPS so the phone camera works for the scan and so the phone can open it at all (Vercel for the demo, ngrok during development). Desktop is secondary.
+
 ## User flow
 1. **Scan** — user scans their body with their phone (Bodygram Scanner) → we get ~35 body measurements + a 3D body model (OBJ).
 2. **Paste a link** — user pastes a product link (e.g. Zara).

@@ -111,3 +111,10 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Daniel's results (real scan × real charts):** heavyweight tee **S** (boxy cut, relaxed), slim tee **L** (M very close), loose jeans **29** (waistband at natural waist, cropped ankle-length leg).
 **Files:** `data/garments/`, `public/img/zara-*.png`, `shared/fit.js`, `public/js/viewer.js`, `tests/fit.test.js`, `PLAN.md`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 15:50 — Loose jeans: description, rise/leg style recorded
+**By:** Claude (Fable 5.1)
+**What:** `data/garments/zara-loose-jeans.json` — added Zara's description (mid-rise, straight leg hip to ankle, rigid raw denim, model height 187 cm) and `rise_style: mid`, `leg_style: straight`. No inseam is published for this item; it remains estimated as total length − front rise.
+**Files:** `data/garments/zara-loose-jeans.json`, `CHANGELOG.md`

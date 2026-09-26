@@ -190,3 +190,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Verified:** headless renders of the jeans front (29 vs 34), side and back — enclosed everywhere, sizes differ; slim tee front/side; heavyweight unchanged; no console errors; 24 tests pass.
 **Files:** `public/models/*.glb`, `data/garments/*.json`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 21:10 — Tops now drape on the body: ring-wrapped torso, sleeves along the arms, shoulder drape
+**By:** Claude (Fable 5.1)
+**What:** `public/js/viewer.js` `_deformTop` replaces the scale-and-place approach for tops (same idea as the trousers):
+- **Torso** below the shoulder line: each vertex is placed by angle on the body's own ring at its height, pushed out by the chart's radial ease (chest circumference vs body), never narrower than the chest below the bust (cloth hangs). Result: the tee follows the chest/back instead of floating as a rigid box.
+- **Collar zone** (above the shoulder line): the mesh's own collar/shoulder shape, scaled to the chest, blended into the ring mapping over 5 cm — no more turtleneck.
+- **Shoulder drape:** a height map of the shoulder tops (armpit → just below the neck base, head excluded) lifts any cloth that would sit inside the shoulders onto the surface (max 5 cm), bilinear so it doesn't step.
+- **Sleeves:** detected along each sleeve's own axis in the flat mesh (shoulder seam → cuff centre; flat-lay sleeves hang diagonally), width measured from the mesh; each sleeve becomes a tube of the chart's arm circumference along the scanned arm direction from the shoulder point. Underarm cloth beside the sleeve stays with the torso (was collapsing into stripes).
+- Look/Fit semantics: Look always encloses the body (a tight garment hugs with a small gap); Fit shows where it's tight/loose in colour.
+**Verified:** headless renders — heavyweight tee S/XL front + side, slim tee front + back, jeans regression: enclosed everywhere, no console errors; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

@@ -102,6 +102,9 @@ export class FitViewer {
     // Arm loops exist only below the armpit; the shoulder point itself comes from the scan.
     const shoulderY = bodyCm.backNeckHeight / 100 - 0.05;
     const shoulderX = bodyCm.acrossBackShoulderWidth / 200 - 0.01;
+    // Height map of the shoulders (top of the body between armpit and neck base) for draping.
+    // (neck and head excluded: only the shoulder tops, up to just below the neck base)
+    this.shoulderMap = buildTopMap(positions, (this.rings.armpitY ?? bodyCm.bustHeight / 100) - 0.05, bodyCm.backNeckHeight / 100 - 0.045);
     this.arms = {};
     for (const [side, sign] of [['R', 1], ['L', -1]]) {
       const line = armLine(this.rings['arm' + side]);
@@ -157,57 +160,6 @@ export class FitViewer {
     const chart = garment.sizes?.[sizeEval.size] ?? {};
     const isTop = garment.category === 'top';
 
-    if (!isTop) {
-      // Trousers: a flat-lay mesh is two flat slabs. Reshape it band by band around the body.
-      this._deformBottoms(model, box, R, chart);
-      this.meshyGroup.add(model);
-      this.setMode(this.mode ?? 'look');
-      return;
-    }
-
-    // Vertical placement from the chart: garment length on this body.
-    let topY;
-    let hemY;
-    if (isTop) {
-      topY = b.backNeckHeight / 100 + 0.01;
-      hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
-    } else {
-      topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
-      hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100, topY - (chart.total_length ?? b.waistHeight) / 100);
-    }
-    const heightM = topY - hemY;
-    const sy = (heightM > 0 ? heightM : 0.6) / (size.y || 1);
-
-    // Depth from the body: a mesh made from a flat photo has no real depth, so wrap it around the
-    // body's actual front-to-back extent (plus the ease) over the covered height range.
-    const ext = this._bodyExtent(isTop ? [this.rings.torso] : [this.rings.torso, this.rings.right, this.rings.left], hemY, topY);
-    const easeR = Math.max(MIN_GAP, cmEaseToRadius(isTop ? R.chest?.ease_cm : R.hip?.ease_cm ?? R.waist?.ease_cm));
-    const depthM = ext ? ext.zmax - ext.zmin + 2 * (easeR + 0.015) : size.z * sy;
-    const sz = depthM / (size.z || 1);
-
-    // Width from the chart: the garment's circumference is 2 x its flat width. Worn, it forms
-    // roughly an ellipse with that perimeter and the depth above, so its visible width is the
-    // ellipse's major axis (a 56 cm flat tee reads ~42 cm wide on the body). This is what makes
-    // S and XL differ.
-    const flatWidthCm = isTop ? chart.chest ?? chart.hem : chart.hip ?? chart.waist;
-    const bandWidth = isTop ? bands.bottom.width : bands.top.width;
-    let sx = sy;
-    if (flatWidthCm && bandWidth > 0.05) {
-      const C = (2 * flatWidthCm) / 100; // circumference, metres
-      const bHalf = depthM / 2;
-      const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - bHalf ** 2));
-      const wornWidth = Math.max(2 * aHalf, (ext ? ext.xmax - ext.xmin : 0) + 2 * easeR);
-      sx = wornWidth / bandWidth;
-    }
-    model.scale.set(sx, sy, sz);
-
-    // Top of the mesh at topY; centred on the body's torso in x/z.
-    const cx = (box.min.x + box.max.x) / 2;
-    const cz = (box.min.z + box.max.z) / 2;
-    const bodyCx = ext ? (ext.xmin + ext.xmax) / 2 : 0;
-    const bodyCz = ext ? (ext.zmin + ext.zmax) / 2 : 0;
-    model.position.set(bodyCx - cx * sx, topY - box.max.y * sy, bodyCz - cz * sz);
-
     // Fabric, not plastic: AI exports tend to come out glossy.
     this._meshMaterials = [];
     model.traverse((o) => {
@@ -228,8 +180,187 @@ export class FitViewer {
       }
     });
 
+    // A flat-lay mesh is two flat slabs. Reshape it vertex by vertex around the body.
+    if (isTop) this._deformTop(model, box, R, chart, garment);
+    else this._deformBottoms(model, box, R, chart);
     this.meshyGroup.add(model);
     this.setMode(this.mode ?? 'look');
+  }
+
+  /**
+   * Reshape a flat-lay top mesh onto the body: the torso wraps the body's rings (pushed out by
+   * the chart's ease, hanging straight from the chest), the sleeves become tubes along the arms.
+   */
+  _deformTop(model, box, R, chart, garment) {
+    const b = this.body;
+    const NB = 64;
+    const h = box.max.y - box.min.y || 1;
+    const meshCx = (box.min.x + box.max.x) / 2;
+    if (!this._gltfSlices) this._gltfSlices = sliceTopMesh(model, box, NB, meshCx);
+    const S = this._gltfSlices;
+
+    const neckY = b.backNeckHeight / 100;
+    const topY = neckY + 0.015;
+    const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
+    const bustY = b.bustHeight / 100;
+    const armpitY = this.rings.armpitY ?? bustY - 0.04;
+
+    // Radial ease (metres) at a height, from the chart circumference vs the body ring there.
+    const chestC = chart.chest ? (2 * chart.chest) / 100 : null;
+    const hemC = chart.hem ? (2 * chart.hem) / 100 : chestC;
+    const easeAt = (Y) => {
+      const Yc = Math.min(Y, bustY);
+      const ring = ringAt(this.rings.torso, Yc);
+      if (!ring) return MIN_GAP;
+      let C = chestC;
+      if (chestC && hemC && Y < bustY) {
+        const t = (bustY - Y) / Math.max(0.01, bustY - hemY);
+        C = chestC + (hemC - chestC) * Math.min(1, Math.max(0, t));
+      }
+      if (!C) return Math.max(MIN_GAP, cmEaseToRadius(R.chest?.ease_cm));
+      return Math.max(MIN_GAP, (C - ringCircumference(ring)) / TWO_PI);
+    };
+    const tCache = new Map();
+    const easeCached = (Y) => {
+      const k = Math.round(Y * 200);
+      let v = tCache.get(k);
+      if (v === undefined) tCache.set(k, (v = easeAt(Y)));
+      return v;
+    };
+    const bustEase = easeAt(bustY);
+
+    // Torso below the armpit: point on the ring at Y by angle; below the chest never narrower
+    // than the chest (cloth hangs).
+    const shoulderY = neckY - 0.06;
+    const torsoPoint = (Y, u, front) => {
+      const theta = front ? Math.acos(u) : -Math.acos(u);
+      const smp = sampleRing(this.rings.torso, Math.min(Y, shoulderY - 0.01), theta);
+      if (!smp) return null;
+      let r = smp.r + easeCached(Y) + 0.006;
+      if (Y < bustY) {
+        const bust = sampleRing(this.rings.torso, bustY, theta);
+        if (bust) r = Math.max(r, bust.r + bustEase + 0.006);
+      }
+      return [smp.cx + r * Math.cos(theta), smp.cz + r * Math.sin(theta)];
+    };
+
+    // Shoulders / collar above the armpit: a shirt sits ON the shoulders, so keep the mesh's own
+    // shape there, scaled so its chest band matches the body's chest (+ ease) and centred on it.
+    const vBust = clamp((bustY - hemY) / Math.max(0.01, topY - hemY), 0, 1);
+    const msBust = lerpStats(S.all, vBust, NB) ?? S.nearestAll(Math.floor(vBust * NB));
+    const bustRing = ringAt(this.rings.torso, bustY);
+    const extBust = ringExtent(bustRing) ?? { xmin: -0.17, xmax: 0.17, zmin: -0.12, zmax: 0.1 };
+    const upSx = ((extBust.xmax - extBust.xmin) / 2 + bustEase + 0.006) / msBust.hw;
+    const upSz = ((extBust.zmax - extBust.zmin) / 2 + bustEase + 0.006) / msBust.hd;
+    const upCx = (extBust.xmin + extBust.xmax) / 2;
+    const upCz = (extBust.zmin + extBust.zmax) / 2;
+    const upperPoint = (x, z) => [upCx + (x - msBust.cx) * upSx, upCz + (z - msBust.cz) * upSz];
+    // ring-wrap up to the shoulder line; the mesh's own (scaled) shape only for the collar zone
+    const blendLo = shoulderY - 0.05;
+    const blendHi = shoulderY;
+
+    // Sleeves: tube along the arm from the shoulder point, radius from the chart's arm width.
+    const sleeveLen = (chart.sleeve ?? 20) / 100;
+    const armR = chart.arm_width ? (2 * chart.arm_width) / 100 / TWO_PI : (b.upperArmGirthR ?? 30) / 100 / TWO_PI + 0.015;
+    const arms = {};
+    for (const side of ['R', 'L']) {
+      const a = this.arms?.[side];
+      if (!a) continue;
+      const Sx = a.shoulder.x;
+      const Sy = a.shoulder.y;
+      const Sz = a.shoulder.z;
+      let dx = a.hand.x - Sx;
+      let dy = a.hand.y - Sy;
+      let dz = a.hand.z - Sz;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      dx /= len;
+      dy /= len;
+      dz /= len;
+      // perpendicular in the x-y plane pointing outward/up
+      let nx = -dy;
+      let ny = dx;
+      const nl = Math.hypot(nx, ny) || 1;
+      nx /= nl;
+      ny /= nl;
+      if (nx * Math.sign(Sx) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      arms[side] = { Sx, Sy, Sz, dx, dy, dz, nx, ny };
+    }
+    // Half sleeve width as a fraction of sleeve length (flat width = chart arm width).
+    const sleeveHalfM = chart.arm_width ? chart.arm_width / 200 : armR * 1.6;
+    const sleeveHalfN = sleeveHalfM / Math.max(0.05, sleeveLen);
+    const sleevePoint = (side, s, u, front) => {
+      const A = arms[side];
+      if (!A) return null;
+      const phi = front ? Math.acos(u) : -Math.acos(u);
+      const along = s * sleeveLen;
+      const r = armR * (1 - 0.12 * s);
+      const px = A.Sx + A.dx * along;
+      const py = A.Sy + A.dy * along;
+      const pz = A.Sz + A.dz * along;
+      return [px + r * Math.cos(phi) * A.nx, py + r * Math.cos(phi) * A.ny, pz + r * Math.sin(phi)];
+    };
+
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const geo = o.geometry;
+      const orig = o.userData.origPos;
+      const pos = geo.attributes.position;
+      const out = pos.array;
+      const n = pos.count;
+      for (let i = 0; i < n; i++) {
+        const x = orig[i * 3];
+        const y = orig[i * 3 + 1];
+        const z = orig[i * 3 + 2];
+        const v = Math.min(0.9999, Math.max(0, (y - box.min.y) / h));
+        let p = null;
+        // Sleeve vertex? (position along/across the sleeve's own axis in the flat mesh)
+        const sv = S.sleeveOf(x, y, z);
+        if (sv) {
+          const q = sleevePoint(sv.side, sv.s, sv.u, sv.front);
+          if (q) {
+            out[i * 3] = q[0];
+            out[i * 3 + 1] = q[1];
+            out[i * 3 + 2] = q[2];
+            continue;
+          }
+        }
+        const band = Math.floor(v * NB);
+        const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
+        const Y = hemY + v * (topY - hemY);
+        const u = clamp((x - ms.cx) / ms.hw, -1, 1);
+        const pr = Y < blendHi ? torsoPoint(Y, u, z >= ms.cz) : null;
+        const pu = Y > blendLo ? upperPoint(x, z) : null;
+        if (pr && pu) {
+          const t = clamp((Y - blendLo) / (blendHi - blendLo), 0, 1);
+          p = [pr[0] + (pu[0] - pr[0]) * t, pr[1] + (pu[1] - pr[1]) * t];
+        } else p = pr ?? pu;
+        let Yd = Y;
+        if (p && Y > armpitY && this.shoulderMap) {
+          // drape: cloth above the armpit rests ON the shoulders, never inside them
+          const top = this.shoulderMap.lookup(p[0], p[1]);
+          if (top != null) Yd = Math.max(Y, Math.min(top + 0.008, Y + 0.05));
+        }
+        out[i * 3] = p ? p[0] : x;
+        out[i * 3 + 1] = Yd;
+        out[i * 3 + 2] = p ? p[1] : z;
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+      if (window.__debugTop) {
+        const samples = [];
+        for (let i = 0; i < n && samples.length < 12; i += 977) {
+          const ax = Math.abs(orig[i * 3] - meshCx);
+          if (ax > S.torsoHalf) samples.push({ in: [orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2]].map((v) => +v.toFixed(3)), out: [out[i * 3], out[i * 3 + 1], out[i * 3 + 2]].map((v) => +v.toFixed(3)) });
+        }
+        this.debugTop = { torsoHalf: S.torsoHalf, sleeveLen: S.sleeveLen, maxAx: S.torsoHalf + S.sleeveLen, box: [box.min.toArray(), box.max.toArray()], arms, sleeveLenM: sleeveLen, armR, cols: S.sleeves.R.map((c) => c && { yc: +c.yc.toFixed(3), yh: +c.yh.toFixed(3), zc: +c.zc.toFixed(3) }), samples, armpitY, bustY, hemY, topY, upSx, upSz };
+      }
+    });
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
   }
 
   /**
@@ -685,6 +816,61 @@ function sliceMesh(scene, box, NB, meshCx) {
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
+/** Top-of-body height map (max y per 1 cm x/z cell) for vertices with yMin <= y <= yMax. */
+function buildTopMap(positions, yMin, yMax) {
+  const cell = 0.01;
+  const x0 = -0.5;
+  const z0 = -0.4;
+  const nx = 100;
+  const nz = 80;
+  const data = new Float32Array(nx * nz).fill(-Infinity);
+  for (let i = 0; i < positions.length; i += 3) {
+    const y = positions[i + 1];
+    if (y < yMin || y > yMax) continue;
+    const ix = Math.floor((positions[i] - x0) / cell);
+    const iz = Math.floor((positions[i + 2] - z0) / cell);
+    if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) continue;
+    const k = iz * nx + ix;
+    if (y > data[k]) data[k] = y;
+  }
+  // Fill 1-cell holes so the surface is continuous, then sample bilinearly (no 1 cm steps).
+  const filled = Float32Array.from(data);
+  for (let iz = 1; iz < nz - 1; iz++) {
+    for (let ix = 1; ix < nx - 1; ix++) {
+      const k = iz * nx + ix;
+      if (Number.isFinite(data[k])) continue;
+      let sum = 0;
+      let cnt = 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        const v = data[(iz + dz) * nx + ix + dx];
+        if (Number.isFinite(v)) { sum += v; cnt++; }
+      }
+      if (cnt >= 3) filled[k] = sum / cnt;
+    }
+  }
+  const at = (ix, iz) => (ix < 0 || iz < 0 || ix >= nx || iz >= nz ? -Infinity : filled[iz * nx + ix]);
+  return {
+    lookup(x, z) {
+      const fx = (x - x0) / cell - 0.5;
+      const fz = (z - z0) / cell - 0.5;
+      const ix = Math.floor(fx);
+      const iz = Math.floor(fz);
+      const tx = fx - ix;
+      const tz = fz - iz;
+      const v00 = at(ix, iz);
+      const v10 = at(ix + 1, iz);
+      const v01 = at(ix, iz + 1);
+      const v11 = at(ix + 1, iz + 1);
+      const vals = [v00, v10, v01, v11];
+      const ws = [(1 - tx) * (1 - tz), tx * (1 - tz), (1 - tx) * tz, tx * tz];
+      let sum = 0;
+      let wsum = 0;
+      for (let i = 0; i < 4; i++) if (Number.isFinite(vals[i])) { sum += vals[i] * ws[i]; wsum += ws[i]; }
+      return wsum > 0.25 ? sum / wsum : null;
+    },
+  };
+}
+
 /**
  * Smoothly sampled body ring: radius/centre interpolated between the two nearest 1 cm slices
  * and between the two nearest angular bins, so deformed meshes don't show the ring grid.
@@ -724,6 +910,196 @@ function lerpStats(arr, v, NB) {
     };
   }
   return s0 ?? s1 ?? null;
+}
+
+/**
+ * Per-band statistics of a top mesh (torso columns only) plus per-column statistics of each
+ * sleeve. The torso half-width is taken from the hem band; anything further out is sleeve.
+ */
+function sliceTopMesh(scene, box, NB, meshCx) {
+  const h = box.max.y - box.min.y || 1;
+  const pct = (arr, q) => {
+    arr.sort((a, b) => a - b);
+    return arr[Math.min(arr.length - 1, Math.max(0, Math.floor(q * (arr.length - 1))))];
+  };
+  // torso half-width from the bottom 12 % of the mesh
+  const hemXs = [];
+  let maxAx = 0;
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const p = o.userData.origPos;
+    for (let i = 0; i < p.length; i += 3) {
+      const ax = Math.abs(p[i] - meshCx);
+      if (ax > maxAx) maxAx = ax;
+      if (p[i + 1] <= box.min.y + h * 0.12) hemXs.push(ax);
+    }
+  });
+  const torsoHalf = hemXs.length ? pct(hemXs, 0.99) * 1.02 : (box.max.x - box.min.x) / 4;
+  const sleeveLen = Math.max(0, maxAx - torsoHalf);
+
+  const NC = 24;
+  const mk = () => ({ xs: [], zs: [], ys: [] });
+  const all = Array.from({ length: NB }, mk);
+  const sleeves = { R: Array.from({ length: NC }, mk), L: Array.from({ length: NC }, mk) };
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const p = o.userData.origPos;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i];
+      const y = p[i + 1];
+      const z = p[i + 2];
+      const ax = Math.abs(x - meshCx);
+      if (ax > torsoHalf && sleeveLen > 0) {
+        const col = Math.min(NC - 1, Math.floor(((ax - torsoHalf) / sleeveLen) * NC));
+        const s = sleeves[x >= meshCx ? 'R' : 'L'][col];
+        s.ys.push(y);
+        s.zs.push(z);
+      } else {
+        const band = Math.min(NB - 1, Math.max(0, Math.floor(((y - box.min.y) / h) * NB)));
+        all[band].xs.push(x);
+        all[band].zs.push(z);
+      }
+    }
+  });
+  const finishBand = (s) => {
+    if (s.xs.length < 6) return null;
+    const xlo = pct(s.xs, 0.01);
+    const xhi = pct(s.xs, 0.99);
+    const zlo = pct(s.zs, 0.04);
+    const zhi = pct(s.zs, 0.96);
+    return { cx: (xlo + xhi) / 2, cz: (zlo + zhi) / 2, hw: Math.max(1e-3, (xhi - xlo) / 2), hd: Math.max(1e-3, (zhi - zlo) / 2) };
+  };
+  const finishCol = (s) => {
+    if (s.ys.length < 6) return null;
+    const ylo = pct(s.ys, 0.03);
+    const yhi = pct(s.ys, 0.97);
+    const zlo = pct(s.zs, 0.04);
+    const zhi = pct(s.zs, 0.96);
+    return { yc: (ylo + yhi) / 2, yh: Math.max(1e-3, (yhi - ylo) / 2), zc: (zlo + zhi) / 2 };
+  };
+  const out = { torsoHalf, sleeveLen, all: all.map(finishBand), sleeves: { R: sleeves.R.map(finishCol), L: sleeves.L.map(finishCol) }, NC };
+  // Sleeve axis per side: from the shoulder seam (top of the mesh just beyond the torso edge) to
+  // the cuff centre (the far column). Sleeves in flat-lay photos hang diagonally, so we need this.
+  out.frames = {};
+  for (const side of ['R', 'L']) {
+    const cols = out.sleeves[side];
+    const first = cols.find(Boolean);
+    let last = null;
+    for (let i = cols.length - 1; i >= 0; i--) if (cols[i]) { last = cols[i]; break; }
+    if (!first || !last || sleeveLen <= 0.01) continue;
+    const sgn = side === 'R' ? 1 : -1;
+    const seam = { x: meshCx + sgn * torsoHalf, y: first.yc + first.yh };
+    const cuff = { x: meshCx + sgn * (torsoHalf + sleeveLen * 0.97), y: last.yc };
+    let ax = cuff.x - seam.x;
+    let ay = cuff.y - seam.y;
+    const L = Math.hypot(ax, ay) || 1;
+    ax /= L;
+    ay /= L;
+    // perpendicular pointing up/outward (towards the sleeve's top edge)
+    const px = sgn > 0 ? -ay : ay;
+    const py = sgn > 0 ? ax : -ax;
+    out.frames[side] = { seam, ax, ay, px, py, L, zc: (first.zc + last.zc) / 2 };
+  }
+  // Second pass: the sleeve's own width, measured along its axis. The top edge (95th percentile
+  // across) is clean; the width comes from the middle of the sleeve, away from the torso.
+  const NS = 16;
+  for (const side of ['R', 'L']) {
+    const F = out.frames[side];
+    if (!F) continue;
+    const bins = Array.from({ length: NS }, () => []);
+    scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const p = o.userData.origPos;
+      for (let i = 0; i < p.length; i += 3) {
+        const x = p[i];
+        if ((side === 'R') !== x >= meshCx) continue;
+        if (Math.abs(x - meshCx) <= torsoHalf * 0.98) continue;
+        const rx = x - F.seam.x;
+        const ry = p[i + 1] - F.seam.y;
+        const s = (rx * F.ax + ry * F.ay) / F.L;
+        if (s < 0 || s >= 1) continue;
+        bins[Math.floor(s * NS)].push((rx * F.px + ry * F.py) / F.L);
+      }
+    });
+    const top = bins.map((b) => (b.length > 5 ? pct(b, 0.95) : null));
+    const widths = [];
+    for (let k = Math.floor(NS * 0.45); k < Math.floor(NS * 0.85); k++) {
+      const b = bins[k];
+      if (b.length > 5) widths.push((pct(b, 0.95) - pct(b, 0.05)) / 2);
+    }
+    widths.sort((a, b) => a - b);
+    const hw = widths.length ? widths[Math.floor(widths.length / 2)] : 0.15;
+    F.hw = hw;
+    F.top = top;
+    F.topAt = (s) => {
+      const k = Math.min(NS - 1, Math.max(0, Math.floor(s * NS)));
+      for (let d = 0; d < NS; d++) {
+        if (top[k - d] != null) return top[k - d];
+        if (top[k + d] != null) return top[k + d];
+      }
+      return hw;
+    };
+  }
+  // Sleeve test shared with the deformer: returns {side, s, u, front} or null.
+  out.sleeveOf = (x, y, z) => {
+    if (Math.abs(x - meshCx) <= torsoHalf * 0.98 || sleeveLen <= 0.01) return null;
+    const side = x >= meshCx ? 'R' : 'L';
+    const F = out.frames[side];
+    if (!F) return null;
+    const rx = x - F.seam.x;
+    const ry = y - F.seam.y;
+    const s = (rx * F.ax + ry * F.ay) / F.L;
+    const c = (rx * F.px + ry * F.py) / F.L;
+    const cTop = F.topAt(Math.min(0.999, Math.max(0, s)));
+    const cc = cTop - F.hw;
+    if (s > -0.08 && s < 1.06 && c <= cTop + 0.03 && c >= cc - F.hw * 1.15) {
+      return { side, s: Math.min(1, Math.max(0, s)), u: Math.max(-1, Math.min(1, (c - cc) / F.hw)), front: z >= F.zc };
+    }
+    return null;
+  };
+  // Torso band statistics over everything that is NOT sleeve (the widening upper torso beside
+  // the sleeves must be part of the torso, or it collapses onto the side seam).
+  const all2 = Array.from({ length: NB }, () => ({ xs: [], zs: [] }));
+  scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const p = o.userData.origPos;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i];
+      const y = p[i + 1];
+      const z = p[i + 2];
+      if (out.sleeveOf(x, y, z)) continue;
+      const band = Math.min(NB - 1, Math.max(0, Math.floor(((y - box.min.y) / h) * NB)));
+      all2[band].xs.push(x);
+      all2[band].zs.push(z);
+    }
+  });
+  out.all = all2.map(finishBand);
+  out.nearestAll = (band) => {
+    for (let d = 1; d < NB; d++) {
+      if (out.all[band - d]) return out.all[band - d];
+      if (out.all[band + d]) return out.all[band + d];
+    }
+    return { cx: meshCx, cz: 0, hw: torsoHalf, hd: 0.05 };
+  };
+  return out;
+}
+
+/** Sleeve column statistics interpolated along the sleeve (s = 0 at the shoulder seam, 1 at the cuff). */
+function sleeveCol(cols, s) {
+  const NC = cols.length;
+  const f = s * NC - 0.5;
+  const c0 = Math.max(0, Math.min(NC - 1, Math.floor(f)));
+  const c1 = Math.min(NC - 1, c0 + 1);
+  const t = Math.max(0, Math.min(1, f - c0));
+  const a = cols[c0];
+  const b = cols[c1];
+  if (a && b) return { yc: a.yc + (b.yc - a.yc) * t, yh: a.yh + (b.yh - a.yh) * t, zc: a.zc + (b.zc - a.zc) * t };
+  if (a || b) return a ?? b;
+  for (let d = 1; d < NC; d++) {
+    if (cols[c0 - d]) return cols[c0 - d];
+    if (cols[c0 + d]) return cols[c0 + d];
+  }
+  return null;
 }
 
 /** Remove faces whose three vertices all sit below yCut (opens a sealed hem). */

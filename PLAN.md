@@ -1,178 +1,148 @@
-# 3D Clothes Scanner — Hackathon Plan
+# 3D Clothes Scanner — Plan
 
-## Goal
+## The idea in one line
+Scan your body, paste a clothing link, and see **which size actually fits and where** — on your own 3D body, from any angle.
 
-Build a working demo that shows: user enters their measurements → selects a garment → gets a fit score and visual result. Judges should walk away understanding the idea immediately.
-
-No accounts, no real brand partnerships, no servers to set up. Hardcode what you have to. Ship the demo.
-
-**Team size: 4 people**
+**What makes it different:** most virtual try-on apps show a pretty picture that looks the same in S or XL. Ours is driven by real measurements: the size you pick visibly changes how the garment sits on *your* body.
 
 ---
 
-## Team Assignments
-
-### Person 1 — Body Input + Server
-
-**Goal:** Get user measurements into the system and wire everything together on the server side.
-
-**Body input:**
-- Build a simple form: height, chest, waist, hips, inseam, shoulder width
-- When the user submits, send those numbers to the server
-
-**Server (keep it simple):**
-- One route: `/fit` — receives body measurements + which garment was selected, returns a fit report
-- The garment catalog is just a file sitting in a folder (no database needed)
-- Store the 3D clothing files and their measurements in a local folder called `/assets`
-
-**Recommended tools:** FastAPI (Python) or Express (Node) — pick whichever your team knows fastest.
-
-**You do not need:** user accounts, a database, or any cloud storage.
-
-**Stretch goal:** If you have an iPhone 12 Pro+, you can use the phone's built-in body scanning to capture a real 3D scan instead of the form — impressive visually, but do not let the whole demo depend on it.
-
-**Deliverable by demo:**
-- Measurement form working, passes numbers to the server
-- The `/fit` and `/garments` routes running on your laptop
+## User flow
+1. **Scan** — user scans their body with their phone (Bodygram Scanner) → we get ~35 body measurements + a 3D body model (OBJ).
+2. **Paste a link** — user pastes a product link (e.g. Zara).
+3. **Pull product data** — photos, size chart for every size, fabric. If the live pull fails → use pre-saved demo items.
+4. **Fit check** — compare body measurements to each size's garment measurements → recommended size + where it's tight / good / loose.
+5. **See it on your body** — 3D body with a garment shape built from the size chart, colored by fit (red = tight, green = good, blue = loose). Switch sizes S/M/L/XL and watch it change. Rotate to any angle.
+6. **(Optional) Realistic image** — AI turns the 3D render into a photo-like image while keeping the measured shape.
 
 ---
 
-### Person 2 — Clothing Models + Fit Scoring
+## Architecture
 
-**Goal:** Get the 3D clothing files ready and write the logic that scores how well a garment fits.
+| Part | Tool | Role | Accurate? |
+|---|---|---|---|
+| Body scan + measurements + 3D body | **Bodygram Platform** | Hosted scanner page + API, returns measurements + OBJ avatar | Yes |
+| Product data | Scraper for Zara + **saved demo items** (JSON) | Photos, size chart, fabric | Saved items: yes |
+| Fit check | **Our code** (simple math) | Best size + per-region verdicts | Yes |
+| Size shown on body | **Our code, three.js** | Garment "shell" built from size-chart numbers around the Bodygram body | Yes — core of the demo |
+| Photo-real image (stretch) | Image model that follows a guide image (e.g. FLUX w/ control via Replicate/fal) | Makes the 3D render look real; shape stays from our math | Needs testing |
 
-**Clothing models (find them, do not build from scratch):**
-- Download free clothing models from Sketchfab (filter by free license) or TurboSquid free section
-- Target 3 to 5 garments: a t-shirt, jeans, a hoodie, a jacket, a dress
-- For each garment, manually write down its key measurements in a data file: chest width, waist width, hip width, total length, shoulder width — these are the numbers we compare against the user's body
+**Not using FASHN (for now):** it has no size/fit input, so S and XL look nearly identical. Only reconsider it as a "pretty preview", never as the size-accurate view.
 
-**Fit scoring:**
-- Write a function: `fitCheck(bodyMeasurements, garmentMeasurements)` → returns a fit report
-- The logic is simple: subtract the garment measurement from the body measurement to get "ease" (how much extra room there is), then label it
+---
 
-```
-fit_report = {
-  "overall": "good fit" or "tight" or "loose",
-  "regions": {
-    "chest":     { "extra_room_cm": +4,  "verdict": "good" },
-    "waist":     { "extra_room_cm": -1,  "verdict": "tight" },
-    "hips":      { "extra_room_cm": +8,  "verdict": "loose" },
-    "length":    { "extra_room_cm": +2,  "verdict": "good" },
-    "shoulders": { "extra_room_cm":  0,  "verdict": "good" }
-  },
-  "size_recommendation": "M",
-  "notes": "Waist runs small — size up if between sizes."
+## Core pieces
+
+### 1. Body scan (Bodygram)
+- Create a scan token: `POST https://platform.bodygram.com/api/orgs/{ORG_ID}/scan-tokens`
+- Send the user to the hosted scanner: `https://platform.bodygram.com/{locale}/{ORG_ID}/scan?token=...&system=metric` (new tab, or iframe with camera permission + Bodygram SDK).
+- Or scan directly by API: `POST /api/orgs/{ORG_ID}/scans` with front + side photos (base64), age, **weight in grams**, **height in mm**, gender. Stats-only scans (no photos) still return measurements + avatar.
+- Response: `measurements: [{name, unit, value}]` and `avatar: {data (base64 OBJ), format: "obj"}`.
+- **Only 5 free scans.** Save every scan's JSON + OBJ to `data/scans/` and reuse them. Never re-scan to test.
+- Phone camera requires **HTTPS** → host on Vercel/Netlify or use ngrok.
+
+### 2. Product data
+- **Demo path first:** 3–5 saved items in `data/garments/*.json` with photos, fabric, and a hand-entered size chart.
+- **Live path (bonus):** Zara is behind Akamai bot protection; plain requests get blocked. Try a headless browser. If the size chart can't be found in the page data, screenshot it and have Claude read it into JSON.
+- Garment JSON shape:
+```json
+{
+  "id": "zara-basic-tee",
+  "name": "Basic T-Shirt",
+  "category": "top",
+  "fabric": "100% cotton",
+  "stretch": "low",
+  "images": ["..."],
+  "chart_type": "garment_flat",
+  "sizes": {
+    "S": { "chest": 50, "waist": 48, "length": 68, "sleeve": 20, "shoulder": 44 },
+    "M": { "chest": 53, "waist": 51, "length": 70, "sleeve": 21, "shoulder": 46 }
+  }
 }
 ```
 
-**How to label the extra room:**
-- Less than -1 cm: too tight
-- -1 to +2 cm: snug / fitted
-- +2 to +6 cm: good fit
-- More than +6 cm: too loose
+### 3. Fit check (the accurate part)
+- **Watch the units:** Zara charts are usually **garment measured flat** (half the circumference) → multiply chest/waist/hip by 2 before comparing to body girths. Some charts are *body* measurements instead — store `chart_type` per item.
+- Per region: `ease = garment_circumference − body_circumference`
+- Labels depend on garment type and fabric stretch. Starting point for a regular woven top (tune after testing):
+  - `ease < 0` → **tight** (red)
+  - `0–4 cm` → **snug** (yellow)
+  - `4–12 cm` → **good** (green)
+  - `> 12 cm` → **loose** (blue)
+  - Stretchy fabric: allow slightly negative ease as "snug".
+- Length / sleeve: compare garment length to where it lands on the body (hem at hip vs mid-thigh; sleeve above/at/past wrist).
+- Recommend the size with no "tight" regions and the most "good" regions.
+- Output:
+```json
+{
+  "recommended": "M",
+  "sizes": {
+    "M": {
+      "regions": {
+        "chest":  { "ease_cm": 6,  "verdict": "good" },
+        "waist":  { "ease_cm": 14, "verdict": "loose" },
+        "length": { "lands_at": "mid-hip", "verdict": "good" }
+      },
+      "summary": "Good through the chest, relaxed at the waist."
+    }
+  }
+}
+```
 
-**Size recommendation:** run the fit check against Small, Medium, Large, and Extra Large measurements for that garment, and recommend whichever size has the most "good" regions.
+### 4. 3D fit view (the centerpiece)
+- three.js page: load the Bodygram OBJ, orbit controls to rotate.
+- Build the **garment shell**: copy the torso (and arms) of the body mesh and push it outward by `ease / (2π)` per region, blending smoothly between chest → waist → hip.
+- Cut the shell at the garment's real **hem length** and **sleeve length**.
+- Color the shell per region by verdict (red / yellow / green / blue), semi-transparent over the body.
+- S / M / L / XL buttons → shell visibly changes size and length. This is the "size actually shows on the body" moment.
 
-**Deliverable by demo:**
-- 3 to 5 garment files with their measurements written down
-- `fitCheck` function working and plugged into Person 1's server
-
----
-
-### Person 3 — What the User Sees (the App)
-
-**Goal:** Build the visual app that the user actually interacts with — and that judges watch during the demo.
-
-The app has three pages the user moves through in order:
-
-**Page 1 — Enter your measurements**
-This is the starting point. The user sees a simple form asking for their height, chest, waist, hips, inseam, and shoulder width. As they fill it in, a simple body outline drawing on the side highlights the body part they are measuring. When they hit submit, it moves to the next page.
-
-**Page 2 — Pick a clothing item**
-The user sees a grid of clothing cards — like browsing a clothing website. Each card shows a photo of the item, its name, and a fake brand logo (Nike, Hollister, whatever looks good). The user clicks one item to select it and move forward.
-
-**Page 3 — See how it fits**
-This is the most important page and what judges will remember. It shows:
-- A body outline drawing with each body region colored in — green means it fits well there, yellow means it is snug, red means it is too tight or too loose
-- A plain-English sentence underneath, like: "Good fit in the chest and shoulders. The waist runs a little tight — consider sizing up."
-- A clear size recommendation, like a badge that says "Recommended: Medium"
-- The clothing item shown next to or on the body
-
-**Recommended tools:** React for building the pages, Tailwind for making it look good fast.
-
-**Deliverable by demo:**
-- All 3 pages working and connected to Person 1's server
-- Looks polished enough to show on a laptop in front of judges
-
----
-
-### Person 4 — 3D Body Avatar
-
-**Goal:** Build the centerpiece of the entire demo — a 3D body figure shaped to the user's actual measurements, with the selected clothing item shown on it.
-
-This is the thing that makes the demo look like real technology and not just a spreadsheet. When the user enters their measurements and picks a jacket, they should see a 3D figure that roughly looks like their body wearing that jacket — and be able to spin it around.
-
-**Step 1 — Build the body figure from measurements**
-Take the measurements Person 1 collected (chest, waist, hips, height, etc.) and use them to generate a 3D body shape. You do not need to build this from scratch — use a free pre-built body model called SMPL (download at smpl.is.tue.mpg.de). It takes body measurements as input and outputs a realistic human body shape. Load it into the browser using Three.js (a free tool for showing 3D things in a web browser).
-
-The result: every user gets a figure that is shaped like them, not a generic mannequin.
-
-**Step 2 — Put the clothing on the body**
-Take the 3D clothing file from Person 2 and position it on the body figure. It does not need to simulate real fabric physics — just place it on the body and scale it to fit. The garment sits on the figure the same way a photo layer sits over an image.
-
-Color-code the garment on the body to match the fit report from Person 2 — green where it fits well, red where it is tight. This makes the fit result visual and immediate.
-
-**Step 3 — Make it interactive**
-The user should be able to click and drag to spin the figure around 360 degrees. That single interaction makes the demo feel polished and real. Three.js handles this in about 10 lines of code.
-
-**Deliverable by demo:**
-- A 3D body figure that changes shape based on the user's measurements
-- The selected clothing item shown on the figure, color-coded by fit
-- The figure is spinnable in the browser
-- Plugged into Person 3's result page
+### 5. Realistic image (stretch goal)
+- Render the 3D body + shell from the chosen angle (exact outline).
+- Send the render + product photo to an image model that follows the render's shape → photo-like result with the measured silhouette.
+- Label it "visual preview"; the 3D view is the source of truth.
 
 ---
 
-## Pitch (Everyone, Hour 20–22)
+## Setup checklist
+- [x] Bodygram account + API key (in local `.env`)
+- [ ] Bodygram **Org ID** in `.env` (`BODYGRAM_ORG_ID`)
+- [ ] Hosting with HTTPS (Vercel/Netlify) or ngrok — for the phone camera
+- [ ] Replicate or fal account + a few dollars (only for the realism stretch goal)
+- [ ] (Optional) Anthropic API key — reading size charts from screenshots
+- [ ] Demo person: height, weight, age, gender, 1 full-body photo
+- [ ] 3–5 Zara product links for demo items
 
-Do this together as a team — it is not one person's job.
-
-- Write a 60-second problem statement: "When you shop for clothes online, you have no idea if they will fit. 40% of everything bought online gets returned, mostly because of fit. We built a tool that tells you exactly how a piece of clothing will fit your body before you buy it."
-- Walk through the app live. Practice it at least twice so it feels smooth.
-- Record a backup video of the full demo in case something breaks on stage.
-
----
-
-## Hackathon Timeline
-
-Assumes about 24 hours. Adjust to your actual schedule.
-
-| Time | What the team is doing |
-|------|------------------------|
-| Hour 0–2 | Agree on tools, set up a shared code repository, split up tasks |
-| Hour 2–8 | Everyone builds their own piece independently |
-| Hour 8–12 | First connection — link the app screens to the server and fit scoring |
-| Hour 12–18 | Fix bugs, clean up the look, add the 3D view |
-| Hour 18–22 | Full flow working end to end, rehearse the pitch |
-| Hour 22–24 | Final polish, record the backup demo video |
+Secrets go in `.env` (gitignored). `.env.example` lists the variable names.
 
 ---
 
-## Minimum Required to Demo
+## Build order
+1. **One scan** — run one stats-only Bodygram scan, save JSON + OBJ to `data/scans/`. (Uses 1 of 5 free scans.)
+2. **One garment** — hand-enter a Zara t-shirt size chart into `data/garments/`.
+3. **Fit check** — function + unit test with the saved scan and garment.
+4. **3D fit view** — OBJ viewer + garment shell + size buttons + fit colors. ← proves the idea
+5. **App flow** — scan page → paste link / pick item → results (size badge, plain-English summary, 3D view).
+6. **Live Zara pull** — with fallback to saved items.
+7. **Realism test** — render → photo-like image. Keep only if it holds the shape.
+8. **Deploy over HTTPS**, do a real phone scan, rehearse the demo, record a backup video.
 
-- [ ] User can enter body measurements
-- [ ] User can browse at least 3 garments
-- [ ] Selecting a garment triggers a fit check
-- [ ] Fit result shows color-coded body regions and a size recommendation
-- [ ] The whole flow runs without crashing in front of judges
-- [ ] Pitch script rehearsed at least once
+## Minimum to demo
+- [ ] A body (saved scan) loads in 3D and rotates
+- [ ] At least 3 garments with real size charts
+- [ ] Fit check recommends a size and explains tight/loose spots
+- [ ] Switching sizes visibly changes the garment on the body
+- [ ] Whole flow runs without depending on live Zara or live scanning
+
+## Risks
+| Risk | Plan B |
+|---|---|
+| Zara blocks scraping / size chart hidden | Saved demo items |
+| Only 5 Bodygram scans | Save every result; reuse |
+| Scanner needs HTTPS for camera | Deploy early or ngrok |
+| AI image ignores the size | 3D view is the proof; image is optional |
+| Size chart units (flat vs circumference, body vs garment) | Store `chart_type` per item; double flat widths |
 
 ---
 
-## Stretch Goals (only if the core is done early)
-
-- Live body scan using an iPhone's built-in depth camera instead of the manual form
-- 3D body figure with the garment draped on it
-- Multiple size options per garment with automatic comparison
-- A "try another size" button that re-runs the fit check
-- Fake brand logos and product page styling to make it feel like a real app
+## Change tracking
+Every change is logged in `CHANGELOG.md` with date, what, why, and files.

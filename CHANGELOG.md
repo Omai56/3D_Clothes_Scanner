@@ -142,3 +142,13 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `data/garments/zara-loose-fit-jeans-556169731.json` + photos — live import from the product link (Indigo, CA$69.90, 100% cotton, sizes 28–36 in cm). The hand-typed jeans moved to `data/garments/examples/`. **All three demo items are now straight from Zara.**
 - `server/tripo.js`, `scripts/tripo-mesh.js` — Tripo3D image-to-3D helper (upload photo → `image_to_model` task → poll → download GLB to `public/models/`). Experiment for a photo-real garment mesh; `TRIPO_API_KEY` in `.env` (not committed).
 **Files:** `data/garments/`, `public/img/zara-loose-fit-jeans-*.jpg`, `server/tripo.js`, `scripts/tripo-mesh.js`, `.env.example`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 17:15 — Merged Samuel's Meshy pipeline; pre-made GLB support
+**By:** Claude (Fable 5.1)
+**What:**
+- Rebased onto Samuel Zhu's commits (`Add Meshy image-to-3D pipeline`, `Fix 6 bugs found in architecture review`). Kept all his fixes; resolved the `.env.example` conflict by listing both `MESHY_API_KEY` and `TRIPO_API_KEY`.
+- `public/js/app.js` — if a garment JSON has `model.glb` (a GLB already in `public/models/`, e.g. made with `scripts/tripo-mesh.js` or downloaded by hand from the Tripo/Meshy web apps), the viewer loads it directly instead of starting a Meshy job.
+- Tripo API status: the key works but the API wallet has **0 credits** (the 200 free credits are web-app only; API task creation fails with code 2010). No mesh generated yet.
+**Files:** `public/js/app.js`, `.env.example`, `CHANGELOG.md`

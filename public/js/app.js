@@ -174,7 +174,10 @@ async function selectGarment(g) {
   state.size = data.report.recommended;
   show('fit');
   await renderFit();
-  if (g.images?.[0]) kickOffMeshy(g);
+  // A ready-made mesh (Tripo/Meshy GLB saved under public/models and referenced by the garment)
+  // wins over generating a new one.
+  if (g.model?.glb) await applyMeshyModel(g.model.glb, g);
+  else if (g.images?.[0]) kickOffMeshy(g);
 }
 
 // ---------- step 3: fit ----------

@@ -212,6 +212,19 @@ app.get('/api/meshy/:taskId', async (req, res) => {
 
 // Attach a 3D model (.glb) to a garment: generated e.g. at tripo3d.ai from the product photo,
 // uploaded from the phone or laptop. Saved to public/models/<id>.glb and linked in the garment JSON.
+// Remove an item from the wardrobe: only its record goes; the mesh (public/models) and photos stay,
+// so pasting the link again brings it back complete.
+app.delete('/api/garments/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!safeName(id)) return res.status(400).json({ error: 'bad id' });
+  try {
+    await fs.unlink(path.join(GARMENTS_DIR, `${id}.json`));
+    res.json({ removed: id });
+  } catch {
+    res.status(404).json({ error: 'item not found' });
+  }
+});
+
 app.post('/api/garments/:id/model', express.raw({ type: () => true, limit: '80mb' }), async (req, res) => {
   const id = req.params.id;
   const g = await readGarment(id);

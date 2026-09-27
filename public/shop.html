@@ -625,6 +625,27 @@
       a.textContent = `View on ${g.brand} ↗`;
       fabric.append(document.createElement('br'), a);
     }
+    if (g.custom) {
+      // Remove from wardrobe: gone from the rail, drawer and server record; the link brings it back
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.className = 'store-link remove-link'; rm.textContent = 'Remove from wardrobe';
+      rm.addEventListener('click', async () => {
+        rm.disabled = true; rm.textContent = 'Removing…';
+        try { await fetch(`/api/garments/${encodeURIComponent(g.id)}`, { method: 'DELETE' }); } catch (e) { /* offline: local removal still happens */ }
+        for (const k of ['top', 'bottom']) if (wornBy[k] && wornBy[k].id === g.id) { wornBy[k] = null; if (view) view.takeOff(k); }
+        Fit.removeCustom(g.id); Fit.takeFromDrawer(g.id);
+        const other = wornBy.top || wornBy.bottom;
+        worn = null; report = null;
+        if (other) wear(other.id);
+        else {
+          showPane('wardrobe'); tabF.disabled = true; $('fitSizeLabel').textContent = '';
+          $('dropHint').hidden = false; $('takeOff').hidden = true;
+          document.title = 'Try On · Fitting Room';
+        }
+        renderWardrobe(); setOpen(true);
+      });
+      fabric.append(document.createElement('br'), rm);
+    }
     const rec = report.sizes[report.recommended];
     const badge = $('badge');
     badge.innerHTML = `<span class="dot">${esc(report.recommended)}</span>Your size: ${esc(sizeName(report.recommended))}`;

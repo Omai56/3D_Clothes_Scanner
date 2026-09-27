@@ -1667,3 +1667,12 @@ body::before { display: none; }
 
 /* Three hangers on a phone rail */
 @media (max-width: 559px) { .hanger { flex-basis: min(112px, 30%); } .hanger .cloth { width: min(116px, 100%); } .hanger .hook { width: min(104px, 90%); } }
+.remove-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600; color: var(--bad, #b3261e); text-decoration: underline; text-underline-offset: 4px; margin-top: 10px; }
+.remove-link:disabled { opacity: .5; cursor: progress; }
+
+/* Top bar: the step indicator never squeezes (the dot was shrinking under its label when the bar got tight) */
+.topbar-inner { flex-wrap: nowrap; }
+.logo { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.steps { flex: 0 0 auto; }
+.steps li, .steps .dot, .steps li + li::before { flex-shrink: 0; }
+.steps .lbl { white-space: nowrap; }

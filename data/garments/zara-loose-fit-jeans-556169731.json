@@ -1,0 +1,87 @@
+{
+  "id": "zara-loose-fit-jeans-556169731",
+  "name": "Loose Fit Jeans",
+  "brand": "Zara",
+  "url": "https://www.zara.com/ca/en/loose-fit-jeans-p00774307.html?v1=556169731&origin=shopcart",
+  "ref": "0774/307",
+  "price": "CA$69.90",
+  "color": "Indigo",
+  "category": "bottom",
+  "fabric": "100% cotton",
+  "stretch": "none",
+  "description": "Model height: 187 cm\n\nLoose-fit jeans crafted from raw cotton denim. This provides a rigid feel during initial wear, which will soften over time with use. Straight leg from hip to ankle, with a fit that neither tapers nor flares. Mid-rise. Rigid fabric.\n\nFive-pocket style. Contrasting topstitching. Front zip fly and button closure.",
+  "images": [
+    "/img/zara-loose-fit-jeans-556169731-1.jpg",
+    "/img/zara-loose-fit-jeans-556169731-2.jpg",
+    "/img/zara-loose-fit-jeans-556169731-3.jpg"
+  ],
+  "source": "Imported from zara.com on 2026-09-27 (PRODUCT MEASUREMENTS, garment measured flat, cm)",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "chest / waist / hip / arm_width / hem = width measured flat (half circumference); length = front length; shoulder = \"wide back\" seam to seam; sleeve = shoulder seam to cuff; total_length = outseam; rise = front rise",
+  "sizes": {
+    "28": {
+      "waist": 35,
+      "hip": 49,
+      "total_length": 106.5,
+      "rise": 31,
+      "back_rise": 35
+    },
+    "29": {
+      "waist": 37,
+      "hip": 51,
+      "total_length": 107,
+      "rise": 32,
+      "back_rise": 36
+    },
+    "30": {
+      "waist": 39,
+      "hip": 53,
+      "total_length": 107.5,
+      "rise": 33,
+      "back_rise": 37
+    },
+    "31": {
+      "waist": 41,
+      "hip": 55,
+      "total_length": 108,
+      "rise": 34,
+      "back_rise": 38
+    },
+    "32": {
+      "waist": 43,
+      "hip": 57,
+      "total_length": 108.5,
+      "rise": 35,
+      "back_rise": 39
+    },
+    "34": {
+      "waist": 45,
+      "hip": 59,
+      "total_length": 109,
+      "rise": 36,
+      "back_rise": 40
+    },
+    "36": {
+      "waist": 47,
+      "hip": 61,
+      "total_length": 109.5,
+      "rise": 37,
+      "back_rise": 41
+    }
+  },
+  "sizes_available": {
+    "28": "in_stock",
+    "29": "in_stock",
+    "30": "in_stock",
+    "31": "in_stock",
+    "32": "in_stock",
+    "34": "in_stock",
+    "36": "in_stock"
+  },
+  "model": {
+    "glb": "/models/zara-loose-fit-jeans-556169731.glb",
+    "source": "existing mesh in public/models",
+    "generated": "2026-09-27"
+  }
+}

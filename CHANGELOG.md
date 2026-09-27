@@ -781,3 +781,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `public/shop.html`, `public/styles.css` — the wardrobe rail shows three hangers on a phone (the jeans were on a second rail page behind the arrow).
 **Verified:** try-on page in the skin with curtains + jeans + tee; heavyweight then slim tee → one top on the body; Take off → nothing on; measure page saved-body tap fills the fields; 24 tests pass.
 **Files:** `public/styles.css`, `public/index.html`, `public/app.js`, `public/shop.html`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Remove from wardrobe; header steps no longer overlap; demo flow (empty closet → paste links) verified
+**By:** Claude (Fable 5.1)
+**What:**
+- `server/index.js` — `DELETE /api/garments/:id` removes an item's record only; its mesh in `public/models` and photos stay, so pasting the link again brings it back complete. `/api/import` re-links an existing mesh from `public/models` (was looking in the Meshy folder).
+- `public/shop.html`, `public/styles.css` — **Remove from wardrobe** under the item in Fit & sizes: takes it off, drops it from rail, drawer and server. On load the wardrobe drops imported items the server no longer has and refreshes the ones it still has (mesh link, photo).
+- `public/fit3d.js` — an item with no mesh link still gets its saved mesh by id (`/models/<id>.glb`), so the coloured shell never shows for the three prepared items.
+- `public/styles.css` — the top bar's step indicator can't shrink any more (the dot slid under its label when the bar got tight); the wordmark truncates instead.
+- Demo data: Daniel's scan and the item records are out of the app (copies in `data/backup-demo/`); meshes kept.
+**Verified:** real import of the jeans returns `model: /models/…glb`; delete on a throwaway record; header at 560–900 px; Remove button present; 24 tests pass.
+**Files:** `server/index.js`, `public/shop.html`, `public/fit3d.js`, `public/styles.css`, `CHANGELOG.md`

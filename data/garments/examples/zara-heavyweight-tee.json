@@ -1,0 +1,25 @@
+{
+  "id": "zara-heavyweight-tee",
+  "name": "Basic Heavyweight T-Shirt /03",
+  "brand": "Zara",
+  "url": "https://www.zara.com/ca/en/basic-heavyweight-t-shirt--03-p01887410.html?v1=545422590",
+  "ref": "1887/410/800",
+  "price": "CA$ 32.90",
+  "category": "top",
+  "sleeve_type": "short",
+  "fabric": "100% cotton (OCS organic)",
+  "stretch": "low",
+  "description": "Regular fit T-shirt made of dense cotton fabric. Round neck and short sleeves. Heavier than our Medium Weight basic model.",
+  "images": ["/img/zara-heavyweight-tee.png", "/img/zara-heavyweight-tee-model.png"],
+  "source": "Zara product page PRODUCT MEASUREMENTS, 2026-09-26, converted from inches (garment measured flat)",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "chest / arm_width = width measured flat (half circumference); length = front length; shoulder = 'wide back' seam to seam; sleeve = shoulder seam to cuff",
+  "sizes": {
+    "S":   { "chest": 55.9, "length": 66.0, "sleeve": 22.1, "shoulder": 55.6, "arm_width": 20.1 },
+    "M":   { "chest": 57.9, "length": 68.1, "sleeve": 23.1, "shoulder": 56.4, "arm_width": 21.1 },
+    "L":   { "chest": 59.9, "length": 70.1, "sleeve": 23.9, "shoulder": 57.4, "arm_width": 22.1 },
+    "XL":  { "chest": 62.0, "length": 71.9, "sleeve": 24.9, "shoulder": 58.4, "arm_width": 23.1 },
+    "XXL": { "chest": 64.0, "length": 73.9, "sleeve": 25.9, "shoulder": 59.4, "arm_width": 23.9 }
+  }
+}

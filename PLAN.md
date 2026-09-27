@@ -119,21 +119,24 @@ Secrets go in `.env` (gitignored). `.env.example` lists the variable names.
 ---
 
 ## Build order
-1. **One scan** — run one stats-only Bodygram scan, save JSON + OBJ to `data/scans/`. (Uses 1 of 5 free scans.)
-2. **One garment** — hand-enter a Zara t-shirt size chart into `data/garments/`.
-3. **Fit check** — function + unit test with the saved scan and garment.
-4. **3D fit view** — OBJ viewer + garment shell + size buttons + fit colors. ← proves the idea
-5. **App flow** — scan page → paste link / pick item → results (size badge, plain-English summary, 3D view).
-6. **Live Zara pull** — with fallback to saved items.
-7. **Realism test** — render → photo-like image. Keep only if it holds the shape.
-8. **Deploy over HTTPS**, do a real phone scan, rehearse the demo, record a backup video.
+1. ~~**One scan** — run one stats-only Bodygram scan, save JSON + OBJ to `data/scans/`.~~ ✅ `data/scans/demo` (4 free scans left)
+2. ~~**One garment** — hand-enter a Zara t-shirt size chart into `data/garments/`.~~ ✅ 3 demo items (approximate charts)
+3. ~~**Fit check** — function + unit test with the saved scan and garment.~~ ✅ `shared/fit.js`, `npm test`
+4. ~~**3D fit view** — OBJ viewer + garment shell + size buttons + fit colors.~~ ✅ `public/js/viewer.js`
+5. ~~**App flow** — scan page → paste link / pick item → results.~~ ✅ `public/`
+6. ~~**Real charts** — 3 real Zara items (heavyweight tee, slim tee, loose jeans) entered from the product pages' PRODUCT MEASUREMENTS + composition.~~ ✅ Live Zara pull stays blocked (bot protection); charts are entered by hand from screenshots.
+7. **Realism test** — render → photo-like image. Keep only if it holds the shape. (not started; the 3D shell now hangs like cloth, has a neckline and a fabric sheen)
+8. ~~Real phone scan~~ ✅ (Daniel, via the app) · **Rehearse the demo, record a backup video.**
 
 ## Minimum to demo
-- [ ] A body (saved scan) loads in 3D and rotates
-- [ ] At least 3 garments with real size charts
-- [ ] Fit check recommends a size and explains tight/loose spots
-- [ ] Switching sizes visibly changes the garment on the body
-- [ ] Whole flow runs without depending on live Zara or live scanning
+- [x] A body (saved scan) loads in 3D and rotates
+- [x] At least 3 garments with **real** size charts
+- [x] Fit check recommends a size and explains tight/loose spots
+- [x] Switching sizes visibly changes the garment on the body
+- [x] Whole flow runs without depending on live Zara or live scanning
+- [x] Real phone scan of the demo person works end to end
+- [x] Real product photos on the item cards
+- [ ] Demo rehearsed on the phone over the tunnel; backup video recorded
 
 ## Risks
 | Risk | Plan B |

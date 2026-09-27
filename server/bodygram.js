@@ -64,6 +64,29 @@ export function scannerUrl({ token, locale = 'en', prefill = {} }) {
   return `${BASE}/${locale}/${env('BODYGRAM_ORG_ID')}/scan?${params}`;
 }
 
+/**
+ * Save a scan entry as data/scans/<name>.json + <name>.obj.
+ * The JSON keeps the measurements and a normalised `input` (cm/kg); the OBJ goes in its own file.
+ */
+export async function saveScanFiles(dir, name, entry) {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  await fs.mkdir(dir, { recursive: true });
+  const obj = Buffer.from(entry.avatar.data, 'base64').toString('utf8');
+  await fs.writeFile(path.join(dir, `${name}.obj`), obj);
+  const { avatar, ...rest } = entry;
+  const inp = rest.input?.photoScan ?? rest.input?.statsEstimations ?? {};
+  const input = {
+    heightCm: inp.height ? inp.height / 10 : null,
+    weightKg: inp.weight ? inp.weight / 1000 : null,
+    age: inp.age ?? null,
+    gender: inp.gender ?? null,
+    photos: !!rest.input?.photoScan,
+  };
+  await fs.writeFile(path.join(dir, `${name}.json`), JSON.stringify({ ...rest, avatarFile: `${name}.obj`, input }, null, 2));
+  return { objBytes: obj.length, measurements: entry.measurements?.length ?? 0 };
+}
+
 /** Turn Bodygram's measurements array into a {name: cm} map. */
 export function measurementsToCm(measurements) {
   const out = {};

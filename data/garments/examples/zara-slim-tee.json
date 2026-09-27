@@ -1,0 +1,24 @@
+{
+  "id": "zara-slim-tee",
+  "name": "Basic Slim Fit T-Shirt /01",
+  "brand": "Zara",
+  "url": "https://www.zara.com/ca/en/basic-slim-fit-t-shirt--01-p05584401.html?v1=555813546",
+  "ref": "5584/401",
+  "price": "CA$ 22.90",
+  "category": "top",
+  "sleeve_type": "short",
+  "fabric": "95% cotton, 5% elastane (OCS organic cotton, RCS recycled spandex)",
+  "stretch": "high",
+  "images": ["/img/zara-slim-tee.png"],
+  "source": "Zara product page PRODUCT MEASUREMENTS, 2026-09-26, converted from inches (garment measured flat)",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "chest / arm_width = width measured flat (half circumference); length = front length; shoulder = 'wide back' seam to seam; sleeve = shoulder seam to cuff",
+  "sizes": {
+    "S":   { "chest": 42.4, "length": 70.1, "sleeve": 15.0, "shoulder": 42.4, "arm_width": 16.5 },
+    "M":   { "chest": 46.5, "length": 70.6, "sleeve": 18.0, "shoulder": 44.5, "arm_width": 17.5 },
+    "L":   { "chest": 50.5, "length": 71.1, "sleeve": 21.1, "shoulder": 46.5, "arm_width": 18.5 },
+    "XL":  { "chest": 54.6, "length": 71.4, "sleeve": 23.9, "shoulder": 48.5, "arm_width": 19.6 },
+    "XXL": { "chest": 58.4, "length": 71.9, "sleeve": 26.9, "shoulder": 50.5, "arm_width": 20.6 }
+  }
+}

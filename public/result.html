@@ -8,6 +8,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
 <body>
 <header class="topbar">
@@ -37,12 +45,16 @@
     <h2>Fit on your body</h2>
     <p class="sub" id="sub"></p>
     <div class="fitmap-body">
-      <div id="figure" class="stage"></div>
+      <div class="stage-col">
+        <div id="viewer3d" class="stage stage-3d" hidden></div>
+        <div id="figure" class="stage"></div>
+        <div id="bodyPicker" class="body-picker"></div>
+      </div>
       <div>
         <div class="size-tabs" id="tabs" role="group" aria-label="Compare sizes"></div>
         <ul class="regions" id="regions"></ul>
         <p class="ease-note">Tap a part to find it on the body. Numbers are garment minus body, so plus means extra room.</p>
-        <div class="legend">
+        <div class="legend" id="legend">
           <span><i style="background:var(--good)"></i>Good fit</span>
           <span><i style="background:var(--warn)"></i>Slightly tight or loose</span>
           <span><i style="background:var(--bad)"></i>Too tight or too loose</span>
@@ -128,6 +140,8 @@
       </li>`).join('');
     focusRegion(focused);
     document.querySelectorAll('.size-tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === size)));
+    window.fitSize = size;
+    document.dispatchEvent(new CustomEvent('fit:size', { detail: size }));
   }
 
   // Tap a row (or the body) to show just that part on the figure; tap again to show all.
@@ -160,6 +174,34 @@
   });
 
   show(report.recommended);
+</script>
+<script type="module">
+  // 3D body wearing the garment (same viewer as the main app); the 2D figure stays as a fallback.
+  import { mountFit3D } from './fit3d.js';
+  const garment = Fit.getGarment(new URLSearchParams(location.search).get('id'));
+  const stage = document.getElementById('viewer3d');
+  const figure = document.getElementById('figure');
+  const fitBody = document.querySelector('.fitmap-body');
+  const legend = document.getElementById('legend');
+  const legend2d = legend.innerHTML;
+  if (garment) {
+    stage.hidden = false;
+    figure.hidden = true;
+    fitBody.classList.add('is-3d');
+    try {
+      const view = await mountFit3D({ stage, picker: document.getElementById('bodyPicker'), legend, garment });
+      document.addEventListener('fit:size', (e) => view.show(e.detail));
+      if (window.fitSize) view.show(window.fitSize);
+      document.querySelector('.ease-note').textContent = 'Drag to turn the body. Numbers are garment minus body, so plus means extra room.';
+    } catch (err) {
+      console.warn('3D view unavailable, showing the 2D figure:', err);
+      stage.hidden = true;
+      figure.hidden = false;
+      fitBody.classList.remove('is-3d');
+      legend.innerHTML = legend2d;
+      document.getElementById('bodyPicker').innerHTML = '';
+    }
+  }
 </script>
 </body>
 </html>

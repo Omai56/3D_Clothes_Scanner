@@ -1,0 +1,21 @@
+{
+  "id": "zara-oversized-hoodie",
+  "name": "Oversized Hoodie",
+  "brand": "Zara",
+  "url": "https://www.zara.com/",
+  "category": "top",
+  "sleeve_type": "long",
+  "fabric": "70% cotton, 30% polyester",
+  "stretch": "medium",
+  "images": ["/img/hoodie.svg"],
+  "source": "DEMO DATA — approximate size chart, replace with the real chart from the product page",
+  "chart_type": "garment_flat",
+  "units": "cm",
+  "measurements_note": "chest/hem = width measured flat; length = back neck to hem; shoulder = seam to seam (dropped); sleeve = shoulder seam to cuff",
+  "sizes": {
+    "S":  { "chest": 58, "hem": 54, "length": 68, "shoulder": 56, "sleeve": 56 },
+    "M":  { "chest": 61, "hem": 57, "length": 70, "shoulder": 58, "sleeve": 58 },
+    "L":  { "chest": 64, "hem": 60, "length": 72, "shoulder": 60, "sleeve": 60 },
+    "XL": { "chest": 67, "hem": 63, "length": 74, "shoulder": 62, "sleeve": 62 }
+  }
+}

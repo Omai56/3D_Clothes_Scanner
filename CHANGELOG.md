@@ -359,3 +359,10 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** The right column shows one pane at a time, chosen with a switch at its top: **Wardrobe** (cabinet + link box) or **Fit & sizes** (product, size strip, why). Putting a piece on the model switches to Fit & sizes; the switch shows the wardrobe count and the size in view ("Fit & sizes · M"); Fit & sizes is disabled until something is on the model. Desktop intro is compacted (heading beside the step label, no intro sentence) and the duplicate demo-body notice is gone, so the sizes sit near the top without scrolling. The 3D rail is laid out again whenever the wardrobe is shown (it broke when the page opened on Fit & sizes).
 **Verified:** desktop drag → Fit & sizes (M), swipe → L, back to wardrobe (hangers intact), back to fit (L kept), take off; phone opened on a piece then switched to the wardrobe; tests pass.
 **Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Try-on page: link bar at the top
+**By:** Claude (Opus 5.5)
+**What:** "Try on from a link" moved from the wardrobe pane to a slim bar at the top of the page (beside the heading on desktop, right under it on phones): link icon, field, Paste and Try it on in one row. The detected store / name / type and errors float just under the bar, so typing doesn't push the page down. Button shows "Reading Zara…" while importing. The intro sentence is hidden on this page (the hint on the model explains dragging). Everything else about the link box is unchanged.
+**Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`

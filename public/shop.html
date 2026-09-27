@@ -21,10 +21,31 @@
   </div>
 </header>
 <main class="page page-tryon">
-  <div class="tryon-intro">
-    <p class="eyebrow">Step 2 of 2 · Try on</p>
-    <h1>Dress your <em>model</em></h1>
-    <p class="lede">Drag a piece from your wardrobe onto the model, then swipe through the sizes to see how each one fits.</p>
+  <div class="tryon-top">
+    <div class="tryon-intro">
+      <p class="eyebrow">Step 2 of 2 · Try on</p>
+      <h1>Dress your <em>model</em></h1>
+      <p class="lede">Drag a piece from your wardrobe onto the model, then swipe through the sizes to see how each one fits.</p>
+    </div>
+    <section class="link-bar" aria-labelledby="linkTitle">
+      <h2 class="sr-only" id="linkTitle">Try on from a link</h2>
+      <form class="link-form" id="linkForm" novalidate>
+      <div class="link-input">
+        <input id="linkInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+          placeholder="Paste a product link from any store" aria-label="Product link">
+        <button type="button" id="pasteBtn" class="paste-btn" hidden>Paste</button>
+      </div>
+      <div class="link-detect" id="linkDetect" hidden>
+        <span class="detect-store" id="linkStore"></span>
+        <span class="detect-name" id="linkName"></span>
+        <label class="detect-type">Type
+          <select id="linkType"></select>
+        </label>
+      </div>
+      <p class="link-error" id="linkError" role="alert"></p>
+      <button class="btn primary" type="submit" id="linkSubmit">Try it on</button>
+    </form>
+    </section>
   </div>
   <div class="card measure-chip" id="chip"></div>
 
@@ -52,33 +73,6 @@
         <button type="button" role="tab" id="tabFit" aria-selected="false" aria-controls="wearing" disabled>Fit &amp; sizes <span class="switch-size" id="fitSizeLabel"></span></button>
       </div>
       <div class="side-pane" id="paneWardrobe" role="tabpanel" aria-labelledby="tabWardrobe">
-  <section class="card link-panel" aria-labelledby="linkTitle">
-    <div class="link-head">
-      <span class="link-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      </span>
-      <div>
-        <h2 id="linkTitle">Try on from a link</h2>
-        <p>Found something you love in another store? Copy its product link and paste it here.</p>
-      </div>
-    </div>
-    <form class="link-form" id="linkForm" novalidate>
-      <div class="link-input">
-        <input id="linkInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
-          placeholder="https://www.zara.com/…/linen-shirt-p012345.html" aria-label="Product link">
-        <button type="button" id="pasteBtn" class="paste-btn" hidden>Paste</button>
-      </div>
-      <div class="link-detect" id="linkDetect" hidden>
-        <span class="detect-store" id="linkStore"></span>
-        <span class="detect-name" id="linkName"></span>
-        <label class="detect-type">Type
-          <select id="linkType"></select>
-        </label>
-      </div>
-      <p class="link-error" id="linkError" role="alert"></p>
-      <button class="btn primary" type="submit" id="linkSubmit">Try it on</button>
-    </form>
-  </section>
   <section class="wardrobe-section" aria-labelledby="wardrobeTitle">
     <div class="section-head">
       <h2 id="wardrobeTitle">Your <em class="accent-word">wardrobe</em></h2>
@@ -612,7 +606,7 @@
     // Anything else, or if the page can't be read, falls back to a standard chart for the item type.
     let g = null;
     submitBtn.disabled = true;
-    submitBtn.textContent = `Reading ${parsed.store}’s size chart…`;
+    submitBtn.textContent = `Reading ${parsed.store}…`;
     try { g = await importLink(parsed.url); }
     catch (err) { console.warn('Import failed, using a standard chart:', err); }
     submitBtn.disabled = false;

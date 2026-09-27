@@ -1012,3 +1012,58 @@ h1 em, .accent-word { font-style: italic; background: var(--brand-grad); -webkit
   .page-tryon .measure-chip { margin-bottom: 16px; padding: 10px 18px; }
   .model-card .stage-3d, .model-card .figure-2d { height: calc(100vh - 256px); }
 }
+
+/* Link bar at the top of the try-on page: one slim row (input + Paste + Try it on).
+   The detected store / name / type and any error show just under it while typing. */
+.link-bar {
+  padding: 6px; margin-bottom: 12px; border-radius: 30px;
+  background: linear-gradient(120deg, var(--tint-lilac), var(--tint-pink));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+  box-shadow: 0 10px 24px -18px rgba(91, 61, 245, .55);
+}
+.link-bar .link-form { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.link-bar .link-input { grid-column: 1; grid-row: 1; }
+.link-bar .link-input input { height: 46px; padding-left: 44px; background: var(--surface); border-color: transparent; }
+.link-bar .link-input input:focus { border-color: var(--accent); }
+.link-bar .link-input::before { /* link icon inside the field */
+  content: ""; position: absolute; left: 16px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); pointer-events: none;
+  background: var(--brand-grad);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.link-bar .paste-btn { height: 34px; padding: 0 12px; font-size: 13px; }
+.link-bar .link-form .btn { grid-column: 2; grid-row: 1; min-height: 46px; padding: 0 18px; font-size: 14.5px; white-space: nowrap; }
+.link-bar .link-detect, .link-bar .link-error { grid-column: 1 / -1; }
+.link-bar .link-detect { margin: 2px 4px 0; padding: 6px 8px 6px 6px; background: var(--surface); border-radius: 999px; flex-wrap: nowrap; }
+.link-bar .detect-name { font-size: 16px; }
+.link-bar .detect-type { font-size: 12px; }
+.link-bar .detect-type select { height: 30px; }
+.link-bar .link-error { margin: 2px 14px 4px; }
+@media (max-width: 559px) {
+  .link-bar .link-input input { padding-left: 40px; padding-right: 70px; font-size: 14.5px; }
+  .link-bar .link-input::before { left: 14px; }
+  .link-bar .link-form .btn { padding: 0 14px; }
+  .link-bar .link-form .btn.primary::after { display: none; }
+  .link-bar .detect-type { display: none; } /* type still guessed from the link; editable on wider screens */
+}
+@media (min-width: 960px) {
+  .tryon-top { display: grid; grid-template-columns: auto minmax(380px, 560px); justify-content: space-between; align-items: center; gap: 12px 32px; margin-bottom: 14px; }
+  .tryon-top .tryon-intro { margin-bottom: 0; }
+  .tryon-top .link-bar { margin-bottom: 0; }
+}
+/* Detected product / errors float under the link bar instead of pushing the page down. */
+.link-bar { position: relative; z-index: 12; }
+.link-bar .link-detect, .link-bar .link-error:not(:empty) {
+  position: absolute; left: 6px; right: 6px; top: calc(100% + 6px); margin: 0;
+  box-shadow: 0 14px 30px -14px rgba(40, 30, 60, .45); border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line));
+}
+.link-bar .link-error:not(:empty) { padding: 10px 16px; border-radius: 16px; background: var(--surface); }
+@media (max-width: 559px) {
+  .link-bar { padding: 5px; }
+  .link-bar .link-form { gap: 5px; }
+  .link-bar .paste-btn { padding: 0 10px; }
+}
+/* The drop hint on the model explains what to do, so the link bar can sit right under the heading. */
+.page-tryon .tryon-intro .lede { display: none; }
+.page-tryon .tryon-intro h1 { margin-bottom: 12px; }
+@media (min-width: 960px) { .page-tryon .tryon-intro h1 { margin-bottom: 0; } }

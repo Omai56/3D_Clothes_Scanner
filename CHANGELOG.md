@@ -413,3 +413,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** Feedback: italic accent words looked thin, and it wasn't obvious enough what to press. Headings now use Playfair Display (bold, upright) instead of Instrument Serif; no italics anywhere; accent words ("measurements", "model", "wardrobe", logo "Check") are solid burnt orange. Everything interactive uses the new action colour (burnt orange `--cta`, #c8481a; brighter #f07a3c with dark text in dark mode): primary buttons (Scan my body, Continue, Try it on) with an orange glow and a small lift on hover, the drag hint on the model, the drop target, the link bar border and icon, the Edit link, the current step, active field number, progress bar, focus rings, hover states on tabs / Paste / Take off / body picker. Secondary buttons are a bolder ink outline that fills ink on hover. Selected states (tab, unit, size) stay ink so actions and states read differently. The ivory / ink / champagne base is unchanged.
 **Verified:** measure and try-on pages at 390 and 1280px, light and dark: no sideways scrolling; white on #c8481a is 4.8:1; tests pass.
 **Files:** `public/styles.css`, `public/index.html`, `public/shop.html` (font link), `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Scan button works like the original app's; main gets the new UI
+**By:** Claude (Opus 5.5)
+**What:** "Scan my body" on the measure page now behaves like "Scan me with the camera" in the original app (`public/app.html`, `public/js/app.js`): it opens the Bodygram scanner in a **new tab** and waits on the measure page (poll every 4 s, up to 8 min), then fills the six fields and picks that 3D body for try-on. A failed scan shows the same message ("The scan failed (code). Try again with better lighting."). If the browser blocks the new tab, the current tab goes to the scanner instead and the wait resumes on return. Card text now matches: "Opens the Bodygram scanner. Two photos, about a minute…". `main` fast-forwarded to this branch so it serves the new UI; the original app is still at `/app.html`.
+**Verified:** simulated scan in Chrome: scanner opens in a new tab, measure page stays and shows "Waiting for your scan…", then all six fields fill and the card shows "Scan done"; tests pass.
+**Files:** `public/index.html`, `CHANGELOG.md`

@@ -32,7 +32,7 @@
         <span class="scan-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="8.5" r="1.8"/><path d="M9 17v-3.5a3 3 0 0 1 6 0V17"/></svg></span>
         <span class="scan-text">
           <b>Scan your body</b>
-          <span id="scanStatus">Two photos with your phone camera, then we fill these in for you</span>
+          <span id="scanStatus">Opens the Bodygram scanner. Two photos, about a minute, then we fill these in for you.</span>
         </span>
         <button class="btn scan-btn" type="button" id="scanBtn">Scan my body</button>
       </div>
@@ -177,7 +177,10 @@
 
   document.getElementById('demo').addEventListener('click', () => fill(Fit.DEMO_BODY));
 
-  // ---------- Body scan: send the user to the Bodygram scanner, fill the fields when they come back ----------
+  // ---------- Body scan: same flow as the original app (public/app.html) ----------
+  // Opens the Bodygram scanner in a new tab (clean camera permission) and waits here; when the scan
+  // finishes, the fields fill in. If the browser blocks the new tab, this tab goes to the scanner
+  // instead and the wait resumes when the user comes back.
   const scanCard = document.getElementById('scanCard');
   const scanBtn = document.getElementById('scanBtn');
   const scanStatus = document.getElementById('scanStatus');
@@ -194,6 +197,8 @@
 
   scanBtn.addEventListener('click', async () => {
     scanState('busy', 'Opening the scanner…');
+    // Open the tab now, while we still have the click; Safari blocks window.open after an await.
+    const tab = window.open('', '_blank');
     const height = readCm('height');
     try {
       const res = await fetch('/api/scan-session', {
@@ -204,9 +209,11 @@
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || 'no scanner link');
       store.set(data.sessionId);
-      location.href = data.url;
+      if (tab) { tab.location.href = data.url; waitForScan(); }
+      else location.href = data.url; // new tab blocked: go there in this tab
     } catch (e) {
       console.warn('scan-session', e);
+      if (tab) tab.close();
       scanState('error', "Couldn't open the scanner right now. Try again, or type your measurements below.");
       scanBtn.textContent = 'Try again';
     }
@@ -223,37 +230,40 @@
     try { sessionStorage.setItem('fit3dScan', name); } catch (e) { /* ignore */ } // try-on page shows this 3D body
   }
 
+  // Poll every 4 s for up to 8 minutes, like the original app.
   let polling = false;
-  async function checkPendingScan() {
+  async function waitForScan() {
     const id = store.get();
     if (!id || polling) return;
     polling = true;
-    scanState('busy', 'Checking your scan…');
+    scanState('busy', 'Waiting for your scan… Finish it in the scanner tab, then come back here.');
     const started = Date.now();
-    while (Date.now() - started < 3 * 60 * 1000) {
+    let failure = null;
+    while (Date.now() - started < 8 * 60 * 1000) {
       try {
         const r = await (await fetch(`/api/scan-session/${encodeURIComponent(id)}`)).json();
         if (r.ready) {
           await applyScan(r.name);
           store.set(null);
+          polling = false;
           scanState('done', 'Scan done: your measurements are filled in below. Check them, then continue.');
           scanBtn.textContent = 'Scan again';
-          polling = false;
           return;
         }
-        if (r.failed) break;
+        if (r.failed) { failure = r.error?.code ?? 'unknown'; break; }
       } catch (e) { console.warn('scan poll', e); }
-      scanState('busy', 'Waiting for your scan to finish…');
-      await new Promise(res => setTimeout(res, 3000));
+      await new Promise(res => setTimeout(res, 4000));
     }
     store.set(null);
     polling = false;
-    scanState('error', "We didn't get a finished scan. Scan again, or type your measurements below.");
+    scanState('error', failure
+      ? `The scan failed (${failure}). Try again with better lighting.`
+      : "We didn't get a finished scan. Scan again, or type your measurements below.");
     scanBtn.textContent = 'Scan again';
   }
-  checkPendingScan();
+  waitForScan(); // resumes after the same-tab fallback
   // Coming back with the browser's Back button can restore the page from cache without re-running scripts.
-  window.addEventListener('pageshow', e => { if (e.persisted) checkPendingScan(); });
+  window.addEventListener('pageshow', e => { if (e.persisted) waitForScan(); });
 
   form.addEventListener('submit', e => {
     e.preventDefault();

@@ -4,25 +4,105 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Choose Clothes · FitCheck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+                   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+  </script>
 </head>
 <body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#2b2170"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M11 9.5l3-1.5c.6 1.3 1.1 2 2 2s1.4-.7 2-2l3 1.5 3 4-2.4 1.6-1.1-1.4V23h-9v-9.3l-1.1 1.4L8 13.5z" fill="#fff" opacity=".95"/><path d="M12.5 19.5h7" stroke="#d9b36a" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 1.6"/></svg></span><span class="logo-word">Fit<em>Check</em></span></a>
+    <ol class="steps" aria-label="Step 2 of 3"><li class="done"><span class="dot">1</span><span class="lbl">Measure</span></li><li class="current" aria-current="step"><span class="dot">2</span><span class="lbl">Choose</span></li><li class=""><span class="dot">3</span><span class="lbl">Fit</span></li></ol>
+  </div>
+</header>
 <main class="page">
-  <header class="topbar">
-    <a class="logo" href="index.html">Fit<span>Check</span></a>
-    <div class="steps" aria-label="Step 2 of 3"><i class="on"></i><i class="on"></i><i></i><span>2 / 3</span></div>
-  </header>
-
+  <p class="eyebrow">Step 2 of 3 · Your wardrobe</p>
   <h1>Pick something to try on</h1>
-  <p class="lede">Your best size is already worked out for every item. Tap one to see how it fits, and where.</p>
+  <p class="lede">Paste a link from any store to try it on. Everything you try is hung in your wardrobe, ready to open again.</p>
 
   <div class="card measure-chip" id="chip"></div>
-  <div class="filters" role="group" aria-label="Filter clothes">
-    <button type="button" data-cat="all" aria-pressed="true">All</button>
-    <button type="button" data-cat="top" aria-pressed="false">Tops</button>
-    <button type="button" data-cat="bottom" aria-pressed="false">Bottoms</button>
-  </div>
-  <section class="grid" id="grid" aria-label="Clothes"></section>
+
+  <section class="card link-panel" aria-labelledby="linkTitle">
+    <div class="link-head">
+      <span class="link-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4l-1.1 1.1M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.1-1.1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </span>
+      <div>
+        <h2 id="linkTitle">Try on from a link</h2>
+        <p>Found something you love in another store? Copy its product link and paste it here.</p>
+      </div>
+    </div>
+    <form class="link-form" id="linkForm" novalidate>
+      <div class="link-input">
+        <input id="linkInput" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+          placeholder="https://www.zara.com/…/linen-shirt-p012345.html" aria-label="Product link">
+        <button type="button" id="pasteBtn" class="paste-btn" hidden>Paste</button>
+      </div>
+      <div class="link-detect" id="linkDetect" hidden>
+        <span class="detect-store" id="linkStore"></span>
+        <span class="detect-name" id="linkName"></span>
+        <label class="detect-type">Type
+          <select id="linkType"></select>
+        </label>
+      </div>
+      <p class="link-error" id="linkError" role="alert"></p>
+      <button class="btn primary" type="submit">Try it on</button>
+    </form>
+  </section>
+
+  <section class="wardrobe-section" aria-labelledby="wardrobeTitle">
+    <div class="section-head">
+      <h2 id="wardrobeTitle">Your wardrobe</h2>
+      <span class="section-note" id="wardrobeNote"></span>
+    </div>
+
+    <div class="wardrobe-scene">
+      <div class="wardrobe" id="wardrobe" data-open="false">
+        <div class="wd-crown"><span class="wd-plaque"><span id="plaqueCount">0</span> pieces</span></div>
+        <div class="wd-cabinet">
+          <div class="wd-interior">
+            <span class="wd-wall wd-wall-l"></span><span class="wd-wall wd-wall-r"></span>
+            <span class="wd-wall wd-wall-t"></span><span class="wd-wall wd-wall-b"></span>
+            <span class="wd-lamp"></span>
+            <span class="wd-rail"></span>
+            <canvas class="wd-canvas" id="wdCanvas" aria-hidden="true"></canvas>
+            <div class="wd-hangers" id="hangers"></div>
+            <button type="button" class="wd-arrow wd-prev" id="wdPrev" aria-label="Previous rail">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="wd-arrow wd-next" id="wdNext" aria-label="Next rail">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class="wd-pager" id="wdPager" aria-live="polite"></div>
+            <div class="wd-empty" id="wdEmpty" hidden>
+              <p><b>Nothing hanging yet.</b> Paste a product link above and try it on. It will be hung here so you can come back to it.</p>
+              <button type="button" class="btn ghost" id="addSamples">Hang some sample pieces</button>
+            </div>
+          </div>
+          <button type="button" class="wd-door wd-door-l" aria-label="Open wardrobe">
+            <span class="face front"><span class="panel"></span><span class="knob"></span></span>
+            <span class="face back"><span class="mirror"></span></span>
+          </button>
+          <button type="button" class="wd-door wd-door-r" aria-label="Open wardrobe">
+            <span class="face front"><span class="panel"></span><span class="knob"></span></span>
+            <span class="face back"><span class="mirror"></span></span>
+          </button>
+        </div>
+        <div class="wd-base"><span class="wd-drawer"><span class="pull"></span></span></div>
+        <div class="wd-feet"><i></i><i></i></div>
+      </div>
+      <div class="wd-shadow"></div>
+    </div>
+
+    <div class="wardrobe-actions">
+      <button type="button" class="btn" id="toggleWardrobe">Open wardrobe</button>
+    </div>
+  </section>
 </main>
 
 <script src="app.js"></script>
@@ -35,31 +115,187 @@
     Fit.FIELDS.map(f => `<span>${short[f.key]} <b>${Math.round(body[f.key])}</b></span>`).join('') +
     '<a href="index.html">Edit</a>';
 
-  const LEVEL_WORD = { good: 'Great fit', warn: 'Good fit', bad: 'Closest fit' };
-  const grid = document.getElementById('grid');
-  grid.innerHTML = Fit.GARMENTS.map(g => {
+  const esc = Fit.esc;
+
+  // ---- Wardrobe: every item tried from a link is hung here, a few per rail page ----
+  const wardrobe = document.getElementById('wardrobe');
+  const hangers = document.getElementById('hangers');
+  const toggleBtn = document.getElementById('toggleWardrobe');
+  const prevBtn = document.getElementById('wdPrev'), nextBtn = document.getElementById('wdNext'), pager = document.getElementById('wdPager');
+  const HANGER = '<svg class="hook" viewBox="0 0 120 44" aria-hidden="true"><path d="M60 22 V14 C60 8 66 6 69 9 C72 12 70 16 66 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M60 22 L10 40 H110 Z" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/></svg>';
+  let page = 0, perPage = 4, view3d = null;
+
+  const perPageFor = () => { const w = hangers.clientWidth || 600; return w >= 560 ? 3 : 2; };
+
+  function hangerHtml(g, i) {
     const report = Fit.fitReport(g, body);
     const worst = report.sizes[report.recommended].worst;
     return `
-    <a class="card garment" data-cat="${g.category}" href="result.html?id=${encodeURIComponent(g.id)}"
-       aria-label="${g.brand} ${g.name}, your size ${report.recommended}">
-      <div class="img" style="background:${g.bg}">${Fit.garmentArt(g)}
-        <span class="size-pill lv-${worst}"><b>${report.recommended}</b>${LEVEL_WORD[worst]}</span>
-      </div>
-      <div class="meta">
-        <div class="brand">${g.brand}</div>
-        <div class="name">${g.name}</div>
-        <div class="price">${g.price}</div>
-      </div>
-    </a>`;
-  }).join('');
+      <div class="hanger" style="--i:${i}" data-i="${i}">
+        <a class="hanger-link" href="result.html?id=${encodeURIComponent(g.id)}" aria-label="${esc(g.brand)} ${esc(g.name)}, your size ${report.recommended}. Open fit.">
+          ${HANGER}
+          <span class="cloth">${Fit.garmentArt(g)}</span>
+          <span class="tag"><span class="tag-brand"><span class="size-chip lv-${worst}">${report.recommended}</span>${esc(g.brand)}</span><span class="tag-name">${esc(g.name)}</span></span>
+        </a>
+        <button type="button" class="unhang" data-id="${g.id}" aria-label="Remove ${esc(g.name)} from wardrobe">×</button>
+      </div>`;
+  }
 
-  document.querySelector('.filters').addEventListener('click', e => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    document.querySelectorAll('.filters button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    grid.querySelectorAll('.garment').forEach(c => { c.hidden = b.dataset.cat !== 'all' && c.dataset.cat !== b.dataset.cat; });
+  function renderWardrobe(dir = 0) {
+    const list = Fit.loadCustom();
+    perPage = perPageFor();
+    const pages = Math.max(1, Math.ceil(list.length / perPage));
+    page = Math.min(Math.max(0, page), pages - 1);
+    const items = list.slice(page * perPage, page * perPage + perPage);
+    hangers.style.setProperty('--cols', perPage);
+    hangers.innerHTML = items.map(hangerHtml).join('');
+    hangers.classList.remove('slide-l', 'slide-r'); void hangers.offsetWidth;
+    if (dir) hangers.classList.add(dir > 0 ? 'slide-l' : 'slide-r');
+
+    if (view3d) {
+      const bottoms = view3d.show(items, perPage, dir);
+      hangers.querySelectorAll('.hanger').forEach((h, i) => h.style.setProperty('--tag-top', (bottoms[i] + 8) + 'px'));
+    }
+    const many = pages > 1;
+    prevBtn.hidden = nextBtn.hidden = !many;
+    prevBtn.disabled = page === 0; nextBtn.disabled = page === pages - 1;
+    pager.hidden = !many;
+    pager.innerHTML = many
+      ? Array.from({ length: pages }, (_, p) => `<button type="button" class="${p === page ? 'on' : ''}" data-p="${p}" aria-label="Rail ${p + 1} of ${pages}"${p === page ? ' aria-current="true"' : ''}></button>`).join('') + `<span>${page + 1} / ${pages}</span>`
+      : '';
+    document.getElementById('wdEmpty').hidden = list.length > 0;
+    document.getElementById('plaqueCount').textContent = list.length;
+    document.getElementById('wardrobeNote').textContent = list.length
+      ? `${list.length} piece${list.length === 1 ? '' : 's'} you tried · tap one to see the fit again`
+      : 'Clothes you try on from links are kept here';
+    syncTabs();
+  }
+
+  function goPage(p) { const dir = Math.sign(p - page); if (!dir) return; page = p; renderWardrobe(dir); }
+  prevBtn.addEventListener('click', () => goPage(page - 1));
+  nextBtn.addEventListener('click', () => goPage(page + 1));
+  pager.addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (b) goPage(+b.dataset.p); });
+
+  // Swipe between rails on touch screens.
+  let sx = null;
+  hangers.addEventListener('pointerdown', e => { sx = e.clientX; });
+  hangers.addEventListener('pointerup', e => {
+    if (sx == null) return;
+    const dx = e.clientX - sx; sx = null;
+    if (Math.abs(dx) > 50) { hangers.dataset.swiped = '1'; setTimeout(() => { delete hangers.dataset.swiped; }, 60); goPage(page + (dx < 0 ? 1 : -1)); }
   });
+  hangers.addEventListener('click', e => { if (e.target.closest('.hanger-link') && hangers.dataset.swiped) e.preventDefault(); }, true);
+
+  function syncTabs() {
+    const open = isOpen();
+    hangers.querySelectorAll('.hanger-link, .unhang').forEach(el => { el.tabIndex = open ? 0 : -1; });
+    [prevBtn, nextBtn, ...pager.querySelectorAll('button')].forEach(el => { el.tabIndex = open ? 0 : -1; });
+  }
+  function setOpen(open) {
+    wardrobe.dataset.open = String(open);
+    toggleBtn.textContent = open ? 'Close wardrobe' : 'Open wardrobe';
+    wardrobe.querySelectorAll('.wd-door').forEach(d => d.setAttribute('aria-label', open ? 'Close wardrobe' : 'Open wardrobe'));
+    syncTabs();
+    if (view3d) view3d.setActive(open);
+    try { sessionStorage.setItem('wd.open', open ? '1' : '0'); } catch (e) { /* ignore */ }
+  }
+  const isOpen = () => wardrobe.dataset.open === 'true';
+  toggleBtn.addEventListener('click', () => setOpen(!isOpen()));
+  wardrobe.querySelectorAll('.wd-door').forEach(d => d.addEventListener('click', () => setOpen(!isOpen())));
+
+  hangers.addEventListener('click', e => {
+    const b = e.target.closest('.unhang');
+    if (!b) return;
+    b.closest('.hanger').classList.add('leaving');
+    setTimeout(() => { Fit.removeCustom(b.dataset.id); renderWardrobe(); setOpen(true); }, 280);
+  });
+  hangers.addEventListener('mouseover', e => { const h = e.target.closest('.hanger'); if (view3d) view3d.hover(h ? +h.dataset.i : null); });
+  hangers.addEventListener('mouseleave', () => { if (view3d) view3d.hover(null); });
+  hangers.addEventListener('focusin', e => { const h = e.target.closest('.hanger'); if (view3d && h) view3d.hover(+h.dataset.i); });
+
+  const SAMPLES = [
+    { url: 'https://www.zara.com/us/en/linen-blend-shirt-white-p01234567.html', art: 'shirt' },
+    { url: 'https://www.nike.com/t/sportswear-club-fleece-pullover-hoodie-black-Gw4Nwq/BV2654-010', art: 'hoodie' },
+    { url: 'https://www.hollisterco.com/shop/us/p/ultra-high-rise-baggy-jeans-light-wash-12345', art: 'jeans' },
+    { url: 'https://www.asos.com/asos-design/asos-design-oversized-t-shirt-in-navy/prd/2045', art: 'tee' },
+    { url: 'https://www.mango.com/us/en/p/men/coats/quilted-puffer-jacket-red_87010643', art: 'jacket' },
+    { url: 'https://www.uniqlo.com/us/en/products/E455498-000/00?name=smart-ankle-chino-pants-beige', art: 'chinos' },
+  ];
+  document.getElementById('addSamples').addEventListener('click', () => {
+    SAMPLES.slice().reverse().forEach(s => { const p = Fit.parseProductLink(s.url); Fit.saveCustom(Fit.makeCustomGarment({ ...p, art: s.art })); });
+    page = 0;
+    renderWardrobe();
+    setOpen(true);
+    wardrobe.classList.remove('swing'); void wardrobe.offsetWidth; wardrobe.classList.add('swing');
+  });
+
+  // Keep the first visible piece in view when the number per rail changes.
+  new ResizeObserver(() => {
+    const n = perPageFor();
+    if (n !== perPage) { page = Math.floor(page * perPage / n); renderWardrobe(); }
+    else if (view3d) { const bottoms = view3d.resize(); hangers.querySelectorAll('.hanger').forEach((h, i) => h.style.setProperty('--tag-top', (bottoms[i] + 8) + 'px')); }
+  }).observe(hangers);
+
+  // Upgrade to the 3D rail when three.js loads; otherwise the flat hangers stay.
+  window.addEventListener('wardrobe3d', e => {
+    try {
+      view3d = e.detail(document.getElementById('wdCanvas'));
+      wardrobe.classList.add('has-3d');
+      view3d.resize();
+      renderWardrobe();
+      view3d.setActive(isOpen());
+    } catch (err) { view3d = null; wardrobe.classList.remove('has-3d'); console.warn('3D wardrobe unavailable', err); }
+  });
+
+  // ---- Paste a link ----
+  const input = document.getElementById('linkInput');
+  const typeSel = document.getElementById('linkType');
+  const detect = document.getElementById('linkDetect');
+  const errorEl = document.getElementById('linkError');
+  typeSel.innerHTML = Fit.TYPES.map(t => `<option value="${t.art}">${t.label}</option>`).join('');
+  let parsed = null, typeTouched = false;
+
+  function onLink() {
+    parsed = Fit.parseProductLink(input.value);
+    errorEl.textContent = '';
+    detect.hidden = !parsed;
+    if (!parsed) return;
+    document.getElementById('linkStore').textContent = parsed.store;
+    document.getElementById('linkName').textContent = parsed.name;
+    if (!typeTouched) typeSel.value = parsed.art;
+  }
+  input.addEventListener('input', () => { typeTouched = false; onLink(); });
+  typeSel.addEventListener('change', () => { typeTouched = true; });
+
+  const pasteBtn = document.getElementById('pasteBtn');
+  if (window.isSecureContext && navigator.clipboard && navigator.clipboard.readText) {
+    pasteBtn.hidden = false;
+    pasteBtn.addEventListener('click', async () => {
+      try { input.value = (await navigator.clipboard.readText()).trim(); typeTouched = false; onLink(); input.focus(); }
+      catch (e) { errorEl.textContent = 'Could not read the clipboard. Long-press the box and choose Paste.'; }
+    });
+  }
+
+  document.getElementById('linkForm').addEventListener('submit', e => {
+    e.preventDefault();
+    if (!input.value.trim()) { errorEl.textContent = 'Paste a product link first.'; input.focus(); return; }
+    if (!parsed) { errorEl.textContent = 'That doesn’t look like a web link. It should start with https://'; input.focus(); return; }
+    const g = Fit.makeCustomGarment({ ...parsed, art: typeSel.value });
+    Fit.saveCustom(g);
+    try { sessionStorage.setItem('wd.open', '1'); } catch (err) { /* ignore */ }
+    location.href = 'result.html?id=' + encodeURIComponent(g.id);
+  });
+
+  renderWardrobe();
+  let startOpen = false;
+  try { startOpen = sessionStorage.getItem('wd.open') === '1'; } catch (e) { /* ignore */ }
+  setOpen(false);
+  if (startOpen && Fit.loadCustom().length) setTimeout(() => { setOpen(true); wardrobe.classList.add('swing'); }, 350);
+</script>
+<script type="module">
+  import { createWardrobe3D } from './wardrobe3d.js';
+  window.__wardrobe3d = createWardrobe3D;
+  window.dispatchEvent(new CustomEvent('wardrobe3d', { detail: createWardrobe3D }));
 </script>
 </body>
 </html>

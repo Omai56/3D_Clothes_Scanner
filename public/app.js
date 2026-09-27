@@ -29,46 +29,118 @@
     inseam:   { label: 'Inseam',    noun: 'leg length',  where: 'in the leg',       kind: 'length' },
   };
 
-  // ---------- Body silhouette ----------
-  // viewBox 0 0 200 440, front view, feet at y=422.
-  const BODY_PATH =
-    'M90 60 L90 74 C78 78 60 78 52 86 C44 92 42 104 41 118 L36 180 L32 238 ' +
-    'C30 250 34 260 40 258 C44 256 46 248 46 240 L52 184 L58 132 ' +
-    'C60 150 66 162 70 172 C66 190 62 204 62 216 L68 330 L74 410 L68 422 L94 422 L94 410 ' +
-    'L96 330 L100 246 L104 330 L106 410 L106 422 L132 422 L126 410 L132 330 L138 216 ' +
-    'C138 204 134 190 130 172 C134 162 140 150 142 132 L148 184 L154 240 ' +
-    'C154 248 156 256 160 258 C166 260 170 250 168 238 L164 180 L159 118 ' +
-    'C158 104 156 92 148 86 C140 78 122 78 110 74 L110 60 Z';
+  // ---------- Body figure ----------
+  // viewBox 0 0 200 440, front view, feet at y≈426. Landmarks the regions rely on:
+  // shoulders y≈90, chest y≈120, waist y≈170, hips y≈216, crotch y≈248.
+  const TORSO =
+    'M93 54 C93 62 92 68 90 70 C82 74 70 76 62 79 C54 82 50 88 50 96 L60 122 ' +
+    'C61 138 64 152 69 168 C71 178 66 192 63 206 C61 214 61 222 62 232 ' +
+    'C64 262 68 300 70 330 C71 350 69 372 72 395 C73 405 74 410 74 414 ' +
+    'C70 418 64 420 64 424 C64 427 90 427 92 424 C92 418 90 414 90 410 ' +
+    'C90 390 94 360 93 336 C94 300 97 270 100 250 C103 270 106 300 107 336 ' +
+    'C106 360 110 390 110 410 C110 414 108 418 108 424 C110 427 136 427 136 424 ' +
+    'C136 420 130 418 126 414 C126 410 127 405 128 395 C131 372 129 350 130 330 ' +
+    'C132 300 136 262 138 232 C139 222 139 214 137 206 C134 192 129 178 131 168 ' +
+    'C136 152 139 138 140 122 L150 96 C150 88 146 82 138 79 C130 76 118 74 110 70 ' +
+    'C108 68 107 62 107 54 Z';
+  const ARM_L =
+    'M58 84 C48 86 44 94 43 104 C41 124 38 144 36 164 C34 184 31 204 29 222 ' +
+    'C27 230 25 240 27 248 C29 256 36 256 38 250 C40 244 39 236 39 228 ' +
+    'C42 210 46 190 48 170 C50 152 54 136 58 124 Z';
+  const ARM_R = ARM_L.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (m, x, y) => `${200 - x} ${y}`);
+  const HEAD = '<ellipse cx="100" cy="34" rx="19" ry="23"/>';
+  // Soft inner lines that give the figure some shape.
+  const DETAILS =
+    'M86 76 C92 80 96 80 99 78 M114 76 C108 80 104 80 101 78 ' +          // collarbones
+    'M78 128 C86 134 94 134 99 131 M122 128 C114 134 106 134 101 131 ' + // chest
+    'M100 150 L100 158 ' +                                                // navel line
+    'M76 334 C79 338 84 338 87 334 M113 334 C116 338 121 338 124 334';   // knees
+  const ELBOW_L = 'M39 166 C41 168 44 168 46 166';
+  const ELBOW_R = 'M161 166 C159 168 156 168 154 166';
 
-  // Region bands (clipped to the silhouette) + the tape-measure line drawn for each.
+  // Region bands (clipped to the body) — used for highlight on page 1 and fit colours on page 3.
   const REGIONS = {
-    height:   { rect: [0, 0, 200, 440],   line: 'M184 14 L184 422', caps: 'M178 14 L190 14 M178 422 L190 422' },
-    shoulder: { rect: [38, 74, 124, 26],  line: 'M52 86 L148 86' },
-    chest:    { rect: [56, 100, 88, 46],  line: 'M58 120 L142 120' },
-    waist:    { rect: [58, 146, 84, 44],  line: 'M68 172 L132 172' },
-    hip:      { rect: [58, 190, 84, 54],  line: 'M62 218 L138 218' },
-    inseam:   { rect: [62, 244, 76, 180], line: 'M100 250 L100 420', caps: 'M94 250 L106 250 M94 420 L106 420' },
+    height:   [0, 0, 200, 440],
+    shoulder: [24, 74, 152, 26],
+    chest:    [56, 100, 88, 46],
+    waist:    [58, 146, 84, 44],
+    hip:      [58, 190, 84, 54],
+    inseam:   [62, 244, 76, 184],
+  };
+
+  // Measuring tapes shown on page 1. Girths wrap round the body (front solid, back dashed).
+  const ring = (cy, rx, ry) => ({
+    back: `M${100 - rx} ${cy} A${rx} ${ry} 0 0 1 ${100 + rx} ${cy}`,
+    front: `M${100 - rx} ${cy} A${rx} ${ry} 0 0 0 ${100 + rx} ${cy}`,
+  });
+  const TAPES = {
+    chest:    { ...ring(120, 45, 7), tag: [100, 132] },
+    waist:    { ...ring(170, 34, 5), tag: [100, 180] },
+    hip:      { ...ring(216, 41, 7), tag: [100, 228] },
+    shoulder: { front: 'M50 92 L150 92', caps: 'M50 86 L50 98 M150 86 L150 98', tag: [100, 100] },
+    height:   { front: 'M186 10 L186 426', caps: 'M180 10 L192 10 M180 426 L192 426', arrows: true, tag: [100, 282] },
+    inseam:   { front: 'M100 252 L100 424', caps: 'M95 252 L105 252 M95 424 L105 424', arrows: true, tag: [100, 300] },
   };
 
   let figureCount = 0;
   function bodyFigure(label) {
-    const id = 'bodyclip' + (++figureCount);
-    const regions = Object.entries(REGIONS).map(([key, r]) => {
-      const [x, y, w, h] = r.rect;
-      return `<g class="region" data-region="${key}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></g>`;
-    }).join('');
-    const lines = Object.entries(REGIONS).map(([key, r]) =>
-      `<path class="measure" data-region="${key}" d="${r.line}"/>` +
-      (r.caps ? `<path class="measure cap" data-region="${key}" d="${r.caps}"/>` : '')
-    ).join('');
+    const n = ++figureCount;
+    const id = s => `${s}${n}`;
+    const regions = Object.entries(REGIONS).map(([key, [x, y, w, h]]) =>
+      `<g class="region" data-region="${key}"><rect x="${x}" y="${y}" width="${w}" height="${h}"/></g>`).join('');
+    const tapes = Object.entries(TAPES).map(([key, t]) => `
+      <g class="tape" data-region="${key}">
+        ${t.back ? `<path class="tape-back" d="${t.back}"/>` : ''}
+        <path class="tape-front" d="${t.front}" pathLength="100"${t.arrows ? ` marker-start="url(#${id('arrow')})" marker-end="url(#${id('arrow')})"` : ''}/>
+        <path class="tape-ticks" d="${t.front}"/>
+        ${t.caps ? `<path class="tape-caps" d="${t.caps}"/>` : ''}
+        <g class="value-tag" transform="translate(${t.tag[0] - 32} ${t.tag[1]})"><rect width="64" height="24" rx="12"/><text x="32" y="17"></text></g>
+      </g>`).join('');
+    const parts = `<path d="${ARM_L}"/><path d="${ARM_R}"/><path d="${TORSO}"/>${HEAD}`;
     return `
 <svg class="body-figure" viewBox="0 0 200 440" role="img" aria-label="${label || 'Body outline'}">
-  <defs><clipPath id="${id}"><path d="${BODY_PATH}"/><ellipse cx="100" cy="36" rx="21" ry="25"/></clipPath></defs>
-  <ellipse class="silhouette" cx="100" cy="36" rx="21" ry="25"/>
-  <path class="silhouette" d="${BODY_PATH}"/>
-  <g clip-path="url(#${id})">${regions}</g>
-  ${lines}
+  <defs>
+    <linearGradient id="${id('skin')}" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" class="skin-light"/><stop offset=".55" class="skin-mid"/><stop offset="1" class="skin-dark"/>
+    </linearGradient>
+    <clipPath id="${id('clip')}">${parts}</clipPath>
+    <marker id="${id('arrow')}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" class="tape-arrow"/>
+    </marker>
+  </defs>
+  <ellipse class="floor-shadow" cx="100" cy="428" rx="50" ry="6"/>
+  <g class="figure-body">
+    <g class="arm arm-l"><path class="outline" d="${ARM_L}"/><path class="skin" fill="url(#${id('skin')})" d="${ARM_L}"/><path class="details" d="${ELBOW_L}"/></g>
+    <g class="arm arm-r"><path class="outline" d="${ARM_R}"/><path class="skin" fill="url(#${id('skin')})" d="${ARM_R}"/><path class="details" d="${ELBOW_R}"/></g>
+    <path class="outline" d="${TORSO}"/>
+    <path class="skin" fill="url(#${id('skin')})" d="${TORSO}"/>
+    <path class="details" d="${DETAILS}"/>
+    <g class="head">
+      <ellipse class="outline" cx="100" cy="34" rx="19" ry="23"/>
+      <ellipse class="skin" fill="url(#${id('skin')})" cx="100" cy="34" rx="19" ry="23"/>
+      <path class="hair" d="M80 34 C78 14 90 8 101 8 C113 8 123 16 120 34 C117 26 112 21 104 20 C98 24 88 25 80 34 Z"/>
+      <g class="eyes"><ellipse cx="93" cy="36" rx="1.8" ry="2.2"/><ellipse cx="107" cy="36" rx="1.8" ry="2.2"/></g>
+      <path class="smile" d="M94.5 44 Q100 48 105.5 44"/>
+      <ellipse class="blush" cx="89" cy="42" rx="3.5" ry="2"/><ellipse class="blush" cx="111" cy="42" rx="3.5" ry="2"/>
+    </g>
+    <g class="sparkles">
+      <path d="M58 20 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3 Z"/>
+      <path d="M140 8 l2.2 5 5 2.2 -5 2.2 -2.2 5 -2.2 -5 -5 -2.2 5 -2.2 Z"/>
+      <path d="M146 50 l1.8 4 4 1.8 -4 1.8 -1.8 4 -1.8 -4 -4 -1.8 4 -1.8 Z"/>
+      <path d="M50 62 l1.5 3.4 3.4 1.5 -3.4 1.5 -1.5 3.4 -1.5 -3.4 -3.4 -1.5 3.4 -1.5 Z"/>
+    </g>
+    <g class="region-layer" clip-path="url(#${id('clip')})">${regions}</g>
+    ${tapes}
+  </g>
 </svg>`;
+  }
+
+  /** Put a value (e.g. "91 cm") on the tape tag of one region. */
+  function setFigureValue(root, key, text) {
+    const t = root.querySelector(`.tape[data-region="${key}"] .value-tag text`);
+    if (t) t.textContent = text || '';
+    const tag = t && t.closest('.value-tag');
+    if (tag) tag.classList.toggle('empty', !text);
   }
 
   // ---------- Garment artwork (simple flat illustrations) ----------
@@ -160,7 +232,75 @@
   ];
 
   function garmentArt(g) { return ART[g.art](g.color); }
-  function getGarment(id) { return GARMENTS.find(g => g.id === id) || null; }
+  function getGarment(id) { return GARMENTS.find(g => g.id === id) || loadCustom().find(g => g.id === id) || null; }
+
+  // ---------- Items from a pasted product link ----------
+  // We can't read a store's size chart from the browser, so a pasted item borrows the
+  // standard chart of the same garment type (from the demo catalogue) and is labelled as an estimate.
+  const CUSTOM_KEY = 'fit.custom';
+  const TYPES = [
+    { art: 'jeans',  label: 'Jeans',             category: 'bottom', words: ['jean', 'denim'] },
+    { art: 'chinos', label: 'Trousers / chinos', category: 'bottom', words: ['chino', 'trouser', 'pant', 'jogger', 'slack', 'cargo', 'short'] },
+    { art: 'hoodie', label: 'Hoodie / sweatshirt', category: 'top',  words: ['hoodie', 'hooded', 'sweatshirt', 'sweater', 'jumper', 'cardigan', 'knit', 'fleece'] },
+    { art: 'jacket', label: 'Jacket / coat',     category: 'top',    words: ['jacket', 'coat', 'puffer', 'parka', 'blazer', 'bomber', 'gilet', 'anorak', 'overshirt'] },
+    { art: 'tee',    label: 'T-shirt / top',     category: 'top',    words: ['tshirt', 'tee', 'top', 'tank', 'vest', 'camisole'] },
+    { art: 'shirt',  label: 'Shirt',             category: 'top',    words: ['shirt', 'blouse', 'oxford', 'polo'] },
+  ];
+  const STORES = { zara: 'Zara', nike: 'Nike', hollisterco: 'Hollister', hollister: 'Hollister', hm: 'H&M', uniqlo: 'Uniqlo',
+    gap: 'Gap', adidas: 'Adidas', asos: 'ASOS', mango: 'Mango', cos: 'COS', levi: "Levi's", abercrombie: 'Abercrombie & Fitch',
+    shein: 'SHEIN', aritzia: 'Aritzia', lululemon: 'lululemon', amazon: 'Amazon', taobao: 'Taobao', tmall: 'Tmall', jd: 'JD' };
+  const COLORS = { black: '#232323', white: '#ecebe7', ecru: '#e6dccb', cream: '#e9dfcc', beige: '#cdb793', sand: '#cdb793', camel: '#b98c55',
+    brown: '#6b4a33', navy: '#233152', blue: '#3a5a86', denim: '#3a5a86', grey: '#8a8d93', gray: '#8a8d93', charcoal: '#44464c',
+    green: '#4a6b4a', khaki: '#8b8559', olive: '#6b6b3a', red: '#b5462f', burgundy: '#6e2433', pink: '#e2a3b0', yellow: '#e3c04d', orange: '#d9793a', purple: '#6b4f8a' };
+
+  function titleCase(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+  /** Best guess at store, name, type and colour from a product URL. Returns null if it isn't a web link. */
+  function parseProductLink(raw) {
+    let u;
+    try { u = new URL(String(raw).trim()); } catch (e) { return null; }
+    if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return null;
+    const hostParts = u.hostname.replace(/^www\./, '').split('.');
+    const storeKey = Object.keys(STORES).find(k => hostParts.some(p => p === k || p.startsWith(k)));
+    const store = storeKey ? STORES[storeKey] : titleCase(hostParts.length > 2 ? hostParts[hostParts.length - 2] : hostParts[0]);
+
+    // Longest readable path segment is usually the product slug.
+    const segs = decodeURIComponent(u.pathname).split('/').map(x => x.replace(/\.(html?|aspx?|php)$/i, '')).filter(Boolean);
+    const slug = segs.filter(x => /[a-z]{3}/i.test(x)).sort((a, b) => b.length - a.length)[0] || '';
+    const GENERIC = /^(p|t|dp|en|us|ca|uk|shop|store|item|items|detail|details|product|products|productpage|goods|html)$/;
+    const words = slug.toLowerCase().replace(/\bt[-_ ]?shirts?\b/g, 'tshirt').split(/[-_+.\s]+/)
+      .filter(w => w && !/\d/.test(w) && !GENERIC.test(w));
+    const text = ' ' + words.join(' ') + ' ' + u.search.toLowerCase() + ' ';
+    const type = TYPES.find(t => t.words.some(w => text.includes(' ' + w))) || TYPES.find(t => t.art === 'tee');
+    const colorWord = Object.keys(COLORS).find(c => new RegExp('[^a-z]' + c + '[^a-z]').test(text));
+    const name = words.length ? words.slice(0, 7).map(w => (w === 'tshirt' ? 'T-Shirt' : titleCase(w))).join(' ') : `${store} item`;
+    return { url: u.href, store, name, art: type.art, color: colorWord ? COLORS[colorWord] : null };
+  }
+
+  function makeCustomGarment({ url, store, name, art, color }) {
+    const type = TYPES.find(t => t.art === art) || TYPES.find(t => t.art === 'tee');
+    const base = GARMENTS.find(g => g.art === type.art);
+    let h = 0;
+    for (const ch of url + art) h = (h * 31 + ch.charCodeAt(0)) | 0;
+    return {
+      id: 'link-' + (h >>> 0).toString(36), custom: true, url, name, brand: store, art: type.art, category: type.category,
+      color: color || base.color, bg: '#ece6dc', price: 'Price on store site',
+      fabric: `Standard ${type.label.toLowerCase()} size chart (estimate)`,
+      rules: base.rules, sizes: base.sizes, addedAt: Date.now(),
+    };
+  }
+
+  function loadCustom() {
+    try { const list = JSON.parse(localStorage.getItem(CUSTOM_KEY)); return Array.isArray(list) ? list : []; } catch (e) { return []; }
+  }
+  function saveCustom(g) {
+    const list = [g, ...loadCustom().filter(x => x.id !== g.id)].slice(0, 12);
+    try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+  }
+  function removeCustom(id) {
+    try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(loadCustom().filter(x => x.id !== id))); } catch (e) { /* ignore */ }
+  }
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- Fit check ----------
   const PHRASES = {
@@ -257,6 +397,7 @@
 
   window.Fit = {
     FIELDS, DEMO_BODY, SIZE_NAMES, GARMENTS, CM_PER_IN: 2.54,
-    bodyFigure, garmentArt, getGarment, fitReport, saveBody, loadBody,
+    bodyFigure, setFigureValue, garmentArt, getGarment, fitReport, saveBody, loadBody,
+    TYPES, parseProductLink, makeCustomGarment, loadCustom, saveCustom, removeCustom, esc,
   };
 })();

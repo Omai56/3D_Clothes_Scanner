@@ -4,16 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Your Fit · FitCheck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="index.html"><span class="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#2b2170"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M11 9.5l3-1.5c.6 1.3 1.1 2 2 2s1.4-.7 2-2l3 1.5 3 4-2.4 1.6-1.1-1.4V23h-9v-9.3l-1.1 1.4L8 13.5z" fill="#fff" opacity=".95"/><path d="M12.5 19.5h7" stroke="#d9b36a" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 1.6"/></svg></span><span class="logo-word">Fit<em>Check</em></span></a>
+    <ol class="steps" aria-label="Step 3 of 3"><li class="done"><span class="dot">1</span><span class="lbl">Measure</span></li><li class="done"><span class="dot">2</span><span class="lbl">Choose</span></li><li class="current" aria-current="step"><span class="dot">3</span><span class="lbl">Fit</span></li></ol>
+  </div>
+</header>
 <main class="page">
-  <header class="topbar">
-    <a class="logo" href="index.html">Fit<span>Check</span></a>
-    <div class="steps" aria-label="Step 3 of 3"><i class="on"></i><i class="on"></i><i class="on"></i><span>3 / 3</span></div>
-  </header>
-
-  <a class="back" href="shop.html">&larr; All clothes</a>
+  <a class="back" href="shop.html">&larr; Wardrobe</a>
   <div id="notice"></div>
 
   <section class="card result-hero">
@@ -33,7 +37,7 @@
     <h2>Fit on your body</h2>
     <p class="sub" id="sub"></p>
     <div class="fitmap-body">
-      <div id="figure"></div>
+      <div id="figure" class="stage"></div>
       <div>
         <div class="size-tabs" id="tabs" role="group" aria-label="Compare sizes"></div>
         <ul class="regions" id="regions"></ul>
@@ -53,7 +57,7 @@
   </section>
 
   <div class="result-actions">
-    <a class="btn primary" href="shop.html">Try another item</a>
+    <a class="btn primary" href="shop.html">Back to wardrobe</a>
     <a class="btn ghost" href="index.html">Edit measurements</a>
   </div>
 </main>
@@ -61,14 +65,15 @@
 <script src="app.js"></script>
 <script>
   const garment = Fit.getGarment(new URLSearchParams(location.search).get('id'));
-  if (!garment) location.replace('shop.html');
+  if (!garment) { location.replace('shop.html'); throw new Error('Unknown item'); }
+  if (garment.custom) Fit.saveCustom({ ...garment, addedAt: Date.now() }); // most recently viewed hangs first
 
   const saved = Fit.loadBody();
   const body = saved || Fit.DEMO_BODY;
-  if (!saved) {
-    document.getElementById('notice').innerHTML =
-      '<p class="notice">Showing results for the demo body. <a href="index.html">Enter your measurements</a> for your own fit.</p>';
-  }
+  const notices = [];
+  if (!saved) notices.push('Showing results for the demo body. <a href="index.html">Enter your measurements</a> for your own fit.');
+  if (garment.custom) notices.push(`We couldn’t read ${Fit.esc(garment.brand)}’s size chart from the link, so this uses a standard chart for this type of item. Check the store’s own chart before you buy.`);
+  document.getElementById('notice').innerHTML = notices.map(n => `<p class="notice">${n}</p>`).join('');
 
   const report = Fit.fitReport(garment, body);
   const rec = report.sizes[report.recommended];
@@ -78,6 +83,12 @@
   document.getElementById('brand').textContent = garment.brand;
   document.getElementById('name').textContent = garment.name;
   document.getElementById('fabric').textContent = `${garment.price} · ${garment.fabric}`;
+  if (garment.custom && /^https?:\/\//.test(garment.url)) {
+    const a = document.createElement('a');
+    a.className = 'store-link'; a.href = garment.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = `View on ${garment.brand} ↗`;
+    document.getElementById('fabric').after(a);
+  }
   document.getElementById('why').innerHTML = report.notes.map(n => `<li>${n}</li>`).join('');
   document.title = `${garment.name} · Your Fit`;
 

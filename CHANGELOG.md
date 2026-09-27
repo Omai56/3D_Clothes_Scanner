@@ -68,3 +68,46 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 **Why:** improve the pages on their own before combining with the main app. The earlier merge with main is kept on branch `backup-merged-with-main`.
 **Files:** `public/index.html`, `public/shop.html`, `public/result.html`, `public/app.js`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Livelier body figure + premium visual redesign of the three pages
+**By:** Claude (Opus 5.5)
+**What:**
+- Body figure (`public/app.js`): natural proportions with hair, face, bent elbows, knees, skin shading and floor shadow. On page 1 it breathes, blinks and sways; a yellow tape wraps around the body (girths) or runs with arrows (lengths) with a value tag; it hops with sparkles when all six measurements are in; tapping a body part focuses that field. Page 3 uses the same figure, static.
+- Design system (`public/styles.css`): Fraunces display serif + Inter UI font (Google Fonts), warm ivory background with soft gradient glows, layered card shadows, frosted sticky top bar with logo mark and labelled steps (Measure / Choose / Fit), studio-style backdrop behind the figure, gradient buttons, inset inputs, spotlight + drop shadow on garment images, refined fit colours, dark mode.
+- Markup (`public/index.html`, `shop.html`, `result.html`): new header, eyebrow labels, stage wrapper for the figure.
+
+**Files:** `public/*`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Page 2: try on from a pasted product link
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/shop.html`: "Try on from a link" panel. Paste any store's product link (one-tap Paste button where the browser allows it). The page shows the detected store, product name and garment type; the type can be changed before "Try it on". Pasted items are kept under "From your links" (this browser only, up to 12) with a remove button, and follow the Tops/Bottoms filter.
+- `public/app.js`: `parseProductLink` (store from the domain, name and colour from the URL slug, type from keywords), `makeCustomGarment`, and saved-link storage. `getGarment` also finds pasted items.
+- `public/result.html`: pasted items show a notice that a standard size chart for the type was used, plus a "View on <store>" link.
+
+**Limit:** the store's real size chart and photos are not read (no server-side fetching in this version), so results for pasted links are estimates.
+**Files:** `public/shop.html`, `public/result.html`, `public/app.js`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Page 2: 3D wardrobe replaces the clothes grid
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/shop.html`: removed the demo clothes grid and filters under the link box. Added "Your wardrobe": a CSS 3D wooden wardrobe whose doors swing open (mirrors on the inside), with a lit interior, hanging rail and every item tried from a link hung on a hanger with a size dot and name tag. Tap a piece to see its fit again, × to take it out. Empty wardrobe offers "Hang some sample pieces" for demos. Open/closed state is remembered for the session and the wardrobe opens automatically when you come back from a fit.
+- `public/result.html`: back link and main button go "Back to wardrobe"; viewing a pasted item moves it to the front of the rail.
+- `public/styles.css`: wardrobe styles (wood, interior walls, doors, hangers, swing animation, dark-mode walnut).
+**Files:** `public/shop.html`, `public/result.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Wardrobe: real 3D clothes + paged rails
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/wardrobe3d.js` (new, three.js 0.169 from jsDelivr): the wardrobe interior is a live 3D scene. Each garment outline is "inflated" into a closed cloth mesh with drape wrinkles (quilted puffs for the jacket), fabric bump textures (knit / denim twill / nylon) and sheen. Details per type: tee rib collar; shirt collar, placket, buttons, pocket; hoodie hood, drawstrings, kangaroo pocket, rib hem; jacket collar and zipper; jeans/chinos waistband, belt loops, rivets. Garments hang on wooden hangers with chrome hooks (clip hangers for trousers) from a chrome rail, lit with a studio environment and casting soft shadows on the back wall. They sway gently; hovering lifts and turns a piece to show its depth; new rails slide in.
+- `public/shop.html`: rails are paged (3 per rail on desktop, 2 on phones) with arrow buttons, page dots and swipe. Labels, size chips and remove buttons are HTML laid exactly under each 3D garment. If three.js can't load (offline), the flat hangers are used with the same paging. Six sample pieces for demos.
+- `public/styles.css`: pager, arrows, 3D overlay styles.
+**Files:** `public/wardrobe3d.js`, `public/shop.html`, `public/styles.css`, `CHANGELOG.md`

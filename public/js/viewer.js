@@ -182,10 +182,12 @@ export class FitViewer {
       }
     });
 
-    // A flat-lay mesh is two flat slabs. Simulate a clean proxy garment (sized from the chart)
-    // on the body and glue the mesh onto it; fall back to the analytic mapping if that fails.
+    // Tops: the plain placement (mesh kept as generated, sized from the chart and placed on the
+    // body) reads better than reshaping it, per Daniel's review. Bottoms: cloth simulation.
+    // Set window.__clothSim = true to simulate tops too.
     try {
-      if (isTop) this._dressTop(model, box, R, chart, garment);
+      if (isTop && !window.__clothSim) this._placeRigid(model, box, R, chart, isTop);
+      else if (isTop) this._dressTop(model, box, R, chart, garment);
       else this._dressBottoms(model, box, R, chart);
     } catch (e) {
       console.warn('cloth simulation failed, using analytic mapping', e);
@@ -194,6 +196,62 @@ export class FitViewer {
     }
     this.meshyGroup.add(model);
     this.setMode(this.mode ?? 'look');
+  }
+
+  /**
+   * Plain placement: the mesh as generated, scaled per axis and placed on the body.
+   * Height = garment length on this body (chart); depth = the body's front-to-back extent over
+   * that range + ease; width = the worn width of the chart circumference (ellipse with that
+   * perimeter and depth). No per-vertex reshaping.
+   */
+  _placeRigid(model, box, R, chart, isTop) {
+    const b = this.body;
+    const size = this._gltfSize;
+    const bands = this._gltfBands;
+    // undo any earlier per-vertex deformation of this cached mesh
+    model.traverse((o) => {
+      if (!o.isMesh || !o.userData.origPos) return;
+      const pos = o.geometry.attributes.position;
+      pos.array.set(o.userData.origPos);
+      pos.needsUpdate = true;
+      o.geometry.computeVertexNormals();
+      o.geometry.computeBoundingSphere();
+    });
+
+    let topY;
+    let hemY;
+    if (isTop) {
+      topY = b.backNeckHeight / 100 + 0.01;
+      hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
+    } else {
+      topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
+      hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100, topY - (chart.total_length ?? b.waistHeight) / 100);
+    }
+    const heightM = topY - hemY;
+    const sy = (heightM > 0 ? heightM : 0.6) / (size.y || 1);
+
+    const ext = this._bodyExtent(isTop ? [this.rings.torso] : [this.rings.torso, this.rings.right, this.rings.left], hemY, topY);
+    const easeR = Math.max(MIN_GAP, cmEaseToRadius(isTop ? R.chest?.ease_cm : R.hip?.ease_cm ?? R.waist?.ease_cm));
+    const depthM = ext ? ext.zmax - ext.zmin + 2 * (easeR + 0.015) : size.z * sy;
+    const sz = depthM / (size.z || 1);
+
+    const flatWidthCm = isTop ? chart.chest ?? chart.hem : chart.hip ?? chart.waist;
+    const bandWidth = isTop ? bands.bottom.width : bands.top.width;
+    let sx = sy;
+    if (flatWidthCm && bandWidth > 0.05) {
+      const C = (2 * flatWidthCm) / 100;
+      const bHalf = depthM / 2;
+      const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - bHalf ** 2));
+      const wornWidth = Math.max(2 * aHalf, (ext ? ext.xmax - ext.xmin : 0) + 2 * easeR);
+      sx = wornWidth / bandWidth;
+    }
+    model.scale.set(sx, sy, sz);
+
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    const bodyCx = ext ? (ext.xmin + ext.xmax) / 2 : 0;
+    const bodyCz = ext ? (ext.zmin + ext.zmax) / 2 : 0;
+    model.position.set(bodyCx - cx * sx, topY - box.max.y * sy, bodyCz - cz * sz);
   }
 
   /** Colliders that keep cloth outside the body: torso/leg rings, arm capsules, shoulder tops, floor. */

@@ -260,3 +260,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `README.md` — Look view (cloth simulation) documented; `PLAN.md` build order updated.
 **Verified:** full fit page renders for the tee (S) and jeans (28 shows "Tight: waist"); no console errors; 24 tests pass.
 **Files:** `public/js/app.js`, `public/index.html`, `public/css/style.css`, `README.md`, `PLAN.md`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Tops back to plain placement (Daniel's call); jeans stay simulated
+**By:** Claude (Fable 5.1)
+**What:** `public/js/viewer.js` `_placeRigid` — for tops, the Look view again uses the mesh as generated, scaled per axis from the chart (length; depth from the body's front-to-back extent + ease; worn width from the chart circumference) and placed on the body — the earlier approach, which reads cleaner than the reshaped/simulated tee. Any cached deformation is undone first (original positions restored). Bottoms keep the cloth simulation (seat + legs), which Daniel was happy with. `window.__clothSim = true` switches tops to the simulation for comparison.
+**Verified:** heavyweight tee S/XL front, side, back; slim tee front — clean, no holes; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

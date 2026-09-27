@@ -1000,7 +1000,10 @@ export class FitViewer {
     const neckY = b.backNeckHeight / 100;
     const armpitY = this.rings.armpitY ?? b.bustHeight / 100;
     const legTopBody = this.rings.legTopY || crotchY;
-    const legTop = legTopBody - 0.02; // the trouser crotch hangs a little below the body's
+    // The trouser crotch hangs a little below the body's; worn lower than its rise allows (the
+    // waistband slider), the whole garment drops with the waistband and the crotch sags.
+    const riseTop = chart.rise != null ? topY - (chart.rise * 0.88) / 100 : legTopBody - 0.02;
+    const legTop = Math.min(legTopBody - 0.02, Math.max(legTopBody - 0.12, riseTop));
     const splitY = this.rings.crotchSplitY ?? crotchY;
     const ankleTop = this.ankleTopY ?? (b.outerAnkleHeightR ?? 7) / 100 + 0.03;
     const legYc = (Y) => clamp(Y, ankleTop, legTopBody - 0.005); // leg ring used for a height
@@ -1083,7 +1086,7 @@ export class FitViewer {
     // smaller than the body it hugs (and the running maximum restarts); otherwise it hangs
     // straight from the widest point above, shrunk uniformly so its perimeter never exceeds the
     // fabric's circumference, and never inside the body.
-    const hangRow = (acc, colMax, n, C, bodyC, out) => {
+    const hangRow = (acc, colMax, n, C, bodyC, out, body = acc) => {
       if (tightAt(C, bodyC)) {
         for (let c = 0; c < n; c++) {
           colMax[c] = acc[c];
@@ -1093,8 +1096,8 @@ export class FitViewer {
       }
       for (let c = 0; c < n; c++) if (acc[c] > colMax[c]) colMax[c] = acc[c];
       const per = perimOf(colMax, n, 0, 0);
-      const f = Math.min(1, Math.max(C, bodyC) / Math.max(1e-6, per));
-      for (let c = 0; c < n; c++) out[c] = Math.max(acc[c], colMax[c] * f);
+      const f = clamp(Math.max(C, bodyC) / Math.max(1e-6, per), 0.5, 1.5);
+      for (let c = 0; c < n; c++) out[c] = Math.max(body[c], colMax[c] * f);
       return false;
     };
     const seatDist = new Float32Array(srows * cols);
@@ -1166,9 +1169,17 @@ export class FitViewer {
       // falls straight from the seat instead of stepping in under it. Under ~1 cm of thigh ease
       // the cloth follows the leg; from 2.5 cm it is fully straight.
       const thighC = sampleRing(legMap, legYc(thighY), 0) ?? { cx: sgn * 0.09, cz: -0.06, r: 0.09 };
-      const ax = thighC.cx;
-      const az = thighC.cz;
+      const ankleC = sampleRing(legMap, ankleTop + 0.02, 0) ?? thighC;
+      // The tube's axis is the leg's own straight line from the thigh to the ankle (legs splay
+      // and lean in a scan; loose cloth hangs along the leg, it does not stay vertical and bulge
+      // where the calf swings out). Rings are measured from that axis.
+      const axisAt = (Y) => {
+        const t = clamp((thighY - Y) / Math.max(0.05, thighY - ankleTop - 0.02), 0, 1);
+        return [thighC.cx + (ankleC.cx - thighC.cx) * t, thighC.cz + (ankleC.cz - thighC.cz) * t];
+      };
+      let [ax, az] = axisAt(thighY);
       const distRow = new Float32Array(lrows * lcols); // scaled body distance from the axis per row/column
+      const axisRow = new Float32Array(lrows * 2);
       const tightRow = new Uint8Array(lrows);
       const colAll = new Float32Array(lcols); // running maximum from the seat down
       // the seat's bottom ring on this side: its outer, front and back extents carry on down
@@ -1199,7 +1210,11 @@ export class FitViewer {
         const base = ringAt(legMap, Yc);
         const sc = base ? C / ringCircumference(base) : 1;
         const cc0 = sampleRing(legMap, Yc, 0) ?? thighC;
+        [ax, az] = axisAt(Yc);
+        axisRow[r * 2] = ax;
+        axisRow[r * 2 + 1] = az;
         const acc = new Float32Array(lcols).fill(-1);
+        const accB = new Float32Array(lcols).fill(-1);
         for (let j = 0; j < NSMP; j++) {
           const th = (j / NSMP) * TWO_PI - Math.PI;
           const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: cc0.cx, cz: cc0.cz };
@@ -1209,9 +1224,16 @@ export class FitViewer {
           const bin = binOf(Math.atan2(pz, px), lcols);
           const d = Math.hypot(px, pz);
           if (d > acc[bin]) acc[bin] = d;
+          const rb = smp.r + gap;
+          const bx = smp.cx + rb * Math.cos(th) - ax;
+          const bz = smp.cz + rb * Math.sin(th) - az;
+          const binB = binOf(Math.atan2(bz, bx), lcols);
+          const dB = Math.hypot(bx, bz);
+          if (dB > accB[binB]) accB[binB] = dB;
         }
         fillBins(acc, lcols, 0.05);
-        tightRow[r] = hangRow(acc, colAll, lcols, C, bodyCAt(legMap, Yc), distRow.subarray(r * lcols, (r + 1) * lcols)) ? 1 : 0;
+        fillBins(accB, lcols, 0.05);
+        tightRow[r] = hangRow(acc, colAll, lcols, C, bodyCAt(legMap, Yc), distRow.subarray(r * lcols, (r + 1) * lcols), accB) ? 1 : 0;
       }
       const restRow = new Float32Array(lrows);
       for (let r = 0; r < lrows; r++) {
@@ -1223,8 +1245,8 @@ export class FitViewer {
           const cc = c % lcols;
           const th = (cc / lcols) * TWO_PI - Math.PI;
           const d = distRow[r * lcols + cc];
-          const px = ax + d * Math.cos(th);
-          const pz = az + d * Math.sin(th);
+          const px = axisRow[r * 2] + d * Math.cos(th);
+          const pz = axisRow[r * 2 + 1] + d * Math.sin(th);
           if (c < lcols) tube.set(r, cc, px, Y, pz);
           if (c > 0) per += Math.hypot(px - px0, pz - pz0);
           px0 = px;

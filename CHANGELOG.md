@@ -608,3 +608,14 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - **Yoke**: along the seam line the cloth is lowered onto the scan's own top-of-body profile per 1 cm column (between the collar and the shoulder tips), so the tee touches the shoulders instead of floating; beyond the tips a dropped seam continues down the arm.
 **Verified:** heavyweight S front (level shoulders, sleeves down along the arm, collar seated) and both back sides (no skin at the armpits; faint ridges remain on the sleeves from the mesh's own creases); slim L front (seam on the shoulder, collar seated) and back (holes are the mesh's); 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Jeans hang along the leg's own line; waistband slider moves the whole garment
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js` `_dressBottoms`):**
+- Each leg tube's axis is the leg's own straight line from the thigh centre to the ankle centre (legs splay and lean in a scan); rings are measured from that axis, so a loose leg is a straight tube along the leg instead of a vertical one that bulges where the calf swings out. Loose rows are never inside the unscaled body outline and are sized to the fabric (0.5–1.5× the shape from above).
+- The garment crotch sits at the waistband minus the chart's rise (capped 2–12 cm below the body's crotch): moving the waistband slider now drops the crotch and the hem together, not just the waistband.
+**Verified:** jeans 29 side/back/front/below and 34 front match the reference photos' straight fall; slider at −8 cm: waistband, crotch and hem all lower. 24 tests pass.
+**Known:** a small fold/notch remains at the crotch seam from below (the mesh's fly slot).
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

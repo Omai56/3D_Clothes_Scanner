@@ -268,3 +268,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** `public/js/viewer.js` `_placeRigid` — for tops, the Look view again uses the mesh as generated, scaled per axis from the chart (length; depth from the body's front-to-back extent + ease; worn width from the chart circumference) and placed on the body — the earlier approach, which reads cleaner than the reshaped/simulated tee. Any cached deformation is undone first (original positions restored). Bottoms keep the cloth simulation (seat + legs), which Daniel was happy with. `window.__clothSim = true` switches tops to the simulation for comparison.
 **Verified:** heavyweight tee S/XL front, side, back; slim tee front — clean, no holes; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Jeans pool on the shoes, tee sits closer, add a 3D model to any item
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/viewer.js`
+  - **Jeans length**: the hem may now reach the top of the foot (was clamped at the ankle); excess length stacks in an 8 cm roll on the shoe, as real jeans do. Both bottoms paths.
+  - **Tee width/depth** (`_placeRigid`): width = body width + the chart's ease (capped by the chart circumference) instead of the full ellipse width, depth = body extent + ease + 6.5 cm — the tee sits closer to the body while keeping its generated shape. S/XL still differ.
+  - **Intersection fix** after placement: vertices that land inside the body (torso rings, arm capsules, shoulder tops) are nudged out to the surface; nothing else moves. Removes the shoulder poking through the front of the heavyweight tee.
+- **Any item can get a 3D look**: `POST /api/garments/:id/model` accepts a `.glb` (validated as binary glTF, saved to `public/models/<id>.glb`, linked in the garment JSON). The fit screen shows an **"Add .glb model"** card for items without one, with the recipe (tripo3d.ai → upload the product photo → export .glb). Any Zara link → imported → fit works; add the model → Look works.
+**Verified:** jeans front/side (29, 34) pool on the shoes; heavyweight tee S/XL front/side/back; slim tee; upload endpoint rejects non-GLB and unknown items, accepts a real file; 24 tests pass.
+**Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `server/index.js`, `CHANGELOG.md`

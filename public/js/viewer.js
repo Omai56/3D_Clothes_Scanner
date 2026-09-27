@@ -232,9 +232,13 @@ export class FitViewer {
 
     const ext = this._bodyExtent(isTop ? [this.rings.torso] : [this.rings.torso, this.rings.right, this.rings.left], hemY, topY);
     const easeR = Math.max(MIN_GAP, cmEaseToRadius(isTop ? R.chest?.ease_cm : R.hip?.ease_cm ?? R.waist?.ease_cm));
-    const depthM = ext ? ext.zmax - ext.zmin + 2 * (easeR + 0.015) : size.z * sy;
+    // Depth: the body's front-to-back extent plus the ease once (cloth hangs off the chest and
+    // shoulder blades; it doesn't stand off both sides by the full ease).
+    const depthM = ext ? ext.zmax - ext.zmin + easeR + 0.065 : size.z * sy;
     const sz = depthM / (size.z || 1);
 
+    // Width: sits close to the body — body width plus the ease, capped by what the chart's
+    // circumference allows at that depth. Bigger sizes still widen because the ease grows.
     const flatWidthCm = isTop ? chart.chest ?? chart.hem : chart.hip ?? chart.waist;
     const bandWidth = isTop ? bands.bottom.width : bands.top.width;
     let sx = sy;
@@ -242,7 +246,8 @@ export class FitViewer {
       const C = (2 * flatWidthCm) / 100;
       const bHalf = depthM / 2;
       const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - bHalf ** 2));
-      const wornWidth = Math.max(2 * aHalf, (ext ? ext.xmax - ext.xmin : 0) + 2 * easeR);
+      const bodyW = ext ? ext.xmax - ext.xmin : 0.34;
+      const wornWidth = Math.max(bodyW + 0.02, Math.min(2 * aHalf, bodyW + easeR));
       sx = wornWidth / bandWidth;
     }
     model.scale.set(sx, sy, sz);
@@ -252,6 +257,47 @@ export class FitViewer {
     const bodyCx = ext ? (ext.xmin + ext.xmax) / 2 : 0;
     const bodyCz = ext ? (ext.zmin + ext.zmax) / 2 : 0;
     model.position.set(bodyCx - cx * sx, topY - box.max.y * sy, bodyCz - cz * sz);
+
+    // Intersection fix only: vertices that land inside the body (torso rings, arm capsules,
+    // shoulder tops) are nudged out to the body surface. Everything already outside the body is
+    // left exactly where the placement put it, so the garment keeps its shape.
+    if (isTop) {
+      const pos0 = model.position;
+      const legTop = this.rings.legTopY || b.insideLegHeight / 100;
+      const C = this._bodyColliders({ gap: 0.008, legTop, neckY: b.backNeckHeight / 100, armpitY: this.rings.armpitY ?? b.bustHeight / 100 });
+      model.traverse((o) => {
+        if (!o.isMesh || !o.userData.origPos) return;
+        const orig = o.userData.origPos;
+        const attr = o.geometry.attributes.position;
+        const out = attr.array;
+        const n = attr.count;
+        const W = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
+          W[i * 3] = orig[i * 3] * sx + pos0.x;
+          W[i * 3 + 1] = orig[i * 3 + 1] * sy + pos0.y;
+          W[i * 3 + 2] = orig[i * 3 + 2] * sz + pos0.z;
+        }
+        let moved = 0;
+        for (let i = 0; i < n; i++) {
+          if (W[i * 3 + 1] < hemY - 0.01) continue;
+          const x0 = W[i * 3];
+          const y0 = W[i * 3 + 1];
+          const z0 = W[i * 3 + 2];
+          for (let pass = 0; pass < 2; pass++) for (const col of C.all) col(W, i);
+          if (W[i * 3] !== x0 || W[i * 3 + 1] !== y0 || W[i * 3 + 2] !== z0) {
+            out[i * 3] = (W[i * 3] - pos0.x) / sx;
+            out[i * 3 + 1] = (W[i * 3 + 1] - pos0.y) / sy;
+            out[i * 3 + 2] = (W[i * 3 + 2] - pos0.z) / sz;
+            moved++;
+          }
+        }
+        if (moved) {
+          attr.needsUpdate = true;
+          o.geometry.computeVertexNormals();
+          o.geometry.computeBoundingSphere();
+        }
+      });
+    }
   }
 
   /** Colliders that keep cloth outside the body: torso/leg rings, arm capsules, shoulder tops, floor. */
@@ -645,11 +691,11 @@ export class FitViewer {
     const armpitY = this.rings.armpitY ?? b.bustHeight / 100;
     const legTop = this.rings.legTopY || crotchY;
     const splitY = this.rings.crotchSplitY ?? crotchY;
-    const ankleY = (b.outerAnkleHeightR ?? 7) / 100 + 0.005;
+    const ankleY = 0.035; // top of the foot: the hem may reach the shoe, excess pools on it
     const hemWanted = chart.total_length != null ? topY - chart.total_length / 100 : crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100;
     const hemY = Math.max(ankleY, hemWanted);
     const excess = Math.max(0, hemY - hemWanted);
-    const POOL = 0.06;
+    const POOL = 0.08;
     const gap = 0.008;
 
     const vCrotch = (S.crotchBand + 1) / NB;
@@ -775,7 +821,7 @@ export class FitViewer {
           if (excess > 0 && Yl < hemY + POOL) {
             const t = clamp((Yl - hemWanted) / (hemY + POOL - hemWanted), 0, 1);
             Y = hemY + t * POOL;
-            bump = Math.min(0.012, excess * 0.12) * Math.sin(Math.PI * t);
+            bump = Math.min(0.02, excess * 0.2) * Math.sin(Math.PI * t);
           }
           p = tube.sample((legTop - Y) / dy, ((th + Math.PI) / TWO_PI) * lcols);
           if (bump) {
@@ -1025,7 +1071,7 @@ export class FitViewer {
     const hipY = b.hipHeight / 100;
     // Pooling: a leg longer than the wearer's bunches up at the ankle instead of vanishing.
     const excess = Math.max(0, hemY - hemWanted); // metres of leg that has nowhere to go
-    const POOL = 0.06;
+    const POOL = 0.08;
     const easeHip = Math.max(MIN_GAP, cmEaseToRadius(R.hip?.ease_cm ?? R.waist?.ease_cm));
     const easeWaist = Math.max(MIN_GAP, cmEaseToRadius(R.waist?.ease_cm ?? R.hip?.ease_cm));
     const legEase = Math.max(MIN_GAP, cmEaseToRadius(R.thigh?.ease_cm ?? R.hip?.ease_cm) + 0.004);
@@ -1087,7 +1133,7 @@ export class FitViewer {
         if (excess <= 0 || Yl >= hemY + POOL) return { Y: Yl, bump: 0 };
         const t = clamp((Yl - legBottom) / (hemY + POOL - legBottom), 0, 1);
         // gentle stack of folds: a few mm out, more the longer the excess
-        return { Y: hemY + t * POOL, bump: Math.min(0.012, excess * 0.12) * Math.sin(Math.PI * t) };
+        return { Y: hemY + t * POOL, bump: Math.min(0.02, excess * 0.2) * Math.sin(Math.PI * t) };
       };
       const mapY = (v) => {
         if (vCrotch == null) return hemY + v * (topY - hemY);

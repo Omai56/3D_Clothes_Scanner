@@ -255,7 +255,30 @@ async function renderFit() {
     loading?.remove();
   }
   renderLookFlags(ev);
+  $('#add-model').hidden = !!(g.model?.glb || state.meshyUrl);
 }
+
+// Attach a .glb (made on tripo3d.ai from the product photo) to the current item, then show it.
+$('#model-file').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  const st = $('#add-model-status');
+  if (!file || !state.garment) return;
+  st.textContent = `Uploading ${file.name} (${(file.size / 1e6).toFixed(1)} MB)…`;
+  try {
+    const r = await fetch(`/api/garments/${encodeURIComponent(state.garment.id)}/model`, { method: 'POST', headers: { 'Content-Type': 'model/gltf-binary' }, body: file });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'upload failed');
+    state.garment = data.garment;
+    st.textContent = 'Added. Draping…';
+    await applyMeshyModel(data.garment.model.glb, data.garment);
+    $('#add-model').hidden = true;
+    loadGarments();
+  } catch (err) {
+    st.textContent = err.message;
+  } finally {
+    e.target.value = '';
+  }
+});
 
 // Flags on the 3D view: which regions are tight (and very loose), so the message survives Look mode.
 function renderLookFlags(ev) {

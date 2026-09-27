@@ -180,6 +180,10 @@
   // the wardrobe from the start; ones folded into the drawer stay there.
   try {
     const saved = await (await fetch('/api/garments')).json();
+    // imported items the server no longer has are gone from this phone too (rail and drawer)
+    const onServer = new Set(saved.map((g) => g.id));
+    for (const g of Fit.loadCustom()) if (g.imported && !onServer.has(g.id)) Fit.removeCustom(g.id);
+    for (const d of Fit.loadDrawer()) if (d.imported && !onServer.has(d.id)) Fit.takeFromDrawer(d.id);
     const drawer = new Set(Fit.loadDrawer().map((d) => d.id));
     for (const g of saved.slice().reverse()) if (!Fit.getGarment(g.id) && !drawer.has(g.id)) Fit.saveCustom(fromServerGarment(g));
   } catch (e) { console.warn('saved pieces unavailable', e); }

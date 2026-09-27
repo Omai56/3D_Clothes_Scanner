@@ -304,3 +304,16 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Known:** the 3D colours come from main's fit engine, the text from FitCheck's, so they can disagree on some items (e.g. hoodie: FitCheck recommends M, main's engine L). FitCheck's "Relaxed" chip is yellow; in 3D relaxed is blue.
 **Verified:** headless screenshots of tee (desktop) and jeans (phone), size and body switching; tests pass.
 **Files:** `public/result.html`, `public/fit3d.js`, `public/styles.css`, `public/app.html`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — FitCheck link box reads Zara's real product page
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/shop.html` — pasting a Zara link now calls the team's Zara import (`/api/import`): real size chart (e.g. S–XXL, jeans 28–36), name, colour, price, fabric and photo ("Reading Zara's size chart…" while it loads, ~5 s). Other stores, or a failed read, fall back to the standard chart as before.
+- `public/fit-main.js` (new) — imported items are judged by the team's fit engine (`shared/fit.js`: dropped shoulders, boxy cuts, rise) instead of FitCheck's sample-item rules, which would call a boxy tee "too loose" in every size. FitCheck's six measurements are expanded to the full body the engine needs (demo scan scaled to height and girths; the demo body gives the demo scan exactly). Report converted to FitCheck's page format. Text, wardrobe label and 3D colours now agree for these items.
+- `public/result.html` — product photo, colour; no "couldn't read the size chart" notice for imported items; length/sleeve rows show where they end; numeric sizes (jeans) named correctly. Inline scripts are now modules so the engine loads first.
+- `public/fit3d.js` — 3D uses the imported chart directly.
+- `server/zara.js` — re-importing a product keeps fields added by hand (e.g. the Tripo `model`); it used to drop them.
+**Verified:** headless end-to-end runs: Zara heavyweight tee (S recommended, dropped shoulders), slim tee (M), loose jeans (32), Hollister link fallback, wardrobe label; typed bodies (160–190 cm) give no errors; tests pass.
+**Files:** `public/shop.html`, `public/result.html`, `public/fit-main.js`, `public/fit3d.js`, `public/styles.css`, `server/zara.js`, `CHANGELOG.md`

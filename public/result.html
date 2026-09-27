@@ -75,7 +75,8 @@
 </main>
 
 <script src="app.js"></script>
-<script>
+<script type="module">
+  import './fit-main.js';
   const garment = Fit.getGarment(new URLSearchParams(location.search).get('id'));
   if (!garment) { location.replace('shop.html'); throw new Error('Unknown item'); }
   if (garment.custom) Fit.saveCustom({ ...garment, addedAt: Date.now() }); // most recently viewed hangs first
@@ -84,17 +85,19 @@
   const body = saved || Fit.DEMO_BODY;
   const notices = [];
   if (!saved) notices.push('Showing results for the demo body. <a href="index.html">Enter your measurements</a> for your own fit.');
-  if (garment.custom) notices.push(`We couldn’t read ${Fit.esc(garment.brand)}’s size chart from the link, so this uses a standard chart for this type of item. Check the store’s own chart before you buy.`);
+  if (garment.custom && !garment.chart) notices.push(`We couldn’t read ${Fit.esc(garment.brand)}’s size chart from the link, so this uses a standard chart for this type of item. Check the store’s own chart before you buy.`);
   document.getElementById('notice').innerHTML = notices.map(n => `<p class="notice">${n}</p>`).join('');
 
   const report = Fit.fitReport(garment, body);
   const rec = report.sizes[report.recommended];
 
-  document.getElementById('garmentImg').innerHTML = Fit.garmentArt(garment);
+  document.getElementById('garmentImg').innerHTML = garment.image
+    ? `<img class="product-photo" src="${Fit.esc(garment.image)}" alt="${Fit.esc(garment.name)}">`
+    : Fit.garmentArt(garment);
   document.getElementById('garmentImg').style.background = garment.bg;
   document.getElementById('brand').textContent = garment.brand;
   document.getElementById('name').textContent = garment.name;
-  document.getElementById('fabric').textContent = `${garment.price} · ${garment.fabric}`;
+  document.getElementById('fabric').textContent = [garment.price, garment.colorName, garment.fabric].filter(Boolean).join(' · ');
   if (garment.custom && /^https?:\/\//.test(garment.url)) {
     const a = document.createElement('a');
     a.className = 'store-link'; a.href = garment.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
@@ -105,13 +108,14 @@
   document.title = `${garment.name} · Your Fit`;
 
   const badge = document.getElementById('badge');
-  badge.innerHTML = `<span class="dot">${report.recommended}</span>Recommended: ${Fit.SIZE_NAMES[report.recommended]}`;
+  badge.innerHTML = `<span class="dot">${report.recommended}</span>Recommended: ${Fit.SIZE_NAMES[report.recommended] ?? report.recommended}`;
   badge.classList.toggle('bad', rec.worst === 'bad');
 
   const figure = document.getElementById('figure');
   figure.innerHTML = Fit.bodyFigure('Body outline coloured by fit');
 
   function fmtEase(r) {
+    if (r.ease == null) return r.detail ?? '';
     const sign = r.ease > 0 ? '+' : '';
     return `${sign}${r.ease} cm`;
   }
@@ -165,7 +169,7 @@
 
   document.getElementById('tabs').innerHTML = Object.keys(garment.sizes).map(s => `
     <button class="size-tab" type="button" data-size="${s}" aria-pressed="false"
-      aria-label="Size ${Fit.SIZE_NAMES[s]}${s === report.recommended ? ', recommended' : ''}">
+      aria-label="Size ${Fit.SIZE_NAMES[s] ?? s}${s === report.recommended ? ', recommended' : ''}">
       ${s}${s === report.recommended ? '<span class="rec"></span>' : ''}
     </button>`).join('');
   document.getElementById('tabs').addEventListener('click', e => {

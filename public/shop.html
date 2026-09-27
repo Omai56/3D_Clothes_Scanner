@@ -51,7 +51,7 @@
         </label>
       </div>
       <p class="link-error" id="linkError" role="alert"></p>
-      <button class="btn primary" type="submit">Try it on</button>
+      <button class="btn primary" type="submit" id="linkSubmit">Try it on</button>
     </form>
   </section>
 
@@ -106,7 +106,8 @@
 </main>
 
 <script src="app.js"></script>
-<script>
+<script type="module">
+  import { importLink } from './fit-main.js';
   const saved = Fit.loadBody();
   const body = saved || Fit.DEMO_BODY;
   const short = { height: 'Height', chest: 'Chest', waist: 'Waist', hip: 'Hips', inseam: 'Inseam', shoulder: 'Shoulders' };
@@ -276,11 +277,22 @@
     });
   }
 
-  document.getElementById('linkForm').addEventListener('submit', e => {
+  const submitBtn = document.getElementById('linkSubmit');
+  document.getElementById('linkForm').addEventListener('submit', async e => {
     e.preventDefault();
+    if (submitBtn.disabled) return;
     if (!input.value.trim()) { errorEl.textContent = 'Paste a product link first.'; input.focus(); return; }
     if (!parsed) { errorEl.textContent = 'That doesn’t look like a web link. It should start with https://'; input.focus(); return; }
-    const g = Fit.makeCustomGarment({ ...parsed, art: typeSel.value });
+    // Supported stores (Zara): read the real size chart, photo and price from the product page.
+    // Anything else, or if the page can't be read, falls back to a standard chart for the item type.
+    let g = null;
+    submitBtn.disabled = true;
+    submitBtn.textContent = `Reading ${parsed.store}’s size chart…`;
+    try { g = await importLink(parsed.url); }
+    catch (err) { console.warn('Import failed, using a standard chart:', err); }
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Try it on';
+    if (!g) g = Fit.makeCustomGarment({ ...parsed, art: typeSel.value });
     Fit.saveCustom(g);
     try { sessionStorage.setItem('wd.open', '1'); } catch (err) { /* ignore */ }
     location.href = 'result.html?id=' + encodeURIComponent(g.id);

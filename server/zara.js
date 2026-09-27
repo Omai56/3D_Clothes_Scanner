@@ -178,7 +178,11 @@ export async function importZara(url, { garmentsDir, imgDir, log = () => {} }) {
   garment.sizes_available = Object.fromEntries(color.sizes.map((s) => [s.name, s.availability]));
 
   await fs.mkdir(garmentsDir, { recursive: true });
-  await fs.writeFile(path.join(garmentsDir, `${garment.id}.json`), JSON.stringify(garment, null, 2) + '\n');
+  const file = path.join(garmentsDir, `${garment.id}.json`);
+  // Re-importing refreshes the product data but keeps what was added by hand (e.g. the 3D `model`).
+  const previous = await fs.readFile(file, 'utf8').then(JSON.parse).catch(() => null);
+  if (previous) for (const [k, v] of Object.entries(previous)) if (!(k in garment)) garment[k] = v;
+  await fs.writeFile(file, JSON.stringify(garment, null, 2) + '\n');
   log(`saved ${garment.id}`);
   return garment;
 }

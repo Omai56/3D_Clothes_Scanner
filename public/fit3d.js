@@ -39,7 +39,7 @@ export function toViewerGarment(g) {
 export async function mountFit3D({ stage, picker, legend, garment, preferScan = 'demo' }) {
   const scans = await (await fetch('/api/scans')).json();
   if (!scans.length) throw new Error('No saved 3D bodies');
-  const vg = toViewerGarment(garment);
+  const vg = garment.chart ?? toViewerGarment(garment); // imported items carry the store's real chart
   const viewer = new FitViewer(stage);
   let report = null;
   let size = null;

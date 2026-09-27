@@ -649,3 +649,12 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Samuel's pages stay at `/measure.html` and `/shop.html`.
 **Verified (headless phone walkthrough):** body tap → room; closet → tap tee → panel with sizes; size change re-drapes; press-and-hold jeans → drag onto body → worn; slim S; no console errors; 24 tests pass.
 **Files:** `public/index.html`, `public/css/style.css`, `public/js/app.js`, `public/js/viewer.js`, `public/app.html`, `public/result.html`, `README.md`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Garments: simple placement is the default (make it look good, roughly show the fit)
+**By:** Claude (Fable 5.1), per Daniel: "forget making it adhere to the body, just make it look good"
+**What (`public/js/viewer.js` `_placeSimple`):** the generated mesh is kept exactly as generated (no sleeve, yoke or leg reshaping), scaled per axis from the size chart (length; depth = body extent + ease; width = what the chart circumference allows, never narrower than the body), set on the body, then a soft neighbour-smoothed push keeps the body from showing through. Sizes still differ visibly. Trousers: each mesh leg slides sideways onto the body's own leg line and is narrowed towards the real hem width (44 % of the hip measurement for a loose fit) and deepened to enclose the calf, fading out at the crotch — so the legs hang straight along the legs instead of splaying like the flat photo. The warp (`window.__fitMode = 'warp'`) and cloth simulation (`'sim'`) remain available but are off.
+**Result:** black tee — no deltoid wrinkles, clean back at S and XL; brown tee — sleeves no longer stick out, clean front (back holes are in the mesh file); jeans — straight from front, side and back at 29 and 34, no clinging.
+**Verified:** headless renders of all three items from front/back/side; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

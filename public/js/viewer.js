@@ -216,6 +216,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     const R = sizeEval.regions;
     const chart = garment.sizes?.[sizeEval.size] ?? {};
     const isTop = garment.category === 'top';
+    this._garmentName = `${garment.name ?? ''} ${garment.description ?? ''}`;
 
     // Fabric, not plastic: AI exports tend to come out glossy.
     this._meshMaterials = [];
@@ -240,8 +241,12 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     // Tops: the plain placement (mesh kept as generated, sized from the chart and placed on the
     // body) reads better than reshaping it, per Daniel's review. Bottoms: cloth simulation.
     // Set window.__clothSim = true to simulate tops too.
+    // Default: the mesh as generated, scaled from the chart and set on the body (Daniel: "make it
+    // look good, it doesn't have to adhere"). window.__fitMode = 'warp' / 'sim' for the others.
     try {
-      if (isTop && !window.__clothSim) this._placeTop(model, box, R, chart);
+      const mode = window.__fitMode ?? 'simple';
+      if (mode === 'simple') this._placeSimple(model, box, R, chart, isTop);
+      else if (isTop && mode === 'warp') this._placeTop(model, box, R, chart);
       else if (isTop) this._dressTop(model, box, R, chart, garment);
       else this._dressBottoms(model, box, R, chart);
     } catch (e) {
@@ -251,6 +256,198 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     }
     this.meshyGroup.add(model);
     this.setMode(this.mode ?? 'look');
+  }
+
+  /**
+   * Simple placement (the look Daniel asked for): the generated mesh kept exactly as it is,
+   * scaled per axis from the size chart and set on the body, then a soft, neighbour-smoothed
+   * push so the body never shows through. No sleeve, yoke or leg reshaping. Sizes still differ
+   * in width, depth and length.
+   */
+  _placeSimple(model, box, R, chart, isTop) {
+    const b = this.body;
+    const size = this._gltfSize;
+    const bands = this._gltfBands;
+    const meshes = [];
+    model.traverse((o) => {
+      if (!o.isMesh || !o.userData.origPos) return;
+      meshes.push(o);
+      const pos = o.geometry.attributes.position;
+      pos.array.set(o.userData.origPos);
+      pos.needsUpdate = true;
+    });
+    const gap = 0.006;
+    const neckY = b.backNeckHeight / 100;
+    const armpitY = this.rings.armpitY ?? b.bustHeight / 100;
+    const legTop = this.rings.legTopY || b.insideLegHeight / 100;
+    const torsoCx = this.rings.torsoCx ?? 0;
+
+    let topY;
+    let hemY;
+    let ext;
+    let flatCm;
+    let easeCm;
+    let bandW;
+    let bandD;
+    if (isTop) {
+      topY = neckY - 0.005;
+      hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
+      ext = this._bodyExtent([this.rings.torso], Math.max(hemY, armpitY - 0.25), neckY - 0.06);
+      flatCm = chart.chest ?? chart.hem ?? null;
+      easeCm = R.chest?.ease_cm ?? 6;
+      bandW = bands.bottom.width;
+      bandD = bands.bottom.depth > 0.02 * size.y ? bands.bottom.depth : size.z;
+    } else {
+      topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
+      const wanted = chart.total_length != null ? topY - chart.total_length / 100 : (b.insideLegHeight - (effectiveInseam(chart) ?? b.insideLegHeight)) / 100;
+      hemY = Math.max(0.012, wanted);
+      ext = this._bodyExtent([this.rings.torso], Math.max(legTop, b.hipHeight / 100 - 0.06), topY);
+      flatCm = chart.hip ?? chart.waist ?? null;
+      easeCm = R.hip?.ease_cm ?? R.waist?.ease_cm ?? 6;
+      bandW = bands.top.width;
+      bandD = size.z;
+    }
+    ext ??= { xmin: -0.17, xmax: 0.17, zmin: -0.11, zmax: 0.11 };
+    const bodyW = ext.xmax - ext.xmin;
+    const bodyD = ext.zmax - ext.zmin;
+    const bodyCx = isTop ? torsoCx : (ext.xmin + ext.xmax) / 2;
+    const bodyCz = (ext.zmin + ext.zmax) / 2;
+    const easeR = Math.max(MIN_GAP, cmEaseToRadius(easeCm));
+
+    // depth: the body's front-to-back extent plus the ease once, plus clearance
+    const depthM = bodyD + easeR + (isTop ? 0.05 : 0.035);
+    // width: what the chart's circumference allows at that depth, never narrower than the body
+    let wornWidth = bodyW + 2 * easeR + 0.02;
+    if (flatCm) {
+      const C = (2 * flatCm) / 100;
+      const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - (depthM / 2) ** 2));
+      wornWidth = clamp(2 * aHalf, bodyW + 0.02, bodyW + 2 * easeR + 0.06);
+    }
+    const heightM = Math.max(0.25, topY - hemY);
+    const sy = heightM / (size.y || 1);
+    const sx = bandW > 0.05 ? wornWidth / bandW : sy;
+    const sz = depthM / (bandD || 1);
+    const cx = (box.min.x + box.max.x) / 2;
+    const cz = (box.min.z + box.max.z) / 2;
+    const px = bodyCx - cx * sx;
+    const py = topY - box.max.y * sy;
+    const pz = bodyCz - cz * sz;
+    this.lastSimpleFit = { wornWidth, depthM, heightM, sx, sy, sz, bodyW, bodyD };
+
+    // Trousers: the flat-lay legs splay outward and are thin pillows. Each mesh leg keeps its
+    // shape but slides sideways/forwards so it hangs on the body's own leg line (thigh to
+    // ankle), and is widened/deepened just enough to enclose the leg. Fades out at the crotch.
+    let legFollow = null;
+    if (!isTop) {
+      const NB = 64;
+      const S = (this._gltfSlices ??= sliceMesh(model, box, NB, (box.min.x + box.max.x) / 2));
+      if (S.crotchBand >= 0) {
+        const h = box.max.y - box.min.y || 1;
+        const meshCx = (box.min.x + box.max.x) / 2;
+        const vCrotch = (S.crotchBand + 1) / NB;
+        const ankleTop = this.ankleTopY ?? (b.outerAnkleHeightR ?? 7) / 100 + 0.03;
+        const rMax = { R: 0, L: 0 };
+        for (const side of ['R', 'L']) {
+          const map = side === 'R' ? this.rings.right : this.rings.left;
+          for (const ring of map.values()) if (ring.y >= ankleTop && ring.y <= legTop) for (let j = 0; j < RING_BINS; j++) if (ring.r[j] > rMax[side]) rMax[side] = ring.r[j];
+        }
+        legFollow = (x, y, W, i) => {
+          const v = clamp((y - box.min.y) / h, 0, 0.9999);
+          if (v > vCrotch + 0.05) return;
+          const side = x >= meshCx ? 'R' : 'L';
+          const ls = lerpStats(S.legs[side], Math.min(v, vCrotch), NB) ?? S.nearestLeg(side, Math.floor(v * NB));
+          if (!ls) return;
+          const map = side === 'R' ? this.rings.right : this.rings.left;
+          const Y = W[i * 3 + 1];
+          const c = sampleRing(map, clamp(Y, ankleTop, legTop - 0.005), 0);
+          if (!c) return;
+          const w = 1 - smoothstep(vCrotch - 0.02, vCrotch + 0.05, v);
+          const lcx = ls.cx * sx + px;
+          const lcz = ls.cz * sz + pz;
+          const need = rMax[side] + gap + 0.012;
+          // the generated legs are wider than the real ones: narrow them a little (never
+          // tighter than the leg inside), and deepen the thin pillow to enclose the calf
+          // hem half-width: from the chart if it has one, else a loose leg = ~44 % of the hip
+          // measurement (flat), a regular one ~38 %
+          const hemFlat = chart.hem ?? (chart.hip ? chart.hip * (/loose|wide|baggy|relaxed/i.test(`${this._garmentName ?? ''}`) ? 0.44 : 0.38) : null);
+          const legHW = hemFlat ? Math.max(need, (hemFlat / 100) * 0.5) : Math.max(need, 0.7 * ls.hw * sx);
+          const kx = legHW / Math.max(1e-3, ls.hw * sx);
+          const kz = Math.max(1, need / Math.max(1e-3, ls.hd * sz));
+          const dx = W[i * 3] - lcx;
+          const dz = W[i * 3 + 2] - lcz;
+          W[i * 3] += w * (c.cx - lcx + dx * (kx - 1));
+          W[i * 3 + 2] += w * (c.cz - lcz + dz * (kz - 1));
+        };
+      }
+    }
+
+    // bake the scale into the vertices, then push what is inside the body out (smoothed)
+    const Cs = this._bodyColliders({ gap, legTop, neckY, armpitY, torsoLo: this.rings.crotchSplitY ?? legTop });
+    const cols = isTop ? Cs.all : Cs.body;
+    for (const o of meshes) {
+      const orig = o.userData.origPos;
+      const n = orig.length / 3;
+      const W = new Float32Array(orig.length);
+      for (let i = 0; i < n; i++) {
+        W[i * 3] = orig[i * 3] * sx + px;
+        W[i * 3 + 1] = orig[i * 3 + 1] * sy + py;
+        W[i * 3 + 2] = orig[i * 3 + 2] * sz + pz;
+      }
+      if (legFollow) for (let i = 0; i < n; i++) legFollow(orig[i * 3], orig[i * 3 + 1], W, i);
+      const adj = (o.userData.adj ??= buildAdjacency(o.geometry));
+      const D = new Float32Array(W.length);
+      const T = new Float32Array(W.length);
+      const collide = () => {
+        for (let i = 0; i < n; i++) {
+          if (T[i * 3 + 1] < hemY - 0.01) continue;
+          for (let pass = 0; pass < 2; pass++) for (const col of cols) col(T, i);
+        }
+      };
+      for (let it = 0; it < 4; it++) {
+        for (let k = 0; k < W.length; k++) T[k] = W[k] + D[k];
+        collide();
+        for (let k = 0; k < W.length; k++) D[k] = T[k] - W[k];
+        const { canon, offsets, list } = adj;
+        for (let i = 0; i < n; i++) {
+          const c = canon[i];
+          const s0 = offsets[c];
+          const e = offsets[c + 1];
+          if (e === s0) {
+            T[i * 3] = D[i * 3];
+            T[i * 3 + 1] = D[i * 3 + 1];
+            T[i * 3 + 2] = D[i * 3 + 2];
+            continue;
+          }
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+          for (let j = s0; j < e; j++) {
+            const q = list[j] * 3;
+            ax += D[q];
+            ay += D[q + 1];
+            az += D[q + 2];
+          }
+          const inv = 0.5 / (e - s0);
+          T[i * 3] = 0.5 * D[i * 3] + ax * inv;
+          T[i * 3 + 1] = 0.5 * D[i * 3 + 1] + ay * inv;
+          T[i * 3 + 2] = 0.5 * D[i * 3 + 2] + az * inv;
+        }
+        D.set(T);
+      }
+      for (let k = 0; k < W.length; k++) T[k] = W[k] + D[k];
+      collide();
+      const attr = o.geometry.attributes.position;
+      attr.array.set(T);
+      attr.needsUpdate = true;
+      if (!isTop && !o.userData.hemCut) {
+        openBottom(o.geometry, orig, box.min.y + (box.max.y - box.min.y) * 0.015);
+        o.userData.hemCut = true;
+      }
+      o.geometry.computeVertexNormals();
+      o.geometry.computeBoundingSphere();
+    }
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
   }
 
   /**

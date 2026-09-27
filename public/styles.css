@@ -979,3 +979,36 @@ h1 em, .accent-word { font-style: italic; background: var(--brand-grad); -webkit
   .model-foot .body-picker label { font-size: 0; gap: 0; }
   .model-foot .body-picker select { font-size: 13.5px; padding: 7px 12px; }
 }
+
+/* Right column switch: Wardrobe | Fit & sizes (one pane at a time, no scrolling down to the sizes) */
+.side-switch {
+  order: -1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px;
+  background: var(--tint-lilac); border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--line));
+}
+.side-switch button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: transparent; color: var(--ink-2); font-weight: 600; font-size: 14px; cursor: pointer;
+  transition: background .2s, color .2s, box-shadow .2s;
+}
+.side-switch button:hover:not(:disabled):not([aria-selected="true"]) { color: var(--accent); }
+.side-switch button[aria-selected="true"] { background: var(--brand-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(91, 61, 245, .6); }
+.side-switch button:disabled { color: var(--muted); opacity: .55; cursor: not-allowed; }
+.side-switch button:focus-visible { outline: none; box-shadow: var(--ring); }
+.switch-count:not(:empty) { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center; font-size: 11px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+[aria-selected="true"] .switch-count:not(:empty) { background: rgba(255, 255, 255, .25); color: #fff; }
+.switch-size { font-weight: 700; }
+.side-pane { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.tryon-side .wearing .regions .region-row { padding-top: 9px; padding-bottom: 9px; }
+.tryon-side .wearing .panel-summary { font-size: 18px; }
+.tryon-side .wearing .fabric { margin: 10px 0 12px; }
+
+@media (min-width: 960px) {
+  /* Compact intro so the model and the size details sit higher on the screen */
+  .page-tryon { padding-top: 18px; }
+  .tryon-intro { display: flex; align-items: baseline; gap: 18px; margin-bottom: 12px; }
+  .tryon-intro .eyebrow { margin: 0; order: 1; }
+  .tryon-intro h1 { font-size: 40px; margin: 0; }
+  .tryon-intro .lede { display: none; }
+  .page-tryon .measure-chip { margin-bottom: 16px; padding: 10px 18px; }
+  .model-card .stage-3d, .model-card .figure-2d { height: calc(100vh - 256px); }
+}

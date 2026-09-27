@@ -47,6 +47,11 @@
     </section>
 
     <div class="tryon-side">
+      <div class="side-switch" role="tablist" aria-label="Wardrobe or fit">
+        <button type="button" role="tab" id="tabWardrobe" aria-selected="true" aria-controls="paneWardrobe">Wardrobe <span class="switch-count" id="wdCount"></span></button>
+        <button type="button" role="tab" id="tabFit" aria-selected="false" aria-controls="wearing" disabled>Fit &amp; sizes <span class="switch-size" id="fitSizeLabel"></span></button>
+      </div>
+      <div class="side-pane" id="paneWardrobe" role="tabpanel" aria-labelledby="tabWardrobe">
   <section class="card link-panel" aria-labelledby="linkTitle">
     <div class="link-head">
       <span class="link-icon" aria-hidden="true">
@@ -122,7 +127,8 @@
       <button type="button" class="btn" id="toggleWardrobe">Open wardrobe</button>
     </div>
   </section>
-      <section class="card wearing" id="wearing" hidden aria-labelledby="name">
+      </div>
+      <section class="card wearing" id="wearing" hidden role="tabpanel" aria-labelledby="tabFit">
         <div id="notice"></div>
         <div class="wearing-head">
           <div class="img" id="garmentImg"></div>
@@ -173,6 +179,21 @@
   const HANGER = '<svg class="hook" viewBox="0 0 120 44" aria-hidden="true"><path d="M60 22 V14 C60 8 66 6 69 9 C72 12 70 16 66 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M60 22 L10 40 H110 Z" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/></svg>';
   let page = 0, perPage = 4, view3d = null;
   let worn = null; // garment on the model
+  // Right column shows one pane at a time: the wardrobe, or the fit & sizes of what's on the model.
+  const tabW = $('tabWardrobe'), tabF = $('tabFit'), paneW = $('paneWardrobe'), paneF = $('wearing');
+  const wardrobeShown = () => !paneW.hidden;
+  function showPane(which) {
+    const fit = which === 'fit' && !!worn;
+    paneW.hidden = fit;
+    paneF.hidden = !fit;
+    tabW.setAttribute('aria-selected', String(!fit));
+    tabF.setAttribute('aria-selected', String(fit));
+    if (view3d) view3d.setActive(!fit && isOpen());
+    // The rail was laid out while hidden (zero size): lay it out again now that it shows.
+    if (!fit) requestAnimationFrame(() => { if (view3d) view3d.resize(); renderWardrobe(); });
+  }
+  tabW.addEventListener('click', () => showPane('wardrobe'));
+  tabF.addEventListener('click', () => showPane('fit'));
 
   const perPageFor = () => { const w = hangers.clientWidth || 600; return w >= 560 ? 3 : 2; };
 
@@ -214,6 +235,7 @@
       ? Array.from({ length: pages }, (_, p) => `<button type="button" class="${p === page ? 'on' : ''}" data-p="${p}" aria-label="Rail ${p + 1} of ${pages}"${p === page ? ' aria-current="true"' : ''}></button>`).join('') + `<span>${page + 1} / ${pages}</span>`
       : '';
     $('wdEmpty').hidden = list.length > 0;
+    $('wdCount').textContent = list.length ? list.length : '';
     $('plaqueCount').textContent = list.length;
     $('plaqueUnit').textContent = list.length === 1 ? 'piece' : 'pieces';
     $('wardrobeNote').textContent = list.length
@@ -247,7 +269,7 @@
     toggleBtn.textContent = open ? 'Close wardrobe' : 'Open wardrobe';
     wardrobe.querySelectorAll('.wd-door').forEach(d => d.setAttribute('aria-label', open ? 'Close wardrobe' : 'Open wardrobe'));
     syncTabs();
-    if (view3d) view3d.setActive(open);
+    if (view3d) view3d.setActive(open && wardrobeShown());
     try { sessionStorage.setItem('wd.open', open ? '1' : '0'); } catch (e) { /* ignore */ }
   }
   const isOpen = () => wardrobe.dataset.open === 'true';
@@ -294,6 +316,7 @@
 
   // Keep the first visible piece in view when the number per rail changes.
   new ResizeObserver(() => {
+    if (!hangers.clientWidth) return; // wardrobe pane hidden
     const n = perPageFor();
     if (n !== perPage) { page = Math.floor(page * perPage / n); renderWardrobe(); }
     else if (view3d) { const bottoms = view3d.resize(); hangers.querySelectorAll('.hanger').forEach((h, i) => h.style.setProperty('--tag-top', (bottoms[i] + 8) + 'px')); }
@@ -306,7 +329,7 @@
       wardrobe.classList.add('has-3d');
       view3d.resize();
       renderWardrobe();
-      view3d.setActive(isOpen());
+      view3d.setActive(isOpen() && wardrobeShown());
     } catch (err) { view3d = null; wardrobe.classList.remove('has-3d'); console.warn('3D wardrobe unavailable', err); }
   });
 
@@ -424,16 +447,20 @@
     hangers.querySelectorAll('.hanger').forEach(h => h.classList.toggle('worn', h.dataset.id === g.id));
     $('dropHint').hidden = true;
     $('takeOff').hidden = false;
+    tabF.disabled = false;
     document.title = `${g.name} · Try on · FitCheck`;
     if (view) view.wear(g, size);
     colourFigure();
     selectSize(size, { instant: true });
     dropzone.classList.remove('put-on'); void dropzone.offsetWidth; dropzone.classList.add('put-on');
+    showPane('fit');
   }
 
   function takeOff() {
     worn = null; report = null;
-    $('wearing').hidden = true;
+    showPane('wardrobe');
+    tabF.disabled = true;
+    $('fitSizeLabel').textContent = '';
     $('dropHint').hidden = false;
     $('takeOff').hidden = true;
     hangers.querySelectorAll('.hanger').forEach(h => h.classList.remove('worn'));
@@ -446,7 +473,6 @@
 
   function renderWearing(g) {
     const notices = [];
-    if (!saved) notices.push('Showing results for the demo body. <a href="index.html">Enter your measurements</a> for your own fit.');
     if (g.custom && !g.chart) notices.push(`We couldn’t read ${esc(g.brand)}’s size chart from the link, so this uses a standard chart for this type of item. Check the store’s own chart before you buy.`);
     $('notice').innerHTML = notices.map(n => `<p class="notice">${n}</p>`).join('');
     $('garmentImg').innerHTML = g.image ? `<img class="product-photo" src="${esc(g.image)}" alt="${esc(g.name)}">` : Fit.garmentArt(g);
@@ -493,7 +519,6 @@
           </ul>
         </article>`;
     }).join('');
-    $('wearing').hidden = false;
   }
 
   // Swiping the size panels picks the size; the tabs follow (and jump to a panel when tapped).
@@ -501,6 +526,7 @@
   function selectSize(s, { instant = false, fromScroll = false } = {}) {
     if (!report || !report.sizes[s]) return;
     size = s;
+    $('fitSizeLabel').textContent = '· ' + s;
     tabsEl.querySelectorAll('.size-tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === s)));
     if (view) view.show(s);
     colourFigure();

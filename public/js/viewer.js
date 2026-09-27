@@ -294,7 +294,7 @@ export class FitViewer {
     // shoulder seam sits down the arm, so the yoke beyond the body's shoulder point slopes down
     // to it (and the sleeve hangs from there).
     const rampStart = 0.02 * P.torsoHW;
-    const rampLen = 0.22 * P.torsoHW;
+    const rampLen = 0.4 * P.torsoHW;
     const xs = shoulderW / 2;
     const dropY = drop * Math.cos(armAng);
     // The flat-lay mesh has a nearly level shoulder line; the body's shoulder slopes down from
@@ -555,7 +555,7 @@ export class FitViewer {
       const rWr = (b.wristGirthR ?? 17) / 100 / TWO_PI + gap;
       const s0 = armAxis(a, rUp - gap);
       // the deltoid at the top of the arm is fatter than the upper-arm girth
-      arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t + rUp * 0.3 * Math.max(0, 1 - t / 0.15)));
+      arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t + rUp * 0.12 * Math.max(0, 1 - t / 0.15)));
     }
     const floor = (pos, i) => {
       if (pos[i * 3 + 1] < 0.01) pos[i * 3 + 1] = 0.01;
@@ -1032,7 +1032,7 @@ export class FitViewer {
         if ((pos[i * 3] - m) * sgn < 0.004) pos[i * 3] = m + 0.004 * sgn;
         // crotch gusset: for the first rows under the crotch the inner side of each leg lies
         // flat on the midline, so the two legs meet like an inseam instead of leaving a notch
-        if (r < 5 && Math.abs(pos[i * 3] - m) < 0.03) pos[i * 3] = m + 0.004 * sgn;
+        if (r < 6 && Math.abs(pos[i * 3] - m) < 0.03) pos[i * 3] = m + 0.004 * sgn;
       };
       legs[side] = tube;
       tubes.push(tube);
@@ -1053,9 +1053,25 @@ export class FitViewer {
       const geo = o.geometry;
       const orig = o.userData.origPos;
       const fr = o.userData.origFront;
+      const df = o.userData.origDepth;
       const pos = geo.attributes.position;
       const out = pos.array;
       const n = pos.count;
+      // ring angle for a vertex: front/back layer by the flag, but within the side band the
+      // angle follows the vertex's depth so the edge wraps round the side of the body
+      const angleOf = (u, frontV, i) => {
+        const base = frontV ? Math.acos(u) : -Math.acos(u);
+        const au = Math.abs(u);
+        if (au < 0.8 || !df) return base;
+        const f = df[i];
+        const phi = Math.acos(au);
+        const side = u >= 0 ? phi * (2 * f - 1) : Math.PI - phi * (2 * f - 1);
+        const w = smoothstep(0.8, 0.95, au);
+        // shortest blend between the two angles
+        let d = side - base;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        return base + w * d;
+      };
       for (let i = 0; i < n; i++) {
         const x = orig[i * 3];
         const y = orig[i * 3 + 1];
@@ -1068,7 +1084,7 @@ export class FitViewer {
           const tube = legs[side];
           const ls = lerpStats(S.legs[side], v, NB) ?? S.nearestLeg(side, band) ?? lerpStats(S.all, v, NB);
           const u = clamp((x - ls.cx) / ls.hw, -1, 1);
-          const th = frontV ? Math.acos(u) : -Math.acos(u);
+          const th = angleOf(u, frontV, i);
           const Yl = hemWanted + (Math.min(v, vCrotch) / vCrotch) * (legTop - hemWanted);
           let Y = Yl;
           let bump = 0;
@@ -1090,7 +1106,7 @@ export class FitViewer {
         const seatPos = () => {
           const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
           const u = clamp((x - ms.cx) / ms.hw, -1, 1);
-          const th = frontV ? Math.acos(u) : -Math.acos(u);
+          const th = angleOf(u, frontV, i);
           const Y = legTop + ((v - vCrotch) / Math.max(1e-3, 1 - vCrotch)) * (topY - legTop);
           return seat.sample((topY - Y) / dy, ((th + Math.PI) / TWO_PI) * cols);
         };
@@ -1739,6 +1755,15 @@ function bakeToWorld(scene) {
       front.set(next);
     }
     o.userData.origFront = front;
+    // depth fraction across the flat-lay thickness (0 = back surface, 1 = front): lets the
+    // rounded side edges wrap smoothly round the body instead of snapping front/back
+    const depthF = new Float32Array(nrm.count);
+    for (let i = 0; i < nrm.count; i++) {
+      const k = cellOf(arr[i * 3], arr[i * 3 + 1]);
+      const thick = maxZ[k] - minZ[k];
+      depthF[i] = thick > 1e-4 ? clamp((arr[i * 3 + 2] - minZ[k]) / thick, 0, 1) : front[i];
+    }
+    o.userData.origDepth = depthF;
     o.geometry.computeBoundingBox();
     o.geometry.computeBoundingSphere();
   }

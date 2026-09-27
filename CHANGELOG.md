@@ -313,3 +313,14 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Known limits:** the slim tee's generated mesh has oversized sleeves/armholes so its sleeves still read full; a thin sliver can show at the back armpit of the heavyweight tee at some angles; the jeans mesh's side edge looks jagged in a pure side view.
 **Verified:** slim L, heavyweight S front/back, jeans 29/34 front, side and from below; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 08:30 — Jeans: no side gaps from the back, crotch closed underneath; fresh code on phones
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/viewer.js` — bottoms glue: within the side band of the flat-lay mesh (|u| > 0.8) the ring angle follows each vertex's depth across the pillow thickness (`origDepth`, computed in `bakeToWorld`), so the rounded side edge wraps round the body instead of snapping front/back — this was the skin showing at both sides of the seat and legs from the back. Crotch gusset covers the first 6 rows under the crotch. Sleeve/torso junction blends over a wider band; the deltoid bulge in the arm collider is smaller (the sleeve caps puffed against it). Also restored the position declarations the simulated-top path (`window.__clothSim`) needs.
+- `server/index.js` — `Cache-Control: no-store` for js/css/html so phones never keep an old viewer (Daniel's phone showed the previous hem behaviour after the last push).
+**Known limits:** slim-tee sleeves still fuller than the photo (generated mesh has oversized armholes); heavyweight sleeve caps show a crease; jeans side edge shows speckles in a pure side view; a small fold under the crotch.
+**Verified:** jeans 29 back / below / side, heavyweight S front + back, slim L; 24 tests pass.
+**Files:** `public/js/viewer.js`, `server/index.js`, `CHANGELOG.md`

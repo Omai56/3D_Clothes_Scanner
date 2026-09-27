@@ -18,8 +18,10 @@ const MODELS_DIR = path.join(ROOT, 'data', 'models');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
-app.use(express.static(path.join(ROOT, 'public')));
-app.use('/shared', express.static(path.join(ROOT, 'shared')));
+// phones cache module scripts aggressively; the app is tiny, always fetch fresh code
+const noStore = { setHeaders: (res, file) => { if (/\.(js|css|html)$/.test(file)) res.setHeader('Cache-Control', 'no-store'); } };
+app.use(express.static(path.join(ROOT, 'public'), noStore));
+app.use('/shared', express.static(path.join(ROOT, 'shared'), noStore));
 app.use('/scans', express.static(SCANS_DIR)); // .obj files
 app.use('/models', express.static(MODELS_DIR)); // .glb files from Meshy
 

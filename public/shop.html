@@ -6,7 +6,7 @@
   <title>Choose Clothes · FitCheck</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -63,7 +63,7 @@
 
     <div class="wardrobe-scene">
       <div class="wardrobe" id="wardrobe" data-open="false">
-        <div class="wd-crown"><span class="wd-plaque"><span id="plaqueCount">0</span> pieces</span></div>
+        <div class="wd-crown"><span class="wd-plaque"><span id="plaqueCount">0</span> <span id="plaqueUnit">pieces</span></span></div>
         <div class="wd-cabinet">
           <div class="wd-interior">
             <span class="wd-wall wd-wall-l"></span><span class="wd-wall wd-wall-r"></span>
@@ -166,6 +166,7 @@
       : '';
     document.getElementById('wdEmpty').hidden = list.length > 0;
     document.getElementById('plaqueCount').textContent = list.length;
+    document.getElementById('plaqueUnit').textContent = list.length === 1 ? 'piece' : 'pieces';
     document.getElementById('wardrobeNote').textContent = list.length
       ? `${list.length} piece${list.length === 1 ? '' : 's'} you tried · tap one to see the fit again`
       : 'Clothes you try on from links are kept here';
@@ -300,7 +301,8 @@
 
   renderWardrobe();
   let startOpen = false;
-  try { startOpen = sessionStorage.getItem('wd.open') === '1'; } catch (e) { /* ignore */ }
+  // Open by default when something is hanging, unless it was closed earlier this visit.
+  try { startOpen = sessionStorage.getItem('wd.open') !== '0'; } catch (e) { startOpen = true; }
   setOpen(false);
   if (startOpen && Fit.loadCustom().length) setTimeout(() => { setOpen(true); wardrobe.classList.add('swing'); }, 350);
 </script>

@@ -6,7 +6,7 @@
   <title>Your Fit · FitCheck</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script type="importmap">
     {
@@ -108,12 +108,19 @@
   document.title = `${garment.name} · Your Fit`;
 
   const badge = document.getElementById('badge');
-  badge.innerHTML = `<span class="dot">${report.recommended}</span>Recommended: ${Fit.SIZE_NAMES[report.recommended] ?? report.recommended}`;
+  badge.innerHTML = `<span class="dot">${report.recommended}</span>Recommended: ${Fit.SIZE_NAMES[report.recommended] ?? `Size ${report.recommended}`}`;
   badge.classList.toggle('bad', rec.worst === 'bad');
 
   const figure = document.getElementById('figure');
   figure.innerHTML = Fit.bodyFigure('Body outline coloured by fit');
 
+  // Colour each row the way the 3D view does: roomy is blue, snug amber, tight red.
+  function verdictOf(r) {
+    if (r.verdict) return r.verdict;
+    if (r.level === 'good' || r.ease == null) return 'good';
+    const roomy = r.goodMax != null ? r.ease > r.goodMax : r.ease > 0;
+    return r.level === 'warn' ? (roomy ? 'loose' : 'snug') : (roomy ? 'very_loose' : 'tight');
+  }
   function fmtEase(r) {
     if (r.ease == null) return r.detail ?? '';
     const sign = r.ease > 0 ? '+' : '';
@@ -135,7 +142,7 @@
     });
 
     document.getElementById('regions').innerHTML = res.regions.map(r => `
-      <li class="lv-${r.level}">
+      <li class="lv-${r.level} v-${verdictOf(r)}">
         <button type="button" class="region-row" data-region="${r.key}" aria-pressed="false">
           <span class="swatch"></span>
           <span class="rtext"><span class="rname">${r.label}</span><br><span class="rdetail">${fmtEase(r)}</span></span>

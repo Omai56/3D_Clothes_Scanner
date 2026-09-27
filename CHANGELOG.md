@@ -317,3 +317,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `server/zara.js` — re-importing a product keeps fields added by hand (e.g. the Tripo `model`); it used to drop them.
 **Verified:** headless end-to-end runs: Zara heavyweight tee (S recommended, dropped shoulders), slim tee (M), loose jeans (32), Hollister link fallback, wardrobe label; typed bodies (160–190 cm) give no errors; tests pass.
 **Files:** `public/shop.html`, `public/result.html`, `public/fit-main.js`, `public/fit3d.js`, `public/styles.css`, `server/zara.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — FitCheck pages redesign (all features kept)
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/styles.css` rewritten with a quieter editorial look: paper background (no longer ends in a white band), ink type, hairline cards, pill buttons, Instrument Serif for headings (replaces Fraunces), no purple/gold gradients. Same class names, so every script and feature works as before. Dark mode updated.
+- Measure page: faceless mannequin (matches the 3D body); on phones the figure is a compact sticky strip above full-width fields instead of a squeezed side column.
+- Wardrobe: pale oak cabinet with lacquered doors and slim brass pulls; opens by itself when something is hanging (unless closed earlier in the visit); plaque says "1 piece" / "N pieces".
+- Result page: bigger product hero, pill size tabs, fit rows coloured like the 3D view (relaxed = blue, snug = amber, tight = red); numeric sizes read "Recommended: Size 32".
+**Verified:** before/after screenshots of all three pages at desktop and phone width, active-field, open-wardrobe, link-detected and dark-mode states; tests pass.
+**Files:** `public/styles.css`, `public/index.html`, `public/shop.html`, `public/result.html`, `public/fit-main.js`, `CHANGELOG.md`

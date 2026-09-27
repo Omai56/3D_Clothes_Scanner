@@ -48,6 +48,7 @@ export function toFitCheckReport(r) {
     const regions = Object.entries(ev.regions).map(([key, x]) => ({
       key,
       label: x.label,
+      verdict: x.verdict,
       level: LEVEL[x.verdict] ?? 'warn',
       chip: VERDICT_LABEL[x.verdict] ?? x.verdict,
       ease: x.ease_cm ?? null,

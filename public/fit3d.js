@@ -88,7 +88,16 @@ export async function mountFit3D({ stage, picker, legend, preferScan = null }) {
     const w = worn[k];
     if (!w || !w.report) return;
     const ev = w.report.sizes[w.size] ?? w.report.sizes[w.report.recommended];
-    const glb = w.garment.chart?.model?.glb ?? w.garment.model?.glb;
+    let glb = w.garment.chart?.model?.glb ?? w.garment.model?.glb;
+    if (!glb) {
+      // a mesh saved earlier for this item (public/models/<id>.glb) is used even if the item's
+      // record does not point at it (imported before the server learned to link it)
+      const id = w.garment.chart?.id ?? w.garment.id;
+      const probe = `/models/${encodeURIComponent(id)}.glb`;
+      try {
+        if ((await fetch(probe, { method: 'HEAD' })).ok) glb = probe;
+      } catch { /* no mesh */ }
+    }
     if (glb) {
       stage.dataset.loading = 'Putting it on you…';
       try {

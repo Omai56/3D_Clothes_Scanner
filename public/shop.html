@@ -185,7 +185,13 @@
     for (const g of Fit.loadCustom()) if (g.imported && !onServer.has(g.id)) Fit.removeCustom(g.id);
     for (const d of Fit.loadDrawer()) if (d.imported && !onServer.has(d.id)) Fit.takeFromDrawer(d.id);
     const drawer = new Set(Fit.loadDrawer().map((d) => d.id));
-    for (const g of saved.slice().reverse()) if (!Fit.getGarment(g.id) && !drawer.has(g.id)) Fit.saveCustom(fromServerGarment(g));
+    for (const g of saved.slice().reverse()) {
+      const have = Fit.loadCustom().find((x) => x.id === g.id);
+      if (have) {
+        // keep the phone's copy current with the server's (a mesh linked later, a new photo)
+        if (JSON.stringify(have.chart?.model) !== JSON.stringify(g.model) || have.image !== (g.images?.[0] ?? null)) Fit.saveCustom({ ...have, ...fromServerGarment(g), addedAt: have.addedAt });
+      } else if (!drawer.has(g.id)) Fit.saveCustom(fromServerGarment(g));
+    }
   } catch (e) { console.warn('saved pieces unavailable', e); }
   const saved = Fit.loadBody();
   const body = saved || Fit.DEMO_BODY;

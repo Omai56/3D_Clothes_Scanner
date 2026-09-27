@@ -134,16 +134,30 @@ export function simulate(tubes, colliders, opts = {}) {
           const rest = t.restAround[r];
           for (let c = 0; c < cols; c++) project(pos, pinned, t.idx(r, c), t.idx(r, c + 1), rest, 1);
         }
+        const hangFrom = t.hangFrom ?? 0;
         for (let r = 0; r < rows - 1; r++) {
           const restRow = t.restDown[r];
           const diag = Math.hypot(restRow, t.restAround[r]);
           const perCol = t.restDownCol;
+          const hanging = r >= hangFrom;
           for (let c = 0; c < cols; c++) {
             const rest = perCol ? perCol[r * cols + c] : restRow;
             // vertical links: symmetric while the cloth falls (so collisions can push rows
             // around), then top-down "follow the leader" in the settle passes, which removes the
             // solver's gravity stretch exactly along links that already hang.
             project(pos, pinned, t.idx(r, c), t.idx(r + 1, c), rest, 1, false, !moving);
+            // Hanging fabric: a warp thread below its support never points upward. Without
+            // bending stiffness slack cloth would crumple into folds and "shorten"; this keeps
+            // every link at least ~30° below horizontal (the lower point is moved).
+            if (hanging) {
+              const a = t.idx(r, c) * 3;
+              const bi = t.idx(r + 1, c);
+              if (!pinned[bi]) {
+                const b = bi * 3;
+                const minDrop = rest * (t.minDropFrac ?? 0.85); // links within ~30° of vertical
+                if (pos[b + 1] > pos[a + 1] - minDrop) pos[b + 1] = pos[a + 1] - minDrop;
+              }
+            }
             // shear: compression-only and light, so a ring that bunches up (collision) can't
             // lever the rows apart vertically and stretch the garment
             project(pos, pinned, t.idx(r, c), t.idx(r + 1, c + 1), diag, 0.2, true);

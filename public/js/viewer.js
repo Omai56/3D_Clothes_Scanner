@@ -251,9 +251,11 @@ export class FitViewer {
       const Y = pos[k + 1];
       if (Y < armpitY || !this.shoulderMap) return;
       const top = this.shoulderMap.lookup(pos[k], pos[k + 2]);
-      if (top != null && Y < top + gap && Y > top - 0.012) pos[k + 1] = top + gap;
+      if (top != null && Y < top + gap && Y > top - 0.05) pos[k + 1] = top + gap;
     };
-    return { body: [body, floor], arms: [...arms, floor], torso: [body, shoulder, floor], all: [body, ...arms, shoulder, floor] };
+    // shoulder lift runs before the radial ring push: cloth over the shoulder rests on it
+    // instead of being shoved sideways off the slope
+    return { body: [body, floor], arms: [...arms, floor], torso: [shoulder, body, floor], all: [shoulder, body, ...arms, floor] };
   }
 
   /** Debug: draw proxy tubes as wireframes (window.__showProxy = true). */
@@ -367,7 +369,10 @@ export class FitViewer {
     torso.setRest(circRow, () => dy);
     // the yoke (neckline -> shoulder line) is a cone lying on the shoulders: its vertical links
     // are as long as the geometry says, not dy, or the rows would collapse onto the neck
-    torso.restDownFromGeometry(0, Math.ceil((neckTopY - (shoulderY - 0.02)) / dy));
+    const yokeRows = Math.ceil((neckTopY - (shoulderY - 0.02)) / dy);
+    const collarHalf = hwRaw(0.985) * 1.1; // half-width of the collar band at the top of the flat mesh
+    torso.restDownFromGeometry(0, yokeRows);
+    torso.hangFrom = yokeRows + 1; // below the yoke the fabric hangs (links point down)
     for (let c = 0; c < cols; c++) torso.pin(0, c); // neckline holds the tee up
 
     // ---- sleeves ----
@@ -380,12 +385,12 @@ export class FitViewer {
       const a = this.arms?.[side];
       const F = S.frames[side];
       if (!a || !F) continue;
-      // arm centre line: from the arm-root centre (inboard/below the shoulder point by the
-      // upper-arm radius) to the hand centre
-      const ax0 = armAxis(a, armBodyR);
-      const Sx = ax0.x;
-      const Sy = ax0.y;
-      const Sz = ax0.z;
+      // sleeve axis starts just under the top of the shoulder, inboard by half the arm radius,
+      // so the cap's top surface (axis + radius, outward/up) clears the deltoid
+      const sgn0 = Math.sign(a.shoulder.x) || 1;
+      const Sx = a.shoulder.x - sgn0 * armBodyR * 0.5;
+      const Sy = a.shoulder.y - armBodyR * 0.3;
+      const Sz = a.shoulder.z;
       let dx = a.hand.x - Sx;
       let dyy = a.hand.y - Sy;
       let dz = a.hand.z - Sz;
@@ -410,21 +415,32 @@ export class FitViewer {
       const tube = new Tube(srows, scols);
       // Sleeve cap: the top edge is slanted like an armhole — it meets the shoulder at the top
       // of the arm and sits `capDepth` lower under the arm. The slant fades out down the sleeve.
-      const capDepth = Math.min(0.14, sleeveLen * 0.6);
-      const capRows = Math.max(1, Math.floor(srows * 0.45));
+      const capDepth = Math.min(0.07, sleeveLen * 0.35);
+      const capRows = Math.max(1, Math.floor(srows * 0.3));
+      // The cap hugs the deltoid (sewn to the armhole) and widens to the sleeve's full width
+      // over the cap rows: a rounded shoulder instead of a square one.
+      const ramp = (r) => {
+        const t = Math.min(1, r / Math.max(1, capRows));
+        return t * t * (3 - 2 * t);
+      };
+      const radiusAt = (r) => armBodyR + gap + (rs - armBodyR - gap) * ramp(r);
       for (let r = 0; r < srows; r++) {
         const fade = Math.max(0, 1 - r / capRows);
+        const rr = radiusAt(r);
+        const dropR = drop * ramp(r);
         for (let c = 0; c < scols; c++) {
           const phi = (c / scols) * TWO_PI - Math.PI;
           const u = Math.cos(phi); // +1 = top of the arm, -1 = underarm
           const along = Math.min(sleeveLen, r * dy + capDepth * ((1 - u) / 2) * fade);
-          const cx = Sx + dx * along - nx * drop;
-          const cy = Sy + dyy * along - ny * drop;
+          const cx = Sx + dx * along - nx * dropR;
+          const cy = Sy + dyy * along - ny * dropR;
           const cz = Sz + dz * along;
-          tube.set(r, c, cx + rs * u * nx, cy + rs * u * ny, cz + rs * Math.sin(phi));
+          tube.set(r, c, cx + rr * u * nx, cy + rr * u * ny, cz + rr * Math.sin(phi));
         }
       }
-      tube.setRest(() => Cs, () => dy);
+      tube.setRest((r) => TWO_PI * radiusAt(r), () => dy);
+      tube.restDownFromGeometry(0, capRows); // the slanted cap's links are longer than dy
+      tube.hangFrom = capRows + 1;
       for (let c = 0; c < scols; c++) tube.pin(0, c);
       sleeves[side] = tube;
       arms[side] = { Sx, Sy, Sz, dx, dy: dyy, dz, nx, ny, rs, drop };
@@ -435,7 +451,7 @@ export class FitViewer {
     // sleeves collide with the arm and the body.
     const C = this._bodyColliders({ gap, legTop, neckY, armpitY });
     torso.colliders = C.torso;
-    for (const t of Object.values(sleeves)) t.colliders = C.arms; // sleeves wrap the arm, not the torso
+    for (const t of Object.values(sleeves)) t.colliders = C.arms; // sleeves wrap the arm; the torso tube handles the body
     const t0 = performance.now();
     simulate(tubes, C.all);
     this.lastSimMs = performance.now() - t0;
@@ -485,14 +501,37 @@ export class FitViewer {
           const side = sv ? sv.side : x >= meshCx ? 'R' : 'L';
           const tube = sleeves[side];
           if (tube) {
-            const s = sv ? sv.s : 0.02;
-            const u = sv ? sv.u : -1;
-            const front = frontV;
-            const phi = front ? Math.acos(u) : -Math.acos(u);
-            const p = tube.sample(s * (tube.rows - 1), ((phi + Math.PI) / TWO_PI) * tube.cols);
-            out[i * 3] = p[0];
-            out[i * 3 + 1] = p[1];
-            out[i * 3 + 2] = p[2];
+            if (sv) {
+              // sleeves: front/back from the sleeve's own mid-plane (normals are noisy on the
+              // folded top edge and would scatter neighbours to opposite sides of the tube)
+              const phi = sv.front ? Math.acos(sv.u) : -Math.acos(sv.u);
+              let p = tube.sample(sv.s * (tube.rows - 1), ((phi + Math.PI) / TWO_PI) * tube.cols);
+              // armhole seam: blend the first few cm of sleeve into the torso tube's side so the
+              // seam is continuous instead of two surfaces meeting with a step
+              if (sv.s < 0.15) {
+                const Ys = hemY + v * (topY - hemY);
+                const sideTh = x >= meshCx ? 0 : Math.PI;
+                const pt = torso.sample(Math.max((neckTopY - Ys) / dy, yokeRows * 0.9), ((sideTh + Math.PI) / TWO_PI) * cols);
+                const w = sv.s / 0.15;
+                const ws = w * w * (3 - 2 * w);
+                p = [pt[0] + (p[0] - pt[0]) * ws, pt[1] + (p[1] - pt[1]) * ws, pt[2] + (p[2] - pt[2]) * ws];
+              }
+              out[i * 3] = p[0];
+              out[i * 3 + 1] = p[1];
+              out[i * 3 + 2] = p[2];
+              continue;
+            }
+            // Underarm gusset (beside the torso, under the sleeve): a web between the torso
+            // tube's side column at this height and the sleeve's underarm root.
+            const Yg = hemY + v * (topY - hemY);
+            const sideTh = x >= meshCx ? 0 : Math.PI; // side seam angle on the torso tube
+            const pt = torso.sample((neckTopY - Yg) / dy, ((sideTh + Math.PI) / TWO_PI) * cols);
+            const phiRoot = frontV ? Math.acos(-1) : -Math.acos(-1);
+            const pr = tube.sample(0.02 * (tube.rows - 1), ((phiRoot + Math.PI) / TWO_PI) * tube.cols);
+            const t = clamp((ax - S.torsoHalf) / Math.max(0.02, S.sleeveLen * 0.35), 0, 1);
+            out[i * 3] = pt[0] + (pr[0] - pt[0]) * t;
+            out[i * 3 + 1] = pt[1] + (pr[1] - pt[1]) * t;
+            out[i * 3 + 2] = pt[2] + (pr[2] - pt[2]) * t;
             continue;
           }
         }
@@ -504,7 +543,16 @@ export class FitViewer {
         const u = clamp((x - ms.cx) / Math.max(1e-3, hwAt(v)), -1, 1);
         const th = frontV ? Math.acos(u) : -Math.acos(u);
         const colF = ((th + Math.PI) / TWO_PI) * cols;
-        const p = torso.sample((neckTopY - Y) / dy, colF);
+        // Row along the tube. In the yoke (flat mesh's horizontal shoulder line) the row is the
+        // distance out from the neck, not the height: the shoulder corner of the mesh belongs on
+        // the shoulder-line ring, not beside the collar.
+        let rowF = (neckTopY - Y) / dy;
+        if (rowF < yokeRows) {
+          // only beyond the collar band; the collar itself keeps its height-based rows
+          const outward = clamp((Math.abs(x - meshCx) - collarHalf) / Math.max(0.02, S.torsoHalf - collarHalf), 0, 1);
+          rowF = Math.max(rowF, outward * yokeRows);
+        }
+        const p = torso.sample(rowF, colF);
         out[i * 3] = p[0];
         out[i * 3 + 1] = p[1];
         out[i * 3 + 2] = p[2];
@@ -1658,6 +1706,7 @@ function sliceTopMesh(scene, box, NB, meshCx) {
       }
     });
     const top = bins.map((b) => (b.length > 5 ? pct(b, 0.95) : null));
+    const bot = bins.map((b) => (b.length > 5 ? pct(b, 0.05) : null));
     const widths = [];
     for (let k = Math.floor(NS * 0.45); k < Math.floor(NS * 0.85); k++) {
       const b = bins[k];
@@ -1667,31 +1716,84 @@ function sliceTopMesh(scene, box, NB, meshCx) {
     const hw = widths.length ? widths[Math.floor(widths.length / 2)] : 0.15;
     F.hw = hw;
     F.top = top;
-    F.topAt = (s) => {
+    F.bot = bot;
+    const nearest = (arr, s, fallback) => {
       const k = Math.min(NS - 1, Math.max(0, Math.floor(s * NS)));
       for (let d = 0; d < NS; d++) {
-        if (top[k - d] != null) return top[k - d];
-        if (top[k + d] != null) return top[k + d];
+        if (arr[k - d] != null) return arr[k - d];
+        if (arr[k + d] != null) return arr[k + d];
       }
-      return hw;
+      return fallback;
     };
+    F.topAt = (s) => nearest(top, s, hw);
+    F.botAt = (s) => nearest(bot, s, -hw);
   }
+  // Per-column sleeve edges (columns run horizontally from the side seam to the cuff): the
+  // top/bottom of the sleeve in y and its mid-plane in z. Flat-lay sleeves slope, so every
+  // column has its own centre; the armhole column is tall, the cuff column short.
+  const NCOL = 24;
+  out.colEdges = {};
+  for (const side of ['R', 'L']) {
+    const ys = Array.from({ length: NCOL }, () => []);
+    const zs = Array.from({ length: NCOL }, () => []);
+    scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const p = o.userData.origPos;
+      for (let i = 0; i < p.length; i += 3) {
+        const x = p[i];
+        if ((side === 'R') !== x >= meshCx) continue;
+        const ax = Math.abs(x - meshCx);
+        if (ax <= torsoHalf * 0.98) continue;
+        const k = Math.min(NCOL - 1, Math.max(0, Math.floor(((ax - torsoHalf) / Math.max(1e-3, sleeveLen)) * NCOL)));
+        ys[k].push(p[i + 1]);
+        zs[k].push(p[i + 2]);
+      }
+    });
+    const top = ys.map((a) => (a.length > 5 ? pct(a.slice(), 0.97) : null));
+    const bot = ys.map((a) => (a.length > 5 ? pct(a.slice(), 0.03) : null));
+    const zc = zs.map((a) => (a.length > 5 ? (pct(a.slice(), 0.05) + pct(a.slice(), 0.95)) / 2 : null));
+    const fill = (arr) => {
+      const o = arr.slice();
+      for (let k = 0; k < NCOL; k++) {
+        if (o[k] != null) continue;
+        for (let d = 1; d < NCOL; d++) {
+          if (arr[k - d] != null) { o[k] = arr[k - d]; break; }
+          if (arr[k + d] != null) { o[k] = arr[k + d]; break; }
+        }
+      }
+      return o;
+    };
+    out.colEdges[side] = { top: fill(top), bot: fill(bot), zc: fill(zc) };
+  }
+  const lerpCol = (arr, f) => {
+    const k0 = Math.max(0, Math.min(NCOL - 1, Math.floor(f)));
+    const k1 = Math.min(NCOL - 1, k0 + 1);
+    const t = Math.max(0, Math.min(1, f - k0));
+    const a = arr[k0];
+    const b = arr[k1];
+    if (a == null) return b;
+    if (b == null) return a;
+    return a + (b - a) * t;
+  };
   // Sleeve test shared with the deformer: returns {side, s, u, front} or null.
+  // s = fraction along the sleeve (side seam -> cuff), u = across it (-1 underarm, +1 top),
+  // front = which layer. Everything beside the torso is sleeve unless it lies clearly below
+  // the sleeve's underarm edge (then it is an underarm gusset).
   out.sleeveOf = (x, y, z) => {
-    if (Math.abs(x - meshCx) <= torsoHalf * 0.98 || sleeveLen <= 0.01) return null;
+    const ax = Math.abs(x - meshCx);
+    if (ax <= torsoHalf * 0.98 || sleeveLen <= 0.01) return null;
     const side = x >= meshCx ? 'R' : 'L';
-    const F = out.frames[side];
-    if (!F) return null;
-    const rx = x - F.seam.x;
-    const ry = y - F.seam.y;
-    const s = (rx * F.ax + ry * F.ay) / F.L;
-    const c = (rx * F.px + ry * F.py) / F.L;
-    const cTop = F.topAt(Math.min(0.999, Math.max(0, s)));
-    const cc = cTop - F.hw;
-    if (s > -0.08 && s < 1.06 && c <= cTop + 0.03 && c >= cc - F.hw * 1.15) {
-      return { side, s: Math.min(1, Math.max(0, s)), u: Math.max(-1, Math.min(1, (c - cc) / F.hw)), front: z >= F.zc };
-    }
-    return null;
+    const E = out.colEdges[side];
+    if (!E) return null;
+    const s = Math.max(0, Math.min(1, (ax - torsoHalf) / sleeveLen));
+    const f = s * NCOL - 0.5;
+    const top = lerpCol(E.top, f);
+    const bot = lerpCol(E.bot, f);
+    const zc = lerpCol(E.zc, f) ?? 0;
+    if (top == null || bot == null) return null;
+    const span = Math.max(1e-3, top - bot);
+    if (y < bot - span * 0.15) return null; // below the sleeve: gusset
+    return { side, s, u: Math.max(-1, Math.min(1, (2 * (y - bot)) / span - 1)), front: z >= zc };
   };
   // Torso band statistics over everything that is NOT sleeve (the widening upper torso beside
   // the sleeves must be part of the torso, or it collapses onto the side seam).

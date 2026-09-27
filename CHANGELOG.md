@@ -234,3 +234,18 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Debug hooks: `window.__showProxy` (wireframe proxies), `window.__debugTop`, `__viewer.lastSimMs` (~0.35–0.6 s per size on the laptop).
 **Verified:** headless renders of all three garments; jeans and slim tee front/side good; heavyweight tee front good, S/XL differ. Known: notch at the back hem and small holes at the shoulder seams (layer classification), underarm gap (no gusset bridging yet).
 **Files:** `public/js/cloth.js`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 04:40 — Cloth simulation tuned: hanging rule, yoke, sleeves, seams
+**By:** Claude (Fable 5.1)
+**What (all `public/js/cloth.js` / `public/js/viewer.js`):**
+- **Hanging rule**: below its support, every vertical cloth link stays within ~30° of vertical (`hangFrom`, `minDropFrac`). Without bending stiffness the slack back panel crumpled and the back hem rode up 26 cm; now front and back hems land within a few cm (measured: front 0.845 m, back 0.90 m on Daniel).
+- **Tops**: neckline pinned at the neck base (crew neck, 1.15× neck girth); yoke rows keep their geometric link lengths; rest circumference from the chart (hem→chest) and from the body outline over the shoulders; collar keeps height-based rows while the rest of the yoke maps by distance from the neck (fixes the boat-neck and the shoulder-corner flap); fabric never smaller than the body.
+- **Sleeves**: classification is now column-based (horizontal distance from the side seam; per-column top/bottom edges) instead of a diagonal axis — the diagonal axis sent armhole vertices to the wrong end of the sleeve (the ragged cap and the back "flap"). Sleeve tube pinned just under the shoulder top, cap hugs the deltoid and widens over the cap rows, arm-only colliders, armhole seam blended into the torso tube over the first 15 % of the sleeve; front/back from the sleeve's mid-plane.
+- **Trousers**: seat tube pinned at the waistband with a front/back crotch pinch + two leg tubes; hanging rule; rest never below body girth.
+- Shoulder-top collider window 5 cm, run before the radial push; layer classification from normals with a mid-surface fallback at seams.
+- Diagnostics kept behind flags: `__showProxy`, `__debugTop`, `__viewer.debugTubes`.
+**Result:** all three garments drape on the body from front/side/back with no holes or flaps; S vs XL differ. Sim + glue ≈ 0.4–0.6 s per size on the laptop.
+**Known:** sleeves still read slightly boxy (tube cross-section is round; real sleeves flatten), fuzzy armhole seam from the side, faint web at the underarm.
+**Files:** `public/js/cloth.js`, `public/js/viewer.js`, `CHANGELOG.md`

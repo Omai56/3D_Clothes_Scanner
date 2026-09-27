@@ -6,7 +6,7 @@
   <title>Your Measurements · FitCheck</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -28,6 +28,15 @@
     </aside>
 
     <form class="card form-panel" id="form" novalidate>
+      <div class="scan-card" id="scanCard">
+        <span class="scan-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="8.5" r="1.8"/><path d="M9 17v-3.5a3 3 0 0 1 6 0V17"/></svg></span>
+        <span class="scan-text">
+          <b>Scan your body</b>
+          <span id="scanStatus">Two photos with your phone camera, then we fill these in for you</span>
+        </span>
+        <button class="btn scan-btn" type="button" id="scanBtn">Scan my body</button>
+      </div>
+      <p class="scan-or"><span>or type them in</span></p>
       <div class="form-head">
         <div class="progress" id="progress" aria-live="polite"></div>
         <div class="unit-toggle" role="group" aria-label="Units">
@@ -167,6 +176,84 @@
   if (saved) fill(saved); else updateProgress();
 
   document.getElementById('demo').addEventListener('click', () => fill(Fit.DEMO_BODY));
+
+  // ---------- Body scan: send the user to the Bodygram scanner, fill the fields when they come back ----------
+  const scanCard = document.getElementById('scanCard');
+  const scanBtn = document.getElementById('scanBtn');
+  const scanStatus = document.getElementById('scanStatus');
+  const SCAN_KEY = 'pendingScan';
+  const store = {
+    get() { try { return sessionStorage.getItem(SCAN_KEY); } catch (e) { return null; } },
+    set(v) { try { v ? sessionStorage.setItem(SCAN_KEY, v) : sessionStorage.removeItem(SCAN_KEY); } catch (e) { /* ignore */ } },
+  };
+  function scanState(state, text) {
+    scanCard.dataset.state = state;
+    scanStatus.textContent = text;
+    scanBtn.disabled = state === 'busy';
+  }
+
+  scanBtn.addEventListener('click', async () => {
+    scanState('busy', 'Opening the scanner…');
+    const height = readCm('height');
+    try {
+      const res = await fetch('/api/scan-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefill: height ? { height: Math.round(height) } : {} }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'no scanner link');
+      store.set(data.sessionId);
+      location.href = data.url;
+    } catch (e) {
+      console.warn('scan-session', e);
+      scanState('error', "Couldn't open the scanner right now. Try again, or type your measurements below.");
+      scanBtn.textContent = 'Try again';
+    }
+  });
+
+  // Bodygram names -> our fields (height comes from what the user entered in the scanner).
+  const SCAN_FIELDS = { chest: 'bustGirth', waist: 'waistGirth', hip: 'hipGirth', inseam: 'insideLegHeight', shoulder: 'acrossBackShoulderWidth' };
+  async function applyScan(name) {
+    const s = await (await fetch(`/api/scans/${encodeURIComponent(name)}`)).json();
+    const m = s.measurements_cm || {};
+    const body = { height: s.input?.heightCm ?? readCm('height') };
+    for (const [key, bg] of Object.entries(SCAN_FIELDS)) body[key] = m[bg] ?? readCm(key);
+    fill(body);
+    try { sessionStorage.setItem('fit3dScan', name); } catch (e) { /* ignore */ } // try-on page shows this 3D body
+  }
+
+  let polling = false;
+  async function checkPendingScan() {
+    const id = store.get();
+    if (!id || polling) return;
+    polling = true;
+    scanState('busy', 'Checking your scan…');
+    const started = Date.now();
+    while (Date.now() - started < 3 * 60 * 1000) {
+      try {
+        const r = await (await fetch(`/api/scan-session/${encodeURIComponent(id)}`)).json();
+        if (r.ready) {
+          await applyScan(r.name);
+          store.set(null);
+          scanState('done', 'Scan done: your measurements are filled in below. Check them, then continue.');
+          scanBtn.textContent = 'Scan again';
+          polling = false;
+          return;
+        }
+        if (r.failed) break;
+      } catch (e) { console.warn('scan poll', e); }
+      scanState('busy', 'Waiting for your scan to finish…');
+      await new Promise(res => setTimeout(res, 3000));
+    }
+    store.set(null);
+    polling = false;
+    scanState('error', "We didn't get a finished scan. Scan again, or type your measurements below.");
+    scanBtn.textContent = 'Scan again';
+  }
+  checkPendingScan();
+  // Coming back with the browser's Back button can restore the page from cache without re-running scripts.
+  window.addEventListener('pageshow', e => { if (e.persisted) checkPendingScan(); });
 
   form.addEventListener('submit', e => {
     e.preventDefault();

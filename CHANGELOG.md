@@ -381,3 +381,35 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** The try-on page reflows smoothly as the browser window is resized, from 320px (small phone) to wide desktop: phone layout below 720px (model pinned on top), a new tablet layout 720–959px (two columns, 340px side column), desktop from 960px. The model's box never gets taller than ~1.9× its width (arms stay in frame); its footer (body picker, Take off) adapts to the model column's own width; short windows (phone on its side) get a compact one-row heading with the link bar so the model is on screen. Top bar lines up with the page.
 **Verified:** live resize sweeps of the try-on and measure pages at 16 widths (320–1440) and landscape heights: no sideways scrolling, no overlapping controls, 3D model and wardrobe re-lay out at each width; tests pass.
 **Files:** `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Try-on page: model column narrowed again
+**By:** Claude (Opus 5.5)
+**What:** On desktop the try-on page (and its top bar) is now capped at 900px instead of 1000px, so the model is ≈ 424px wide (was ≈ 524px); the wardrobe / fit column stays 420px. The "Step 2 of 2 · Try on" label stays on one line in the narrower heading row. Tablet and phone layouts unchanged.
+**Verified:** screenshots at 1024 and 1440px wide: model 424px, side column 420px, no sideways scrolling.
+**Files:** `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Measure page: "Scan my body" button
+**By:** Claude (Opus 5.5)
+**What:** A scan card at the top of the measurements form ("Scan your body" / **Scan my body**), with "or type them in" below it. The button asks the server for a Bodygram scan session (`POST /api/scan-session`, passing the height if already typed) and redirects to Bodygram's phone scanner. When the user comes back to the measure page, it polls `GET /api/scan-session/:id` (up to 3 min), fills Height / Chest / Waist / Hips / Inseam / Shoulder from the scan (bustGirth, waistGirth, hipGirth, insideLegHeight, acrossBackShoulderWidth), and picks that 3D body for the try-on page. If the scanner can't be opened or the scan never finishes, the card shows a message and the fields can still be typed in.
+**Verified:** screenshots at 390 and 1280px wide (no sideways scrolling); clicking the button with no Bodygram keys shows the error message and stays on the page. The full scan round-trip is untested: `BODYGRAM_ORG_ID` / `BODYGRAM_API_KEY` are not set in `.env`.
+**Files:** `public/index.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Premium restyle ("quiet luxury")
+**By:** Claude (Opus 5.5)
+**What:** The whole site moves from the violet→pink brand with pastel washes to a restrained ivory / ink / champagne look. Warm ivory paper and hairline borders; primary buttons, selected tabs and badges in ink (cream in dark mode); champagne-bronze as the only accent (links, focus rings, eyebrows, progress); accent words in the serif (h1 *em*, logo "Check", size letter) in a brushed-champagne gradient. Buttons use small tracked capitals; eyebrows are finer and wider-spaced; smaller corner radii; softer, more diffuse shadows. The 3D studio backdrop is warm greige instead of lilac→peach; the wardrobe is ivory lacquer with brass pulls; the yellow body strip, the link bar and the scan card are now neutral. Fit colours (red / amber / green / blue) are unchanged. All changes are colour/type tokens and the "Colour" layer in `styles.css`, plus a few on-brand text colours.
+**Verified:** measure and try-on pages at 390 and 1280px wide, light and dark: no sideways scrolling; tests pass.
+**Files:** `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Bolder type and an orange action colour
+**By:** Claude (Opus 5.5)
+**What:** Feedback: italic accent words looked thin, and it wasn't obvious enough what to press. Headings now use Playfair Display (bold, upright) instead of Instrument Serif; no italics anywhere; accent words ("measurements", "model", "wardrobe", logo "Check") are solid burnt orange. Everything interactive uses the new action colour (burnt orange `--cta`, #c8481a; brighter #f07a3c with dark text in dark mode): primary buttons (Scan my body, Continue, Try it on) with an orange glow and a small lift on hover, the drag hint on the model, the drop target, the link bar border and icon, the Edit link, the current step, active field number, progress bar, focus rings, hover states on tabs / Paste / Take off / body picker. Secondary buttons are a bolder ink outline that fills ink on hover. Selected states (tab, unit, size) stay ink so actions and states read differently. The ivory / ink / champagne base is unchanged.
+**Verified:** measure and try-on pages at 390 and 1280px, light and dark: no sideways scrolling; white on #c8481a is 4.8:1; tests pass.
+**Files:** `public/styles.css`, `public/index.html`, `public/shop.html` (font link), `CHANGELOG.md`

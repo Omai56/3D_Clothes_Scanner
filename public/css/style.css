@@ -118,6 +118,10 @@ button:disabled { opacity: .5; }
 .segmented { position: absolute; right: 10px; top: 10px; display: flex; background: rgba(255,255,255,.9); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; z-index: 2; }
 .segmented button { border: 0; background: transparent; font: inherit; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; color: var(--muted); }
 .segmented button.active { background: var(--ink); color: #fff; }
+.look-flags { position: absolute; left: 10px; bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; pointer-events: none; max-width: 70%; }
+.look-flags span { font-size: 12px; font-weight: 700; color: #fff; padding: 4px 9px; border-radius: 999px; background: var(--tight); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.look-flags span.loose { background: var(--loose); }
+.viewer-help { font-size: 12px; color: var(--muted); margin: 8px 2px 0; line-height: 1.4; }
 .viewer-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; background: rgba(255,255,255,.7); }
 .viewer-notice { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); background: rgba(0,0,0,.65); color: #fff; font-size: 12px; padding: 5px 12px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
 

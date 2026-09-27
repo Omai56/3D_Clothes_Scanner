@@ -250,9 +250,33 @@ async function renderFit() {
   try {
     await viewer.loadBody(state.scan.objUrl, state.scan.measurements_cm);
     viewer.showFit(g, ev);
-    if (state.meshyUrl) await viewer.loadGarmentModel(state.meshyUrl, g, ev);
+    if (state.meshyUrl) await drape(state.meshyUrl, g, ev);
   } finally {
     loading?.remove();
+  }
+  renderLookFlags(ev);
+}
+
+// Flags on the 3D view: which regions are tight (and very loose), so the message survives Look mode.
+function renderLookFlags(ev) {
+  const el = $('#look-flags');
+  const tight = Object.values(ev.regions).filter((r) => r.verdict === 'tight').map((r) => r.label.toLowerCase());
+  const loose = Object.values(ev.regions).filter((r) => r.verdict === 'very_loose').map((r) => r.label.toLowerCase());
+  const chips = [];
+  if (tight.length) chips.push(`<span>Tight: ${esc(tight.join(', '))}</span>`);
+  if (loose.length) chips.push(`<span class="loose">Very loose: ${esc(loose.join(', '))}</span>`);
+  el.innerHTML = chips.join('');
+  el.hidden = chips.length === 0;
+}
+
+// Simulate + glue the garment mesh for this size, with a status line while it runs (~0.5 s).
+async function drape(url, garment, ev) {
+  setMeshyStatus('Draping the garment on your body…');
+  await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+  try {
+    await viewer.loadGarmentModel(url, garment, ev);
+  } finally {
+    setMeshyStatus('');
   }
 }
 
@@ -311,7 +335,7 @@ async function applyMeshyModel(url, garment) {
   state.meshyUrl = url;
   if (!viewer || !state.report) return;
   const ev = state.report.sizes[state.size];
-  await viewer.loadGarmentModel(url, garment, ev);
+  await drape(url, garment, ev);
   showViewMode(true);
 }
 
@@ -349,8 +373,7 @@ $('#waist-slider').addEventListener('input', (e) => {
     if (!r.ok) return;
     state.report = data.report;
     if (!state.report.sizes[state.size]) state.size = state.report.recommended;
-    await renderFit();
-    if (state.meshyUrl && viewer) await viewer.loadGarmentModel(state.meshyUrl, state.garment, state.report.sizes[state.size]);
+    await renderFit(); // renderFit re-drapes when a mesh is loaded
   }, 200);
 });
 

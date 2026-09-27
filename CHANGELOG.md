@@ -249,3 +249,14 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Result:** all three garments drape on the body from front/side/back with no holes or flaps; S vs XL differ. Sim + glue ≈ 0.4–0.6 s per size on the laptop.
 **Known:** sleeves still read slightly boxy (tube cross-section is round; real sleeves flatten), fuzzy armhole seam from the side, faint web at the underarm.
 **Files:** `public/js/cloth.js`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 05:05 — Demo polish: tight flags on Look, Look/Fit help line, draping status
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/app.js` — red **"Tight: …"** (and blue "Very loose: …") chips on the 3D view whenever a region is tight/very loose, so the fit verdict is visible in Look mode too; a "Draping the garment on your body…" status while the simulation runs; size chips and the waistband slider both re-drape through one path.
+- `public/index.html`, `public/css/style.css` — one-line explanation under the viewer: *Look* is the real garment draped on your scan at this size; *Fit* colours it by where it is tight or loose.
+- `README.md` — Look view (cloth simulation) documented; `PLAN.md` build order updated.
+**Verified:** full fit page renders for the tee (S) and jeans (28 shows "Tight: waist"); no console errors; 24 tests pass.
+**Files:** `public/js/app.js`, `public/index.html`, `public/css/style.css`, `README.md`, `PLAN.md`, `CHANGELOG.md`

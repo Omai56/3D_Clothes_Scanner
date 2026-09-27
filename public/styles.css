@@ -1073,3 +1073,52 @@ h1 em, .accent-word { font-style: italic; background: var(--brand-grad); -webkit
   .tryon { grid-template-columns: minmax(0, 1fr) 420px; }
   .tryon-top { grid-template-columns: auto minmax(320px, 470px); gap: 12px 24px; }
 }
+
+/* ---------- Try-on page at every width (drag the window edge: it reflows smoothly) ----------
+   < 720px   phone: model pinned on top, wardrobe / fit below
+   720–959   tablet: two columns, 340px side column
+   ≥ 960     desktop: two columns, 420px side column, page capped at 1000px */
+body:has(.page-tryon) .topbar-inner { max-width: 1000px; }
+@media (min-width: 720px) and (max-width: 959px) {
+  .tryon { grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; }
+  .model-card { top: 70px; }
+  .model-card .stage-3d, .model-card .figure-2d { height: calc(100vh - 200px); min-height: 380px; max-height: 720px; }
+  .tryon-side .wardrobe-section { order: 0; margin-top: 0; }
+  .tryon-side .wearing { order: 1; }
+  .tryon-side .wd-cabinet { height: 400px; }
+  .tryon-top { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .tryon-side .section-head h2 { font-size: 26px; }
+  .tryon-side .section-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+}
+/* Short windows (a phone on its side, a squat browser): the model fits the height instead of the width. */
+@media (max-height: 560px) and (min-width: 720px) {
+  .model-card { top: 58px; }
+  .model-card .stage-3d, .model-card .figure-2d { height: calc(100vh - 130px); min-height: 220px; }
+}
+@media (max-height: 560px) and (max-width: 719px) {
+  .model-card { position: relative; top: auto; }
+  .model-card .stage-3d, .model-card .figure-2d { height: 300px; }
+}
+/* Keep the model's box no taller than ~1.9× its width, so arms and loose sleeves never touch the sides. */
+.model-card { container-type: inline-size; }
+.model-card .stage-3d, .model-card .figure-2d { max-height: min(780px, 190cqw); }
+/* Short windows: compact heading so the model is on screen straight away. */
+@media (max-height: 560px) {
+  .page-tryon { padding-top: 12px; }
+  .page-tryon .eyebrow { display: none; }
+  .page-tryon .tryon-intro h1 { font-size: 30px; margin-bottom: 8px; }
+  .page-tryon .measure-chip { padding: 7px 14px; font-size: 12px; margin-bottom: 10px; }
+  .tryon-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 16px; margin-bottom: 10px; }
+  .tryon-top .link-bar { margin-bottom: 0; }
+  .tryon-top .tryon-intro h1 { margin: 0; }
+}
+/* Model footer adapts to the model column's own width (not the window): drop the label, then wrap. */
+@container (max-width: 440px) {
+  .model-foot .body-picker label { font-size: 0; gap: 0; }
+  .model-foot .body-picker select { font-size: 13.5px; padding: 7px 12px; }
+}
+@container (max-width: 300px) {
+  .model-foot { flex-wrap: wrap; }
+  .model-foot .body-picker, .model-foot .body-picker select { width: 100%; }
+  .take-off { width: 100%; }
+}

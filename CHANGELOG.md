@@ -373,3 +373,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **By:** Claude (Opus 5.5)
 **What:** On desktop the try-on page is centred and capped at 1000px: model ≈ 520px wide (was ≈ 780px), wardrobe / fit column 420px; link bar resized to match; shorter link placeholder. Phone layout unchanged. Checked at 1024, 1280 and 1600px wide (no sideways scrolling).
 **Files:** `public/styles.css`, `public/shop.html`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Try-on page works at any window width
+**By:** Claude (Opus 5.5)
+**What:** The try-on page reflows smoothly as the browser window is resized, from 320px (small phone) to wide desktop: phone layout below 720px (model pinned on top), a new tablet layout 720–959px (two columns, 340px side column), desktop from 960px. The model's box never gets taller than ~1.9× its width (arms stay in frame); its footer (body picker, Take off) adapts to the model column's own width; short windows (phone on its side) get a compact one-row heading with the link bar so the model is on screen. Top bar lines up with the page.
+**Verified:** live resize sweeps of the try-on and measure pages at 16 widths (320–1440) and landscape heights: no sideways scrolling, no overlapping controls, 3D model and wardrobe re-lay out at each width; tests pass.
+**Files:** `public/styles.css`, `CHANGELOG.md`

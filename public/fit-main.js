@@ -88,7 +88,7 @@ function artFor(g) {
  */
 /** A garment saved on the server (data/garments, from an earlier import) as a wardrobe piece. */
 export function fromServerGarment(g) {
-  const colorKey = Object.keys(COLORS).find((c) => new RegExp(`\b${c}\b`, 'i').test(g.color ?? ''));
+  const colorKey = Object.keys(COLORS).find((c) => new RegExp(`\\b${c}\\b`, 'i').test(g.color ?? ''));
   return {
     id: g.id,
     custom: true,

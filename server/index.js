@@ -152,8 +152,7 @@ app.post('/api/import', async (req, res) => {
       try {
         await fs.access(path.join(MODELS_DIR, `${garment.id}.glb`));
         garment.model = { glb: `/models/${garment.id}.glb`, source: 'existing mesh in public/models', generated: new Date().toISOString().slice(0, 10) };
-        await fs.writeFile(path.join(GARMENTS_DIR, `${garment.id}.json`), JSON.stringify(garment, null, 2) + '
-');
+        await fs.writeFile(path.join(GARMENTS_DIR, `${garment.id}.json`), `${JSON.stringify(garment, null, 2)}\n`);
       } catch { /* no mesh yet: the Add .glb card / Meshy handle it */ }
       return res.json({ imported: true, garment });
     }

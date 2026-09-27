@@ -366,3 +366,10 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **By:** Claude (Opus 5.5)
 **What:** "Try on from a link" moved from the wardrobe pane to a slim bar at the top of the page (beside the heading on desktop, right under it on phones): link icon, field, Paste and Try it on in one row. The detected store / name / type and errors float just under the bar, so typing doesn't push the page down. Button shows "Reading Zara…" while importing. The intro sentence is hidden on this page (the hint on the model explains dragging). Everything else about the link box is unchanged.
 **Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — Try-on page: narrower model column
+**By:** Claude (Opus 5.5)
+**What:** On desktop the try-on page is centred and capped at 1000px: model ≈ 520px wide (was ≈ 780px), wardrobe / fit column 420px; link bar resized to match; shorter link placeholder. Phone layout unchanged. Checked at 1024, 1280 and 1600px wide (no sideways scrolling).
+**Files:** `public/styles.css`, `public/shop.html`, `CHANGELOG.md`

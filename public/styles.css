@@ -1067,3 +1067,9 @@ h1 em, .accent-word { font-style: italic; background: var(--brand-grad); -webkit
 .page-tryon .tryon-intro .lede { display: none; }
 .page-tryon .tryon-intro h1 { margin-bottom: 12px; }
 @media (min-width: 960px) { .page-tryon .tryon-intro h1 { margin-bottom: 0; } }
+/* Narrower model column: the page is centred and capped, model ≈ 520px, wardrobe 420px. */
+@media (min-width: 960px) {
+  .page-tryon { max-width: 1000px; }
+  .tryon { grid-template-columns: minmax(0, 1fr) 420px; }
+  .tryon-top { grid-template-columns: auto minmax(320px, 470px); gap: 12px 24px; }
+}

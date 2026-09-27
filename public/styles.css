@@ -630,9 +630,11 @@ html, body { overflow-x: clip; }
 .hanger:hover { transform: translateY(-6px) rotate(-2deg); }
 .hanger.leaving { transform: translateY(-50px); opacity: 0; }
 .unhang {
-  position: absolute; left: 6px; top: 40px; width: 26px; height: 26px; border-radius: 50%; border: 0; cursor: pointer; font-size: 16px; line-height: 1;
-  background: rgba(255, 255, 255, .94); color: #1d1b18; box-shadow: 0 2px 6px rgba(0, 0, 0, .2); opacity: 0; transition: opacity .2s;
+  position: absolute; left: 6px; top: 40px; width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 0; cursor: pointer;
+  font: 700 15px/1 var(--font-ui);
+  background: rgba(255, 255, 255, .96); color: var(--cta-text); box-shadow: 0 0 0 1.5px var(--cta), 0 2px 6px rgba(0, 0, 0, .2); opacity: 0; transition: opacity .2s, background .2s, color .2s;
 }
+.unhang:hover, .unhang:focus-visible { background: var(--cta); color: var(--on-cta); outline: none; }
 .hanger:hover .unhang, .hanger:focus-within .unhang { opacity: 1; }
 @media (hover: none) { .unhang { opacity: .9; } }
 .wardrobe.swing .hanger { animation: hanger-swing 1.8s ease-out both; animation-delay: calc(var(--i) * 90ms + .55s); }
@@ -683,7 +685,7 @@ html, body { overflow-x: clip; }
 .wd-base { height: 40px; margin: 0 -5px; padding: 8px 14px; border-radius: 0 0 4px 4px;
   background: linear-gradient(180deg, rgba(0, 0, 0, .08), transparent 30%), linear-gradient(180deg, var(--wood-2), var(--wood-3));
   box-shadow: inset 0 1px 0 rgba(0, 0, 0, .12); }
-.wd-drawer { display: block; position: relative; height: 100%; border-radius: 2px; background: linear-gradient(180deg, var(--lacquer-1), var(--lacquer-2)); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); }
+.wd-drawer { display: block; position: relative; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 2px; background: linear-gradient(180deg, var(--lacquer-1), var(--lacquer-2)); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); }
 .wd-drawer .pull { position: absolute; left: 50%; top: 50%; width: 72px; height: 4px; transform: translate(-50%, -50%); border-radius: 3px; background: linear-gradient(180deg, var(--brass-1), var(--brass-2) 60%, var(--brass-3)); box-shadow: 0 2px 3px rgba(0, 0, 0, .25); }
 .wd-feet { display: flex; justify-content: space-between; padding: 0 26px; }
 .wd-feet i { width: 6px; height: 14px; border-radius: 0 0 2px 2px; background: linear-gradient(90deg, var(--brass-3), var(--brass-1), var(--brass-3)); }
@@ -1384,3 +1386,113 @@ main.page { position: relative; }
 @media (prefers-reduced-motion: reduce) {
   .page-lights i, .page-doodles span, .deco-tape, .deco-sign, .deco-stage-plant { animation: none; }
 }
+
+/* ---------- The drawer (抽屉) under the doors ----------
+   Pull it and it slides out toward you: the front drops and grows a little, and the tray inside comes out
+   with it. Pieces taken off the rail lie folded on a gingham liner; tap one to hang it back. */
+.wardrobe-scene { --tray-h: 128px; }
+.wd-base { position: relative; z-index: 6; }
+.wd-base::before { content: ""; position: absolute; inset: 8px 14px; border-radius: 2px; background: linear-gradient(180deg, #2b221a, #4a3a2c); }
+.wd-drawer {
+  z-index: 2; cursor: pointer; transform-origin: 50% 0;
+  transition: transform .7s cubic-bezier(.3, .75, .2, 1), box-shadow .7s ease;
+}
+.wd-drawer:hover { transform: translateY(3px); }
+.wd-drawer:focus-visible { outline: none; box-shadow: var(--ring), inset 0 0 0 1px rgba(0, 0, 0, .08); }
+.wardrobe[data-drawer="true"] .wd-drawer {
+  transform: translateY(var(--tray-h)) scale(1.05);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08), 0 14px 18px -8px rgba(60, 40, 20, .38);
+}
+.wardrobe[data-drawer="true"] .wd-drawer:hover { transform: translateY(calc(var(--tray-h) - 3px)) scale(1.05); }
+.wardrobe[data-drawer="true"] .wd-drawer:focus-visible { box-shadow: var(--ring), inset 0 0 0 1px rgba(0, 0, 0, .08), 0 14px 18px -8px rgba(60, 40, 20, .38); }
+.wd-drawer.bump { animation: wd-drawer-bump .6s cubic-bezier(.3, .75, .2, 1); }
+.drawer-count {
+  position: absolute; right: 14px; top: 50%; min-width: 20px; height: 20px; padding: 0 6px; transform: translateY(-50%);
+  border-radius: 999px; display: grid; place-items: center; background: var(--cta); color: var(--on-cta);
+  font: 700 11px/1 var(--font-ui); box-shadow: 0 3px 8px -3px var(--cta-glow);
+}
+.drawer-count[hidden] { display: none; }
+.drawer-hint {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  width: 16px; height: 16px; color: var(--cta-text); transition: transform .3s;
+}
+.wd-drawer:hover .drawer-hint { transform: translateY(calc(-50% + 2px)); }
+/* Open: the arrow points up, to push the drawer back in. */
+.wardrobe[data-drawer="true"] .drawer-hint, .wardrobe[data-drawer="true"] .wd-drawer:hover .drawer-hint { transform: translateY(-50%) rotate(180deg); }
+
+/* "Folded into the drawer below", just above the drawer, with a button that opens it. */
+.wd-toast {
+  position: absolute; z-index: 8; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%); margin: 0;
+  display: flex; align-items: center; gap: 10px; width: max-content; max-width: calc(100% - 16px); padding: 8px 8px 8px 14px; border-radius: 999px;
+  background: var(--ink); color: var(--bg); font-size: 13px; line-height: 1.3; box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .45);
+  animation: wd-toast-in .3s cubic-bezier(.2, .8, .2, 1);
+}
+.wd-toast[hidden] { display: none; }
+.wd-toast button { flex: none; border: 0; border-radius: 999px; padding: 7px 12px; cursor: pointer; background: var(--cta); color: var(--on-cta); font: 700 12px/1 var(--font-ui); }
+.wd-toast button:focus-visible { outline: none; box-shadow: var(--ring); }
+@keyframes wd-toast-in { from { opacity: 0; transform: translate(-50%, 6px); } }
+.wardrobe[data-drawer="true"] .drawer-count { opacity: 0; }
+.drawer-count { transition: opacity .3s; }
+
+/* The tray grows out of the slot while the front moves down, so its contents travel with the front. */
+.wd-tray {
+  position: absolute; z-index: 1; left: 14px; right: 14px; top: 8px; height: 0; overflow: hidden;
+  transition: height .7s cubic-bezier(.3, .75, .2, 1);
+}
+.wardrobe[data-drawer="true"] .wd-tray { height: calc(var(--tray-h) + 14px); }
+.wd-tray-box {
+  position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--tray-h) + 14px);
+  clip-path: polygon(3.5% 0, 96.5% 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(180deg, rgba(40, 25, 10, .34), transparent 26%),
+    linear-gradient(90deg, rgba(40, 25, 10, .16), transparent 5%, transparent 95%, rgba(40, 25, 10, .16)),
+    repeating-linear-gradient(90deg, rgba(217, 105, 74, .1) 0 9px, transparent 9px 18px),
+    repeating-linear-gradient(0deg, rgba(217, 105, 74, .1) 0 9px, transparent 9px 18px),
+    var(--linen-1);
+}
+.wd-tray-box { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; padding: 10px 6% 18px; }
+.wd-tray-label { position: absolute; top: 9px; left: 4%; right: 4%; text-align: center; font: 500 12px/1.3 var(--font-ui); color: #5f564c; }
+.wd-tray-label b, .wd-tray-empty b { font-weight: 700; color: #1d1b18; }
+.wd-folded { width: 100%; height: 70px; display: flex; justify-content: center; align-items: flex-end; gap: 10px; }
+.wd-folded:empty { display: none; }
+.wd-tray-empty { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 6px; color: #6f655a; font-size: 13px; line-height: 1.35; }
+.wd-tray-empty[hidden] { display: none; }
+.wd-tray-box:has(.wd-tray-empty:not([hidden])) .wd-tray-label { display: none; }
+.wd-tray-empty svg { flex: none; width: 40px; height: auto; filter: drop-shadow(0 3px 3px rgba(60, 40, 20, .22)); }
+.wd-tray-empty span { max-width: 30ch; }
+.folded {
+  position: relative; flex: 0 1 70px; min-width: 34px; padding: 0; border: 0; background: none; cursor: pointer;
+  transform: rotate(var(--r, 0deg)); transition: transform .25s cubic-bezier(.2, .8, .2, 1), opacity .3s ease;
+}
+.folded svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 4px 4px rgba(60, 40, 20, .28)); }
+.folded:hover, .folded:focus-visible { transform: translateY(-6px) rotate(0deg); outline: none; }
+.folded:hover svg, .folded:focus-visible svg { filter: drop-shadow(0 0 0 var(--cta)) drop-shadow(0 0 2px var(--cta)) drop-shadow(0 8px 8px rgba(60, 40, 20, .3)); }
+.folded-tip {
+  position: absolute; left: 50%; bottom: calc(100% + 4px); transform: translate(-50%, 4px); opacity: 0; pointer-events: none;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--cta); color: var(--on-cta);
+  font: 700 9px/1.4 var(--font-ui); letter-spacing: .12em; text-transform: uppercase; transition: opacity .2s, transform .2s;
+}
+.folded:hover .folded-tip, .folded:focus-visible .folded-tip { opacity: 1; transform: translate(-50%, 0); }
+.folded.rising { transform: translateY(-40px) scale(.9); opacity: 0; }
+
+@media (prefers-color-scheme: dark) { .wd-tray-label, .wd-tray-empty { color: var(--muted); } .wd-tray-label b, .wd-tray-empty b { color: var(--ink); } }
+
+/* Room below the scene for the pulled-out drawer, so it never covers the button under it. */
+.wd-rug { transition: margin-bottom .7s cubic-bezier(.3, .75, .2, 1); }
+.wardrobe[data-drawer="true"] ~ .wd-rug { margin-bottom: calc(var(--tray-h) - 34px); }
+
+@keyframes wd-drawer-bump { 30% { transform: translateY(12px) scale(1.02); } 60% { transform: translateY(-2px); } }
+@media (max-width: 480px) {
+  .wardrobe-scene { --tray-h: 120px; }
+  .wd-tray-box { padding-left: 4%; padding-right: 4%; }
+  .wd-folded { gap: 4px; }
+  .wd-tray-label { font-size: 8.5px; letter-spacing: .1em; }
+  .wd-tray-empty { font-size: 12px; }
+  .wd-tray-label { font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wd-drawer.bump { animation: none; }
+}
+
+.folded-name { display: block; margin-top: 3px; font: 600 9px/1.1 var(--font-ui); color: #6f655a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-color-scheme: dark) { .folded-name { color: var(--muted); } }

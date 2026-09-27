@@ -116,7 +116,17 @@
             <span class="face back"><span class="mirror"></span></span>
           </button>
         </div>
-        <div class="wd-base"><span class="wd-drawer"><span class="pull"></span></span></div>
+        <div class="wd-base">
+          <div class="wd-tray" id="wdTray" role="region" aria-label="Drawer" inert>
+            <div class="wd-tray-box">
+              <span class="wd-tray-label">Clothes you took off the rail. <b>Tap one to hang it back up.</b></span>
+              <div class="wd-folded" id="folded"></div>
+              <div class="wd-tray-empty" id="trayEmpty"><svg viewBox="0 0 40 34" aria-hidden="true"><path d="M20 9c-3-6-9-7-9-3s6 4 9 3zM20 9c3-6 9-7 9-3s-6 4-9 3z" fill="#d9694a"/><path d="M8 12h24l3 18c0 2-2 3-4 3H9c-2 0-4-1-4-3z" fill="#c9b6dc"/><path d="M8 12h24l-.6 4H8.6z" fill="#b39cc9"/><circle cx="20" cy="9" r="2" fill="#c25a3c"/><path d="M14 20l2 2M22 24l2 2M17 27l2 2M26 19l2 2" stroke="#9a80b5" stroke-width="1.4" stroke-linecap="round"/></svg><span><b>Nothing in here yet.</b> Tap <b>↓</b> on a piece in the wardrobe and it’s folded in here, so you can hang it back later.</span></div>
+            </div>
+          </div>
+          <button type="button" class="wd-drawer" id="wdDrawer" aria-expanded="false" aria-controls="wdTray" aria-label="Open the drawer"><svg class="drawer-hint" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="pull"></span><span class="drawer-count" id="drawerCount" hidden></span></button>
+          <p class="wd-toast" id="wdToast" role="status" hidden><span id="wdToastText"></span> <button type="button" id="wdToastShow">Show me</button></p>
+        </div>
         <div class="wd-feet"><i></i><i></i></div>
       </div>
       <div class="wd-shadow"></div>
@@ -209,7 +219,7 @@
           <span class="cloth">${Fit.garmentArt(g)}</span>
           <span class="tag"><span class="worn-badge">On model</span><span class="tag-brand"><span class="size-chip lv-${worst}">${report.recommended}</span>${esc(g.brand)}</span><span class="tag-name">${esc(g.name)}</span></span>
         </a>
-        <button type="button" class="unhang" data-id="${esc(g.id)}" aria-label="Remove ${esc(g.name)} from wardrobe">×</button>
+        <button type="button" class="unhang" data-id="${esc(g.id)}" aria-label="Put ${esc(g.name)} in the drawer" title="Put in the drawer">↓</button>
       </div>`;
   }
 
@@ -291,7 +301,11 @@
     b.closest('.hanger').classList.add('leaving');
     setTimeout(() => {
       if (worn && worn.id === b.dataset.id) takeOff();
+      const g = Fit.getGarment(b.dataset.id);
+      if (g) Fit.foldIntoDrawer(g);
       Fit.removeCustom(b.dataset.id); renderWardrobe(); setOpen(true);
+      renderDrawer(true);
+      if (g && !drawerOpen()) toast('Folded into the drawer below.');
     }, 280);
   });
   hangers.addEventListener('mouseover', e => { const h = e.target.closest('.hanger'); if (view3d) view3d.hover(h ? +h.dataset.i : null); });
@@ -313,6 +327,56 @@
     setOpen(true);
     swing();
   });
+  // ---- The drawer: pieces taken off the rail are folded in here; tap one to hang it back ----
+  const drawerBtn = $('wdDrawer'), tray = $('wdTray'), folded = $('folded');
+  const drawerOpen = () => wardrobe.dataset.drawer === 'true';
+  function setDrawer(open) {
+    wardrobe.dataset.drawer = String(open);
+    drawerBtn.setAttribute('aria-expanded', String(open));
+    drawerBtn.setAttribute('aria-label', open ? 'Close the drawer' : 'Open the drawer');
+    tray.inert = !open;
+    if (open) hideToast();
+  }
+  // A short note after a piece is folded away, pointing at the drawer.
+  const toastEl = $('wdToast');
+  let toastTimer = 0;
+  function toast(text) {
+    $('wdToastText').textContent = text;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() { clearTimeout(toastTimer); toastEl.hidden = true; }
+  $('wdToastShow').addEventListener('click', () => setDrawer(true));
+  function renderDrawer(bump) {
+    const list = Fit.loadDrawer();
+    folded.innerHTML = list.map((g, i) => `
+      <button type="button" class="folded" data-id="${esc(g.id)}" style="--r:${(i % 3 - 1) * 2}deg" aria-label="Hang ${esc(g.brand)} ${esc(g.name)} back on the rail" title="${esc(g.brand)} · ${esc(g.name)}">
+        ${Fit.foldedArt(g)}<span class="folded-name" aria-hidden="true">${esc(g.name)}</span><span class="folded-tip">Hang back</span>
+      </button>`).join('');
+    $('trayEmpty').hidden = list.length > 0;
+    const count = $('drawerCount');
+    count.hidden = !list.length;
+    count.textContent = list.length;
+    if (bump && !drawerOpen()) { drawerBtn.classList.remove('bump'); void drawerBtn.offsetWidth; drawerBtn.classList.add('bump'); }
+  }
+  drawerBtn.addEventListener('click', () => setDrawer(!drawerOpen()));
+  folded.addEventListener('click', e => {
+    const b = e.target.closest('.folded');
+    if (!b) return;
+    const g = Fit.loadDrawer().find(x => x.id === b.dataset.id);
+    if (!g) return;
+    b.classList.add('rising');
+    setTimeout(() => {
+      Fit.saveCustom(g); // also takes it out of the drawer
+      page = 0;
+      renderWardrobe(); renderDrawer();
+      setOpen(true); swing();
+    }, 320);
+  });
+  setDrawer(false);
+  renderDrawer();
+
   function swing() { wardrobe.classList.remove('swing'); void wardrobe.offsetWidth; wardrobe.classList.add('swing'); }
 
   // Keep the first visible piece in view when the number per rail changes.

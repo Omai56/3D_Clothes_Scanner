@@ -21,10 +21,6 @@
     .saved-body-wrap { position: relative; display: inline-flex; }
     .saved-body-x { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #000; background: #fff; color: #000; font: 700 14px/1 inherit; cursor: pointer; padding: 0; display: grid; place-items: center; }
     .saved-body-x[data-arm="1"] { background: #b3261e; border-color: #b3261e; color: #fff; width: auto; padding: 0 8px; border-radius: 999px; font-size: 11px; }
-    /* the step indicator never lets the label sit on the dot */
-    .steps li { gap: 8px; }
-    .steps .dot { flex: none; }
-    .steps .lbl { white-space: nowrap; }
   `;
   document.head.appendChild(style);
 

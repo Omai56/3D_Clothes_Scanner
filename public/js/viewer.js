@@ -457,7 +457,10 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
         const k = i * 3;
         const Y = P0[k + 1];
         if (Y > wbY + 0.08) return;
+        // gentle everywhere below the waistband; the last 8 cm above the hem open out fully so the
+        // hem lies on the jeans with no step (a hem drapes over what is under it)
         const w = 1 - smoothstep(wbY - 0.02, wbY + 0.08, Y);
+        const wHem = 1 - smoothstep(hemY + 0.005, hemY + 0.08, Y);
         const c = sampleRing(this.rings.torso, Math.max(Y, refY), 0);
         if (!c) return;
         const dx = P0[k] - c.cx;
@@ -469,7 +472,8 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
         const rb = ring[ia] * (1 - ta) + ring[(ia + 1) % NA] * ta + 0.004;
         const d = Math.hypot(dx, dz);
         if (d < rb) {
-          const f = 1 + (w * Math.min(0.02, rb - d)) / Math.max(d, 1e-6); // never more than 2 cm out: a hem lying on the jeans, not a box
+          const push = Math.max(w * Math.min(0.02, rb - d), wHem * (rb - d));
+          const f = 1 + push / Math.max(d, 1e-6);
           P0[k] = c.cx + dx * f;
           P0[k + 2] = c.cz + dz * f;
         }

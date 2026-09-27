@@ -243,6 +243,7 @@
           <span class="tag"><span class="worn-badge">On model</span><span class="tag-brand"><span class="size-chip lv-${worst}">${report.recommended}</span>${esc(g.brand)}</span><span class="tag-name">${esc(g.name)}</span></span>
         </a>
         <button type="button" class="unhang" data-id="${esc(g.id)}" aria-label="Put ${esc(g.name)} in the drawer" title="Put in the drawer">↓</button>
+        ${g.custom ? `<button type="button" class="remove-x" data-id="${esc(g.id)}" aria-label="Remove ${esc(g.name)} from the wardrobe" title="Remove from wardrobe">×</button>` : ''}
       </div>`;
   }
 
@@ -319,10 +320,31 @@
     wear(link.dataset.id);
   });
   hangers.addEventListener('click', e => {
+    const x = e.target.closest('.remove-x');
+    if (x) { e.preventDefault(); removeFromWardrobe(x.dataset.id, x.closest('.hanger')); return; }
     const b = e.target.closest('.unhang');
     if (!b) return;
     foldAway(b.dataset.id, b.closest('.hanger'), true);
   });
+  // Remove a piece for good: off the body, off the rail and drawer, record deleted on the server.
+  // The mesh and photos stay, so pasting the link again brings it back complete.
+  async function removeFromWardrobe(id, hanger) {
+    if (hanger) hanger.classList.add('leaving');
+    try { await fetch(`/api/garments/${encodeURIComponent(id)}`, { method: 'DELETE' }); } catch (e) { /* offline: local removal still happens */ }
+    for (const k of ['top', 'bottom']) if (wornBy[k] && wornBy[k].id === id) { wornBy[k] = null; if (view) view.takeOff(k); }
+    Fit.removeCustom(id); Fit.takeFromDrawer(id);
+    const other = wornBy.top || wornBy.bottom;
+    if (worn && worn.id === id) {
+      worn = null; report = null;
+      if (other) wear(other.id);
+      else {
+        showPane('wardrobe'); tabF.disabled = true; $('fitSizeLabel').textContent = '';
+        $('dropHint').hidden = false; $('takeOff').hidden = true;
+        document.title = 'Try On · Fitting Room';
+      }
+    }
+    renderWardrobe(); setOpen(true);
+  }
   // Take a piece off the rail and fold it into the drawer (the ↓ button, or dropping it on the drawer).
   function foldAway(id, hanger, note) {
     if (hanger) hanger.classList.add('leaving');
@@ -624,27 +646,6 @@
       a.className = 'store-link'; a.href = g.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
       a.textContent = `View on ${g.brand} ↗`;
       fabric.append(document.createElement('br'), a);
-    }
-    if (g.custom) {
-      // Remove from wardrobe: gone from the rail, drawer and server record; the link brings it back
-      const rm = document.createElement('button');
-      rm.type = 'button'; rm.className = 'store-link remove-link'; rm.textContent = 'Remove from wardrobe';
-      rm.addEventListener('click', async () => {
-        rm.disabled = true; rm.textContent = 'Removing…';
-        try { await fetch(`/api/garments/${encodeURIComponent(g.id)}`, { method: 'DELETE' }); } catch (e) { /* offline: local removal still happens */ }
-        for (const k of ['top', 'bottom']) if (wornBy[k] && wornBy[k].id === g.id) { wornBy[k] = null; if (view) view.takeOff(k); }
-        Fit.removeCustom(g.id); Fit.takeFromDrawer(g.id);
-        const other = wornBy.top || wornBy.bottom;
-        worn = null; report = null;
-        if (other) wear(other.id);
-        else {
-          showPane('wardrobe'); tabF.disabled = true; $('fitSizeLabel').textContent = '';
-          $('dropHint').hidden = false; $('takeOff').hidden = true;
-          document.title = 'Try On · Fitting Room';
-        }
-        renderWardrobe(); setOpen(true);
-      });
-      fabric.append(document.createElement('br'), rm);
     }
     const rec = report.sizes[report.recommended];
     const badge = $('badge');

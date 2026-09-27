@@ -306,16 +306,20 @@
   hangers.addEventListener('click', e => {
     const b = e.target.closest('.unhang');
     if (!b) return;
-    b.closest('.hanger').classList.add('leaving');
-    setTimeout(() => {
-      if (worn && worn.id === b.dataset.id) takeOff();
-      const g = Fit.getGarment(b.dataset.id);
-      if (g) Fit.foldIntoDrawer(g);
-      Fit.removeCustom(b.dataset.id); renderWardrobe(); setOpen(true);
-      renderDrawer(true);
-      if (g && !drawerOpen()) toast('Folded into the drawer below.');
-    }, 280);
+    foldAway(b.dataset.id, b.closest('.hanger'), true);
   });
+  // Take a piece off the rail and fold it into the drawer (the ↓ button, or dropping it on the drawer).
+  function foldAway(id, hanger, note) {
+    if (hanger) hanger.classList.add('leaving');
+    setTimeout(() => {
+      if (worn && worn.id === id) takeOff();
+      const g = Fit.getGarment(id);
+      if (g) Fit.foldIntoDrawer(g);
+      Fit.removeCustom(id); renderWardrobe(); setOpen(true);
+      renderDrawer(true);
+      if (note && g && !drawerOpen()) toast('Folded into the drawer below.');
+    }, 280);
+  }
   hangers.addEventListener('mouseover', e => { const h = e.target.closest('.hanger'); if (view3d) view3d.hover(h ? +h.dataset.i : null); });
   hangers.addEventListener('mouseleave', () => { if (view3d) view3d.hover(null); });
   hangers.addEventListener('focusin', e => { const h = e.target.closest('.hanger'); if (view3d && h) view3d.hover(+h.dataset.i); });
@@ -371,17 +375,21 @@
   drawerBtn.addEventListener('click', () => setDrawer(!drawerOpen()));
   folded.addEventListener('click', e => {
     const b = e.target.closest('.folded');
-    if (!b) return;
-    const g = Fit.loadDrawer().find(x => x.id === b.dataset.id);
+    if (!b || dragEnded) return;
+    hangBack(b.dataset.id, b);
+  });
+  // Take a folded piece out of the drawer and hang it back on the rail (tap it, or drag it onto the wardrobe).
+  function hangBack(id, btn) {
+    const g = Fit.loadDrawer().find(x => x.id === id);
     if (!g) return;
-    b.classList.add('rising');
+    if (btn) btn.classList.add('rising');
     setTimeout(() => {
       Fit.saveCustom(g); // also takes it out of the drawer
       page = 0;
       renderWardrobe(); renderDrawer();
       setOpen(true); swing();
     }, 320);
-  });
+  }
   setDrawer(false);
   renderDrawer();
 
@@ -417,15 +425,24 @@
     drag = { id: link.dataset.id, hanger: link.closest('.hanger'), pointerId: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false };
     if (e.pointerType !== 'mouse') drag.timer = setTimeout(() => drag && startDrag(), 300);
   });
+  // …and a folded piece from the open drawer back onto the wardrobe.
+  folded.addEventListener('pointerdown', e => {
+    const b = e.target.closest('.folded');
+    if (!b || e.button > 0 || !drawerOpen()) return;
+    if (e.pointerType === 'mouse') e.preventDefault();
+    drag = { id: b.dataset.id, fromDrawer: true, hanger: b, pointerId: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false };
+    if (e.pointerType !== 'mouse') drag.timer = setTimeout(() => drag && startDrag(), 300);
+  });
+  folded.addEventListener('contextmenu', e => { if (e.target.closest('.folded')) e.preventDefault(); });
   function startDrag() {
-    const g = Fit.getGarment(drag.id);
+    const g = drag.fromDrawer ? Fit.loadDrawer().find(x => x.id === drag.id) : Fit.getGarment(drag.id);
     if (!g) { drag = null; return; }
     drag.active = true;
     clearTimeout(drag.timer);
     navigator.vibrate?.(12);
     ghost = document.createElement('div');
-    ghost.className = 'drag-ghost';
-    ghost.innerHTML = Fit.garmentArt(g);
+    ghost.className = drag.fromDrawer ? 'drag-ghost folded-ghost' : 'drag-ghost';
+    ghost.innerHTML = drag.fromDrawer ? Fit.foldedArt(g) : Fit.garmentArt(g);
     document.body.appendChild(ghost);
     document.body.classList.add('is-dragging');
     drag.hanger.classList.add('lifting');
@@ -435,25 +452,51 @@
     const r = dropzone.getBoundingClientRect();
     return drag.x >= r.left && drag.x <= r.right && drag.y >= r.top && drag.y <= r.bottom;
   }
+  // The drawer (its front, and the tray when it's pulled out), with a little margin so it's easy to hit.
+  function overDrawer() {
+    const a = drawerBtn.getBoundingClientRect(), t = tray.getBoundingClientRect(), m = 14;
+    const top = Math.min(a.top, t.height ? t.top : a.top) - m;
+    return drag.x >= a.left - m && drag.x <= a.right + m && drag.y >= top && drag.y <= a.bottom + m;
+  }
+  // The wardrobe itself (doors or rail), for a piece coming out of the drawer.
+  function overWardrobe() {
+    const r = wardrobe.querySelector('.wd-cabinet').getBoundingClientRect();
+    return drag.x >= r.left && drag.x <= r.right && drag.y >= r.top && drag.y <= r.bottom;
+  }
   function moveGhost() {
     ghost.style.left = drag.x + 'px';
     ghost.style.top = drag.y + 'px';
+    if (drag.fromDrawer) { wardrobe.classList.toggle('rail-over', overWardrobe()); return; }
     dropzone.classList.toggle('drop-over', overDrop());
+    wardrobe.classList.toggle('drawer-over', !overDrop() && overDrawer());
   }
   function endDrag(drop) {
     if (!drag) return;
     clearTimeout(drag.timer);
-    if (drag.active) {
+    if (drag.active && drag.fromDrawer) {
+      const hit = drop && overWardrobe();
+      dragEnded = true; setTimeout(() => { dragEnded = false; }, 0);
+      ghost.classList.add(hit ? 'onto-rail' : 'returning');
+      const g = ghost; setTimeout(() => g.remove(), 220);
+      ghost = null;
+      document.body.classList.remove('is-dragging');
+      wardrobe.classList.remove('rail-over');
+      drag.hanger.classList.remove('lifting');
+      if (hit) hangBack(drag.id, null);
+    } else if (drag.active) {
       const hit = drop && overDrop();
+      const toDrawer = drop && !hit && overDrawer();
       const id = drag.id;
       dragEnded = true; setTimeout(() => { dragEnded = false; }, 0);
-      ghost.classList.add(hit ? 'dropped' : 'returning');
+      ghost.classList.add(hit ? 'dropped' : toDrawer ? 'into-drawer' : 'returning');
       const g = ghost; setTimeout(() => g.remove(), 220);
       ghost = null;
       document.body.classList.remove('is-dragging');
       dropzone.classList.remove('drop-over');
+      wardrobe.classList.remove('drawer-over');
       drag.hanger.classList.remove('lifting');
       if (hit) wear(id);
+      else if (toDrawer) foldAway(id, drag.hanger, false);
     }
     drag = null;
   }

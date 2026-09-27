@@ -4,9 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Your Measurements · Fitting Room</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -49,7 +46,7 @@
       <div class="fields" id="fields"></div>
       <div class="form-actions">
         <button class="btn primary" type="submit">Continue to try on</button>
-        <button class="btn ghost" type="button" id="demo">Fill with demo scan</button>
+        <button class="btn ghost" type="button" id="demo">Use my saved scan (Daniel)</button>
       </div>
     </form>
   </div>
@@ -177,7 +174,11 @@
   const saved = Fit.loadBody();
   if (saved) fill(saved); else updateProgress();
 
-  document.getElementById('demo').addEventListener('click', () => fill(Fit.DEMO_BODY));
+  // Sample body = Daniel's saved Bodygram scan (data/scans/daniel): fills the fields from it and makes
+  // the try-on page show that 3D body. Falls back to the built-in numbers if the server is away.
+  document.getElementById('demo').addEventListener('click', async () => {
+    try { await applyScan(Fit.SAMPLE_SCAN); } catch (e) { console.warn('sample scan', e); fill(Fit.DEMO_BODY); }
+  });
 
   // ---------- Body scan: same flow as the original app (public/app.html) ----------
   // Opens the Bodygram scanner in a new tab (clean camera permission) and waits here; when the scan

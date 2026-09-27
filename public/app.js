@@ -7,7 +7,9 @@
   const STORE_KEY = 'fit.body';
 
   // From data/scans/demo.json (Bodygram stats-only scan), converted mm -> cm.
-  const DEMO_BODY = { height: 175, chest: 91.4, waist: 77.9, hip: 93.5, inseam: 79.7, shoulder: 46.7 };
+  // Sample body: Daniel's Bodygram scan (data/scans/daniel.json), so the app can be tested on a real body.
+  const SAMPLE_SCAN = 'daniel';
+  const DEMO_BODY = { height: 178, chest: 86.3, waist: 70.7, hip: 93.6, inseam: 80.4, shoulder: 44.8 };
 
   const FIELDS = [
     { key: 'height',   label: 'Height',        hint: 'Standing straight, no shoes',             min: 120, max: 230 },
@@ -454,7 +456,7 @@
   }
 
   window.Fit = {
-    FIELDS, DEMO_BODY, SIZE_NAMES, GARMENTS, CM_PER_IN: 2.54,
+    FIELDS, DEMO_BODY, SAMPLE_SCAN, SIZE_NAMES, GARMENTS, CM_PER_IN: 2.54,
     bodyFigure, setFigureValue, garmentArt, getGarment, fitReport, saveBody, loadBody,
     TYPES, parseProductLink, makeCustomGarment, loadCustom, saveCustom, removeCustom, esc,
     foldedArt, loadDrawer, foldIntoDrawer, takeFromDrawer,

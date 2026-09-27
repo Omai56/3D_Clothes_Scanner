@@ -203,15 +203,21 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
   async loadGarmentModel(url, garment, sizeEval) {
     if (!this.body) return;
     const category = garment.category === 'top' ? 'top' : 'bottom';
-    // one slot per category: a top and a bottom can be worn together
+    // one slot per category: a top and a bottom can be worn together; a second top swaps the
+    // first. Loads are async, so a newer request for the same slot cancels an older one.
+    const token = (this._loadToken = (this._loadToken ?? 0) + 1);
+    (this._slotLoading ??= {})[category] = token;
     let slot = this.slots[category];
     if (slot && slot.url !== url) {
       this.meshyGroup.remove(slot.group);
+      delete this.slots[category];
       slot = null;
     }
     if (!slot) {
       const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       const gltf = await new Promise((resolve, reject) => new GLTFLoader().load(url, resolve, undefined, reject));
+      if (this._slotLoading[category] !== token) return; // superseded while loading
+      if (this.slots[category]) this.meshyGroup.remove(this.slots[category].group);
       bakeToWorld(gltf.scene); // positions in scene units, float32, node transforms reset
       // Measure the raw mesh once: bounding box + the width of its bottom and top bands
       // (a tee's hem / a pair of trousers' waistband — the parts with no sleeves in them).

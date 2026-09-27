@@ -757,3 +757,27 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - The uncommitted "Zara-style skin" edits found in the working folder (from another session on this machine: fonts and decorations removed, square corners) were **not** merged; they are parked in `git stash` ("other-session Zara-style skin edits") because they remove the curtains and backdrops Daniel asked for.
 **Verified:** measure page tap → fields 178/86.3/70.7/93.6/80.4/44.8 and body remembered; try-on page with jeans + tee shows curtains, lamp, sign; 24 tests pass.
 **Files:** `public/measure-bodies.js`, `public/index.html`, `public/shop.html`, `public/decor.js`, `public/styles.css`, `public/js/viewer.js`, `CHANGELOG.md`
+
+## 2026-09-27 10:12 — Light only, Zara-style skin, Daniel's scan as the sample body
+**By:** Claude (Fable 5.1)
+**Why:** Daniel's laptop is in dark mode, so the pages rendered dark (the stylesheet followed `prefers-color-scheme`). He wants it light always, less "AI-looking", closer to Zara, and his own scan as the sample body so he can test without rescanning.
+**What:**
+- **Light only.** Every `@media (prefers-color-scheme: dark)` block in `public/styles.css` is disabled (rewritten to a never-matching query), `color-scheme: light` stays. The OS setting no longer changes the app.
+- **Zara-style skin** (override layer at the end of `public/styles.css`): white page, black ink, one grotesk (Helvetica Neue / Arial system stack; Google Fonts Playfair + Inter no longer loaded by the measure page), small tracked uppercase headings, labels and buttons, square corners everywhere (`border-radius: 999px` → 0, radius tokens 0), hairline black borders, no shadows, no corner colour wash, no burnt-orange / champagne accents (all action colours are black; fit colours red/amber/green/blue untouched). Inputs are underlined, not boxed. Top bar is the wordmark only. Step dots are square.
+- **Decorations kept.** Fairy lights, doodles, tape measure, pin cushion, sign, plant and the illustrated wardrobe all stay (Daniel asked; they were briefly removed at 10:12 and put back at 10:20).
+- **Sample body = Daniel's scan.** The measure page button "Fill with demo scan" is now "Use my saved scan (Daniel)": it loads `data/scans/daniel` through `/api/scans/daniel`, fills the six fields from the Bodygram measurements (178 / 86.3 / 70.7 / 93.6 / 80.4 / 44.8) and marks that 3D body for the try-on page (falls back to the built-in numbers if the server is unreachable). `Fit.DEMO_BODY` in `public/app.js` holds those numbers too, and `Fit.SAMPLE_SCAN = 'daniel'`.
+**Verified:** headless Chrome with the OS in dark mode, 1280 and 390px: measure page renders white with the new type; the sample button fills all six fields and `sessionStorage.fit3dScan = daniel`; Continue opens the try-on page with Daniel's 3D body selected and his numbers in the chip; no page errors; 24 tests pass.
+**Files:** `public/styles.css`, `public/index.html`, `public/app.js`, `public/decor.js`, `CHANGELOG.md`
+
+---
+
+---
+
+## 2026-09-27 — Zara-style skin restored with Omai's curtains and backdrop changer; one top at a time; three hangers on a phone rail
+**By:** Claude (Fable 5.1), per Daniel ("revert to the Zara style I had, just add the curtain decoration and background changer")
+**What:**
+- The Zara-style skin (from the other session on this machine, previously stashed) is back on top of Omai's latest: square corners, tracked uppercase type, hairlines; the fitting-room curtains, brass rail, lamp and backdrop-changing sign stay (`public/styles.css` keeps both blocks, skin last; `public/index.html`, `public/app.js` from the skin).
+- `public/js/viewer.js` — garment loads are tokened per slot: a second top swaps the first even if the first is still loading (before, two quick taps stacked two tees and Take off then removed only one).
+- `public/shop.html`, `public/styles.css` — the wardrobe rail shows three hangers on a phone (the jeans were on a second rail page behind the arrow).
+**Verified:** try-on page in the skin with curtains + jeans + tee; heavyweight then slim tee → one top on the body; Take off → nothing on; measure page saved-body tap fills the fields; 24 tests pass.
+**Files:** `public/styles.css`, `public/index.html`, `public/app.js`, `public/shop.html`, `public/js/viewer.js`, `CHANGELOG.md`

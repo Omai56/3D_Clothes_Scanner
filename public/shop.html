@@ -214,7 +214,7 @@
   tabW.addEventListener('click', () => showPane('wardrobe'));
   tabF.addEventListener('click', () => showPane('fit'));
 
-  const perPageFor = () => { const w = hangers.clientWidth || 600; return w >= 560 ? 3 : 2; };
+  const perPageFor = () => { const w = hangers.clientWidth || 600; return w >= 330 ? 3 : 2; }; // 3 hangers fit a phone rail
 
   function hangerHtml(g, i) {
     const report = Fit.fitReport(g, body);

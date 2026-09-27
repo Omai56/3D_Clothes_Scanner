@@ -418,6 +418,141 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 ## 2026-09-26 — Scan button works like the original app's; main gets the new UI
 **By:** Claude (Opus 5.5)
-**What:** "Scan my body" on the measure page now behaves like "Scan me with the camera" in the original app (`public/app.html`, `public/js/app.js`): it opens the Bodygram scanner in a **new tab** and waits on the measure page (poll every 4 s, up to 8 min), then fills the six fields and picks that 3D body for try-on. A failed scan shows the same message ("The scan failed (code). Try again with better lighting."). If the browser blocks the new tab, the current tab goes to the scanner instead and the wait resumes on return. Card text now matches: "Opens the Bodygram scanner. Two photos, about a minute…". `main` fast-forwarded to this branch so it serves the new UI; the original app is still at `/app.html`.
+**What:** "Scan my body" on the measure page now behaves like "Scan me with the camera" in the original app (`public/app.html`, `public/js/app.js`): it opens the Bodygram scanner in a **new tab** and waits on the measure page (poll every 4 s, up to 8 min), then fills the six fields and picks that 3D body for try-on. A failed scan shows the same message ("The scan failed (code). Try again with better lighting."). If the browser blocks the new tab, the current tab goes to the scanner instead and the wait resumes on return. Card text now matches: "Opens the Bodygram scanner. Two photos, about a minute…". `main` merged into this branch (cloth simulation, .glb upload, no-store caching come along) and main updated to the result, so main serves the new UI; the original app is still at `/app.html` and has main's latest additions (Look flags, Look/Fit help, Add .glb model).
 **Verified:** simulated scan in Chrome: scanner opens in a new tab, measure page stays and shows "Waiting for your scan…", then all six fields fill and the card shows "Scan done"; tests pass.
-**Files:** `public/index.html`, `CHANGELOG.md`
+**Files:** `public/index.html`, `public/app.html` (main's additions), `CHANGELOG.md`
+
+---
+
+## 2026-09-27 01:30 — Cloth simulation: garments now drape on the body
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/cloth.js` — small position-based cloth solver: tube grids with per-row rest circumference and per-gap/per-column vertical rest lengths, gravity, distance + compression-only shear constraints, pinned rows, pluggable colliders, quasi-static settle with top-down "follow-the-leader" vertical links (verified: a free-hanging tube keeps its exact length; a tube narrower than the body wraps it without stretching).
+- `public/js/viewer.js`
+  - `_dressTop`: torso tube from the neckline (pinned) to the hem, rows sized from the chart (hem→chest flat widths ×2; over the shoulders the yoke follows the body outline with the chest's ease, and its vertical links are taken from geometry so the cone over the shoulders doesn't collapse); one tube per sleeve with a slanted sleeve cap, pinned at the arm root, sized from the chart's arm width, resting on the arm with slack underneath. Colliders: body rings (torso / each leg), arm capsules (sleeves only), shoulder-top height map, floor. Fabric never smaller than the body it wraps (tight = hugs).
+  - `_dressBottoms`: seat tube pinned at the waistband, pinched front/back at the crotch, plus a tube per leg hanging from the crotch; same sizing rules; pooling at the ankle kept.
+  - AI mesh glued to the simulated proxies by (height, angle); front/back layer decided from surface normals (mid-surface fallback at seams); smoothed width profile; analytic mapping kept as fallback.
+- Debug hooks: `window.__showProxy` (wireframe proxies), `window.__debugTop`, `__viewer.lastSimMs` (~0.35–0.6 s per size on the laptop).
+**Verified:** headless renders of all three garments; jeans and slim tee front/side good; heavyweight tee front good, S/XL differ. Known: notch at the back hem and small holes at the shoulder seams (layer classification), underarm gap (no gusset bridging yet).
+**Files:** `public/js/cloth.js`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 04:40 — Cloth simulation tuned: hanging rule, yoke, sleeves, seams
+**By:** Claude (Fable 5.1)
+**What (all `public/js/cloth.js` / `public/js/viewer.js`):**
+- **Hanging rule**: below its support, every vertical cloth link stays within ~30° of vertical (`hangFrom`, `minDropFrac`). Without bending stiffness the slack back panel crumpled and the back hem rode up 26 cm; now front and back hems land within a few cm (measured: front 0.845 m, back 0.90 m on Daniel).
+- **Tops**: neckline pinned at the neck base (crew neck, 1.15× neck girth); yoke rows keep their geometric link lengths; rest circumference from the chart (hem→chest) and from the body outline over the shoulders; collar keeps height-based rows while the rest of the yoke maps by distance from the neck (fixes the boat-neck and the shoulder-corner flap); fabric never smaller than the body.
+- **Sleeves**: classification is now column-based (horizontal distance from the side seam; per-column top/bottom edges) instead of a diagonal axis — the diagonal axis sent armhole vertices to the wrong end of the sleeve (the ragged cap and the back "flap"). Sleeve tube pinned just under the shoulder top, cap hugs the deltoid and widens over the cap rows, arm-only colliders, armhole seam blended into the torso tube over the first 15 % of the sleeve; front/back from the sleeve's mid-plane.
+- **Trousers**: seat tube pinned at the waistband with a front/back crotch pinch + two leg tubes; hanging rule; rest never below body girth.
+- Shoulder-top collider window 5 cm, run before the radial push; layer classification from normals with a mid-surface fallback at seams.
+- Diagnostics kept behind flags: `__showProxy`, `__debugTop`, `__viewer.debugTubes`.
+**Result:** all three garments drape on the body from front/side/back with no holes or flaps; S vs XL differ. Sim + glue ≈ 0.4–0.6 s per size on the laptop.
+**Known:** sleeves still read slightly boxy (tube cross-section is round; real sleeves flatten), fuzzy armhole seam from the side, faint web at the underarm.
+**Files:** `public/js/cloth.js`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 05:05 — Demo polish: tight flags on Look, Look/Fit help line, draping status
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/app.js` — red **"Tight: …"** (and blue "Very loose: …") chips on the 3D view whenever a region is tight/very loose, so the fit verdict is visible in Look mode too; a "Draping the garment on your body…" status while the simulation runs; size chips and the waistband slider both re-drape through one path.
+- `public/index.html`, `public/css/style.css` — one-line explanation under the viewer: *Look* is the real garment draped on your scan at this size; *Fit* colours it by where it is tight or loose.
+- `README.md` — Look view (cloth simulation) documented; `PLAN.md` build order updated.
+**Verified:** full fit page renders for the tee (S) and jeans (28 shows "Tight: waist"); no console errors; 24 tests pass.
+**Files:** `public/js/app.js`, `public/index.html`, `public/css/style.css`, `README.md`, `PLAN.md`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Tops back to plain placement (Daniel's call); jeans stay simulated
+**By:** Claude (Fable 5.1)
+**What:** `public/js/viewer.js` `_placeRigid` — for tops, the Look view again uses the mesh as generated, scaled per axis from the chart (length; depth from the body's front-to-back extent + ease; worn width from the chart circumference) and placed on the body — the earlier approach, which reads cleaner than the reshaped/simulated tee. Any cached deformation is undone first (original positions restored). Bottoms keep the cloth simulation (seat + legs), which Daniel was happy with. `window.__clothSim = true` switches tops to the simulation for comparison.
+**Verified:** heavyweight tee S/XL front, side, back; slim tee front — clean, no holes; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Jeans pool on the shoes, tee sits closer, add a 3D model to any item
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/viewer.js`
+  - **Jeans length**: the hem may now reach the top of the foot (was clamped at the ankle); excess length stacks in an 8 cm roll on the shoe, as real jeans do. Both bottoms paths.
+  - **Tee width/depth** (`_placeRigid`): width = body width + the chart's ease (capped by the chart circumference) instead of the full ellipse width, depth = body extent + ease + 6.5 cm — the tee sits closer to the body while keeping its generated shape. S/XL still differ.
+  - **Intersection fix** after placement: vertices that land inside the body (torso rings, arm capsules, shoulder tops) are nudged out to the surface; nothing else moves. Removes the shoulder poking through the front of the heavyweight tee.
+- **Any item can get a 3D look**: `POST /api/garments/:id/model` accepts a `.glb` (validated as binary glTF, saved to `public/models/<id>.glb`, linked in the garment JSON). The fit screen shows an **"Add .glb model"** card for items without one, with the recipe (tripo3d.ai → upload the product photo → export .glb). Any Zara link → imported → fit works; add the model → Look works.
+**Verified:** jeans front/side (29, 34) pool on the shoes; heavyweight tee S/XL front/side/back; slim tee; upload endpoint rejects non-GLB and unknown items, accepts a real file; 24 tests pass.
+**Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 06:30 — Tees: shoulders, sleeves and slim scale fixed; jeans: crotch closed, hem to the floor
+**By:** Claude (Fable 5.1)
+**What (all in `public/js/viewer.js`):**
+- **Tops** — `_placeRigid` replaced by `_placeTop`, a smooth warp of the generated mesh (no per-vertex remodelling):
+  - shoulder line = the body's shoulder width (a dropped seam sits a little down the arm and the yoke slopes down to it);
+  - body of the tee = the chart circumference as an ellipse that hangs from the shoulders where the fabric allows, otherwise pulled in to the body. The slim tee is now really slim (chest ≈ 34 cm wide on Daniel vs ≈ 45 cm for the heavyweight tee; before both came out ≈ 47 cm because the width was taken from the shoulder-height torso extent);
+  - the back panel hangs from the upper back, not the chest-level back (removed the horizontal shelf across the shoulder blades);
+  - sleeves keep their generated shape but swing about the shoulder joint down towards the arm (black tee falls more, brown no longer sticks out), are narrowed when the mesh's sleeve is fatter than the chart's `arm_width`, and are made at least as thick as the arm inside them;
+  - nothing inside the body: the push of each vertex is spread to its neighbours over 5 passes (soft bumps instead of the corners at the shoulders); the shoulder lift applies only to cloth over the torso and never in the neck column (collar no longer torn); the deltoid is fatter than the upper-arm girth in the arm collider.
+  - Mesh analysis (`topProfile`): torso width = median of the bands clearly below the sleeves (the sloping sleeve underside had inflated it by 5 cm, which made the sleeve region a thin strip and pushed the sleeve scale factors to their caps).
+- **Bottoms** (`_dressBottoms`, colliders):
+  - the hem may reach the floor (was the top of the foot); the excess pools right above the shoe. Below the ankle the leg is treated as a straight cylinder and a top-of-foot height map lifts cloth onto the shoe instead of through it.
+  - **crotch**: the two leg tubes are kept apart by the real midline between the thighs per row (this scan is not symmetric about x = 0 — right thigh centred at +12 cm, left at −7.5 cm — so the left leg's inner side sat 2 cm inside the thigh and showed skin from below); the first rows under the crotch lie flat on that midline like an inseam; the seat is kept outside the fused hull of both thighs below the crotch; the crotch pinch (front/back centre pinned to the body) is gone; the seat↔legs glue is blended over ±5 % of the mesh height so there is no tear across the thighs; the trouser crotch hangs 2 cm below the body's.
+  - crotch band detection ignores the narrow fly crevice generated meshes carry above the real crotch; front/back layer classification is "back only if near the back surface and facing backwards" with a neighbour majority vote (recessed front details no longer stretch through the body).
+- `_bodyColliders` gained `legLo`, `footTop`, `torsoLo` options and a `seat` collider list; `buildAdjacency`, `smoothstep`, `topProfile` helpers.
+**Verified (headless renders on Daniel's scan):** heavyweight tee S/XL front + back, slim tee S/L front, jeans 29/34 front, side and from below (crotch closed, hem on the shoes); no console errors; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 07:20 — Tee yoke follows the shoulder slope; jeans hem breaks on the shoe
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`), from Daniel's review against Zara's model photos:**
+- **Tops**: the yoke now slopes down from the neck base to the shoulder tip like the body does (the flat-lay mesh has a level shoulder line, so the seam floated above the shoulder); the sleeve seam sits on the shoulder tip for a fitted tee (was 1–2 cm outside it) and a dropped seam continues down the arm; the sleeve/torso junction blends over a wider band (fewer holes at the back armpit); the sleeve's front-to-back thickness floor is just the arm's diameter.
+- **Bottoms**: the hem stops 3 cm above the floor and is pushed round the shoe by the real foot outline (reads as the hem breaking on the shoe, as in the reference photo) instead of being lifted point by point onto the foot, which had left a tattered hem; pooling roll reduced, radial bump nearly removed.
+- Layer classification: edge vertices (side seams, hems) go by the mid-surface again; only backward-facing vertices are tested against the back surface.
+**Known limits:** the slim tee's generated mesh has oversized sleeves/armholes so its sleeves still read full; a thin sliver can show at the back armpit of the heavyweight tee at some angles; the jeans mesh's side edge looks jagged in a pure side view.
+**Verified:** slim L, heavyweight S front/back, jeans 29/34 front, side and from below; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 08:30 — Jeans: no side gaps from the back, crotch closed underneath; fresh code on phones
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/viewer.js` — bottoms glue: within the side band of the flat-lay mesh (|u| > 0.8) the ring angle follows each vertex's depth across the pillow thickness (`origDepth`, computed in `bakeToWorld`), so the rounded side edge wraps round the body instead of snapping front/back — this was the skin showing at both sides of the seat and legs from the back. Crotch gusset covers the first 6 rows under the crotch. Sleeve/torso junction blends over a wider band; the deltoid bulge in the arm collider is smaller (the sleeve caps puffed against it). Also restored the position declarations the simulated-top path (`window.__clothSim`) needs.
+- `server/index.js` — `Cache-Control: no-store` for js/css/html so phones never keep an old viewer (Daniel's phone showed the previous hem behaviour after the last push).
+**Known limits:** slim-tee sleeves still fuller than the photo (generated mesh has oversized armholes); heavyweight sleeve caps show a crease; jeans side edge shows speckles in a pure side view; a small fold under the crotch.
+**Verified:** jeans 29 back / below / side, heavyweight S front + back, slim L; 24 tests pass.
+**Files:** `public/js/viewer.js`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 09:05 — Baggy legs hang straight to the floor; sleeve tube clears the arm
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`):**
+- **Bottoms**: a leg with 8 cm or more of ease at the thigh hangs straight down from its widest ring (per column running maximum, and the rest circumference of every row below is at least the thigh's); a tight leg still follows knee and calf; in between it blends. The hem now reaches the floor (was 3 cm above) and the excess pools on the shoe.
+- **Tops**: boxy tees swing their sleeves only a little (the cap distorted), fitted tees still hang theirs along the arm; the sleeve tube is kept at least 4.5 cm wider and 3 cm deeper than the arm so it cannot sink into it.
+**Verified:** jeans 29/34 front + 34 side (straight, on the floor), heavyweight S, slim L; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 10:00 — Jeans straight from the back too; sleeves bend along their length; brown mesh diagnosed
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`):**
+- **Bottoms**: a straight (baggy) leg now hangs on one front-to-back axis taken from the thigh, so the calf's backward bulge no longer pulls the cloth with it (from the back the legs were following the calves); fully straight from 5 cm of thigh ease.
+- **Tops**: the sleeve swing builds up along the sleeve (none at the armhole cap, full from 60 % out) instead of turning the whole sleeve at the seam — cuffs hang down, caps keep their shape. A shoulder-joint sphere collider covers the deltoid/armpit wedge that neither the clipped torso rings nor the arm capsule reached. `window.__sleeveSwing = false` keeps the sleeves as generated.
+- **Diagnosis**: the slim tee's skin patches at the back collar, back armpits and hem are holes in the generated GLB itself (rendered the raw mesh alone: same holes). No placement change affects them; the item needs a regenerated mesh (tripo3d.ai → "Add .glb model" card).
+**Verified:** jeans 29 back (straight), heavyweight S front/back, slim L front/back; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 10:20 — Seat hangs straight (no side bulge); tees 1 cm lower; black tee sleeves as Daniel preferred
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`):**
+- **Bottoms**: the seat tube hangs straight down from its widest point per column (running maximum from the waistband down), so the cloth no longer balloons out again around the hips in a side view.
+- **Tops**: neck line 1 cm lower (the top read as floating above the shoulders); the sleeve swing is back to the rigid, small-for-boxy-tees version and the shoulder-joint sphere collider is removed — Daniel judged the previous round better for the black tee (the bend-along-the-sleeve version gave an asymmetric shoulder and back-armpit gaps).
+**Verified:** heavyweight S front/back, slim L front, jeans 29 side; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

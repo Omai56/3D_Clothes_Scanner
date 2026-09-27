@@ -125,7 +125,7 @@ Secrets go in `.env` (gitignored). `.env.example` lists the variable names.
 4. ~~**3D fit view** — OBJ viewer + garment shell + size buttons + fit colors.~~ ✅ `public/js/viewer.js`
 5. ~~**App flow** — scan page → paste link / pick item → results.~~ ✅ `public/`
 6. ~~**Real charts** — 3 real Zara items (heavyweight tee, slim tee, loose jeans) entered from the product pages' PRODUCT MEASUREMENTS + composition.~~ ✅ Live Zara pull stays blocked (bot protection); charts are entered by hand from screenshots.
-7. **Realism test** — render → photo-like image. Keep only if it holds the shape. (not started; the 3D shell now hangs like cloth, has a neckline and a fabric sheen)
+7. ~~**Realism**~~ ✅ AI garment meshes (Tripo, from the flat product photo) for all three items, **cloth-simulated onto the body**: proxy tubes sized from the size chart hang under gravity against the scan, and the mesh is glued to them. Look / Fit toggle in the viewer. Photo-real AI images (FASHN etc.) deliberately not used — no size input.
 8. ~~Real phone scan~~ ✅ (Daniel, via the app) · **Rehearse the demo, record a backup video.**
 
 ## Minimum to demo

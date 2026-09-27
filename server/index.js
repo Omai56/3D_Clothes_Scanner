@@ -18,8 +18,10 @@ const MODELS_DIR = path.join(ROOT, 'data', 'models');
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
-app.use(express.static(path.join(ROOT, 'public')));
-app.use('/shared', express.static(path.join(ROOT, 'shared')));
+// phones cache module scripts aggressively; the app is tiny, always fetch fresh code
+const noStore = { setHeaders: (res, file) => { if (/\.(js|css|html)$/.test(file)) res.setHeader('Cache-Control', 'no-store'); } };
+app.use(express.static(path.join(ROOT, 'public'), noStore));
+app.use('/shared', express.static(path.join(ROOT, 'shared'), noStore));
 app.use('/scans', express.static(SCANS_DIR)); // .obj files
 app.use('/models', express.static(MODELS_DIR)); // .glb files from Meshy
 
@@ -199,6 +201,24 @@ app.get('/api/meshy/:taskId', async (req, res) => {
   } catch (e) {
     res.status(502).json({ error: e.message });
   }
+});
+
+// Attach a 3D model (.glb) to a garment: generated e.g. at tripo3d.ai from the product photo,
+// uploaded from the phone or laptop. Saved to public/models/<id>.glb and linked in the garment JSON.
+app.post('/api/garments/:id/model', express.raw({ type: () => true, limit: '80mb' }), async (req, res) => {
+  const id = req.params.id;
+  const g = await readGarment(id);
+  if (!g) return res.status(404).json({ error: 'garment not found' });
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || buf.length < 100) return res.status(400).json({ error: 'no file received' });
+  if (buf.readUInt32LE(0) !== 0x46546c67) return res.status(400).json({ error: 'not a .glb file (binary glTF)' });
+  const modelsDir = path.join(ROOT, 'public', 'models');
+  await fs.mkdir(modelsDir, { recursive: true });
+  const file = `${id}.glb`;
+  await fs.writeFile(path.join(modelsDir, file), buf);
+  g.model = { glb: `/models/${file}`, source: 'uploaded via app', generated: new Date().toISOString().slice(0, 10) };
+  await fs.writeFile(path.join(GARMENTS_DIR, `${id}.json`), JSON.stringify(g, null, 2) + '\n');
+  res.json({ garment: g });
 });
 
 // ---------- fit ----------

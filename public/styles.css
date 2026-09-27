@@ -1685,3 +1685,8 @@ body::before { display: none; }
 .steps { flex: 0 0 auto; }
 .steps li, .steps .dot, .steps li + li::before { flex-shrink: 0; }
 .steps .lbl { white-space: nowrap; }
+
+/* Step indicator, final word: dot, connector and label sit side by side whatever else applies */
+.steps li { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+.steps .dot, .steps .lbl { position: static; margin: 0; transform: none; flex: none; }
+.steps li + li::before { position: static; display: inline-block; flex: none; margin: 0 4px 0 0; }

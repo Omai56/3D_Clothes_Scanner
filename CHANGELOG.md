@@ -794,3 +794,14 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Demo data: Daniel's scan and the item records are out of the app (copies in `data/backup-demo/`); meshes kept.
 **Verified:** real import of the jeans returns `model: /models/…glb`; delete on a throwaway record; header at 560–900 px; Remove button present; 24 tests pass.
 **Files:** `server/index.js`, `public/shop.html`, `public/fit3d.js`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Wardrobe: × on each hanger removes a piece; colours fixed; stylesheet restored
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/shop.html`, `public/styles.css` — an always-visible **×** circle on every hanger removes the piece (off the body, off the rail and drawer, record deleted on the server; the mesh and photos stay so the link brings it back). The text link in the fit pane is gone.
+- `public/fit-main.js` — imported items get their real colour in the wardrobe (the word-boundary regex in `fromServerGarment` had become a backspace character, so every piece was grey). The wardrobe also refreshes a stored item's colour from the server.
+- `public/styles.css` — restored in full: the × edit had cut the sheet at an earlier `.remove-link` rule from the skin (pages briefly rendered unstyled).
+**Verified:** chocolate tee hangs brown with the × showing; stylesheet 932 rules; no page errors.
+**Files:** `public/shop.html`, `public/styles.css`, `public/fit-main.js`, `CHANGELOG.md`

@@ -745,3 +745,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **By:** Claude (Opus 5.5)
 **What:** The fitting room sign now cycles four backdrops: Studio (default), Blush wallpaper, Garden trellis, Maldives beach.
 **Files:** `public/decor.js`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Omai's latest merged (curtains, backdrop changer); saved-body picker on the measure page; hem lies on the jeans
+**By:** Claude (Fable 5.1)
+**What:**
+- Merged Omai's two newest commits (fitting-room curtains on a brass rail, pendant lamp, backdrop changer on the sign, drag between rail and drawer). The try-on page keeps the real 3D inside them.
+- `public/measure-bodies.js` (new, loaded by `public/index.html`) — **Saved 3D bodies** on the measure page: tap one and it turns black, the six fields fill from that scan, the try-on page uses that body; then "Continue to try on". Replaces the demo button when scans exist. Also keeps the step indicator's dot and label apart.
+- `public/js/viewer.js` — a top's hem opens fully onto a worn bottom over its last 8 cm, so from the side the shirt lies on the jeans with no step.
+- The uncommitted "Zara-style skin" edits found in the working folder (from another session on this machine: fonts and decorations removed, square corners) were **not** merged; they are parked in `git stash` ("other-session Zara-style skin edits") because they remove the curtains and backdrops Daniel asked for.
+**Verified:** measure page tap → fields 178/86.3/70.7/93.6/80.4/44.8 and body remembered; try-on page with jeans + tee shows curtains, lamp, sign; 24 tests pass.
+**Files:** `public/measure-bodies.js`, `public/index.html`, `public/shop.html`, `public/decor.js`, `public/styles.css`, `public/js/viewer.js`, `CHANGELOG.md`

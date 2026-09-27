@@ -1,6 +1,5 @@
 // Saved 3D bodies on the measure page: tap one (it turns black), the fields fill from that scan
-// and the try-on page shows that body; then "Continue to try on". Reuses the page's own
-// "use saved scan" handler (Fit.SAMPLE_SCAN + the #demo button) so the fill logic lives once.
+// and the try-on page shows that body; then "Continue to try on".
 (function () {
   const demo = document.getElementById('demo');
   const actions = document.querySelector('.form-actions');
@@ -54,13 +53,24 @@
           b.setAttribute('aria-pressed', 'true');
           note.textContent = 'Filling your measurements from this scan…';
           note.classList.remove('ok');
-          Fit.SAMPLE_SCAN = s.name;
-          demo.click(); // the page's own handler: fills the fields + remembers the body for the try-on page
-          setTimeout(() => {
-            note.textContent = `Using ${s.label}. Press “Continue to try on”.`;
-            note.classList.add('ok');
-            actions.querySelector('button[type="submit"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 700);
+          fetch(`/api/scans/${encodeURIComponent(s.name)}`)
+            .then((r) => r.json())
+            .then((scan) => {
+              const m = scan.measurements_cm || {};
+              const cm = { height: scan.input?.heightCm, chest: m.bustGirth, waist: m.waistGirth, hip: m.hipGirth, inseam: m.insideLegHeight, shoulder: m.acrossBackShoulderWidth };
+              const inches = document.querySelector('.unit-toggle [data-unit="in"]')?.getAttribute('aria-pressed') === 'true';
+              for (const [key, v] of Object.entries(cm)) {
+                const input = document.querySelector(`#fields input[name="${key}"]`);
+                if (!input || v == null) continue;
+                input.value = (inches ? v / 2.54 : v).toFixed(1).replace(/\.0$/, '');
+                input.dispatchEvent(new Event('input', { bubbles: true })); // the page validates + updates progress
+              }
+              try { sessionStorage.setItem('fit3dScan', s.name); } catch (e) { /* ignore */ } // the try-on page shows this body
+              note.textContent = `Using ${s.label}. Press “Continue to try on”.`;
+              note.classList.add('ok');
+              actions.querySelector('button[type="submit"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            })
+            .catch(() => { note.textContent = 'Could not read that scan. Try again.'; });
         });
         row.appendChild(b);
       }

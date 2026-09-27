@@ -281,3 +281,23 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - **Any item can get a 3D look**: `POST /api/garments/:id/model` accepts a `.glb` (validated as binary glTF, saved to `public/models/<id>.glb`, linked in the garment JSON). The fit screen shows an **"Add .glb model"** card for items without one, with the recipe (tripo3d.ai → upload the product photo → export .glb). Any Zara link → imported → fit works; add the model → Look works.
 **Verified:** jeans front/side (29, 34) pool on the shoes; heavyweight tee S/XL front/side/back; slim tee; upload endpoint rejects non-GLB and unknown items, accepts a real file; 24 tests pass.
 **Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 06:30 — Tees: shoulders, sleeves and slim scale fixed; jeans: crotch closed, hem to the floor
+**By:** Claude (Fable 5.1)
+**What (all in `public/js/viewer.js`):**
+- **Tops** — `_placeRigid` replaced by `_placeTop`, a smooth warp of the generated mesh (no per-vertex remodelling):
+  - shoulder line = the body's shoulder width (a dropped seam sits a little down the arm and the yoke slopes down to it);
+  - body of the tee = the chart circumference as an ellipse that hangs from the shoulders where the fabric allows, otherwise pulled in to the body. The slim tee is now really slim (chest ≈ 34 cm wide on Daniel vs ≈ 45 cm for the heavyweight tee; before both came out ≈ 47 cm because the width was taken from the shoulder-height torso extent);
+  - the back panel hangs from the upper back, not the chest-level back (removed the horizontal shelf across the shoulder blades);
+  - sleeves keep their generated shape but swing about the shoulder joint down towards the arm (black tee falls more, brown no longer sticks out), are narrowed when the mesh's sleeve is fatter than the chart's `arm_width`, and are made at least as thick as the arm inside them;
+  - nothing inside the body: the push of each vertex is spread to its neighbours over 5 passes (soft bumps instead of the corners at the shoulders); the shoulder lift applies only to cloth over the torso and never in the neck column (collar no longer torn); the deltoid is fatter than the upper-arm girth in the arm collider.
+  - Mesh analysis (`topProfile`): torso width = median of the bands clearly below the sleeves (the sloping sleeve underside had inflated it by 5 cm, which made the sleeve region a thin strip and pushed the sleeve scale factors to their caps).
+- **Bottoms** (`_dressBottoms`, colliders):
+  - the hem may reach the floor (was the top of the foot); the excess pools right above the shoe. Below the ankle the leg is treated as a straight cylinder and a top-of-foot height map lifts cloth onto the shoe instead of through it.
+  - **crotch**: the two leg tubes are kept apart by the real midline between the thighs per row (this scan is not symmetric about x = 0 — right thigh centred at +12 cm, left at −7.5 cm — so the left leg's inner side sat 2 cm inside the thigh and showed skin from below); the first rows under the crotch lie flat on that midline like an inseam; the seat is kept outside the fused hull of both thighs below the crotch; the crotch pinch (front/back centre pinned to the body) is gone; the seat↔legs glue is blended over ±5 % of the mesh height so there is no tear across the thighs; the trouser crotch hangs 2 cm below the body's.
+  - crotch band detection ignores the narrow fly crevice generated meshes carry above the real crotch; front/back layer classification is "back only if near the back surface and facing backwards" with a neighbour majority vote (recessed front details no longer stretch through the body).
+- `_bodyColliders` gained `legLo`, `footTop`, `torsoLo` options and a `seat` collider list; `buildAdjacency`, `smoothstep`, `topProfile` helpers.
+**Verified (headless renders on Daniel's scan):** heavyweight tee S/XL front + back, slim tee S/L front, jeans 29/34 front, side and from below (crotch closed, hem on the shoes); no console errors; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

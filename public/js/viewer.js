@@ -107,6 +107,9 @@ export class FitViewer {
     // Only the top ~5 cm of the shoulders (near-horizontal surface); the sloping sides are handled
     // by the ring colliders. Neck and head excluded.
     this.shoulderMap = buildTopMap(positions, bodyCm.backNeckHeight / 100 - 0.1, bodyCm.backNeckHeight / 100 - 0.045);
+    // Top of the feet: trousers that are too long rest on the shoe instead of passing through it.
+    this.ankleTopY = (bodyCm.outerAnkleHeightR ?? 7) / 100 + 0.03;
+    this.footMap = buildTopMap(positions, 0, this.ankleTopY);
     this.arms = {};
     for (const [side, sign] of [['R', 1], ['L', -1]]) {
       const line = armLine(this.rings['arm' + side]);
@@ -151,6 +154,7 @@ export class FitViewer {
       this._gltfBox = box;
       this._gltfBands = measureBands(this._gltf.scene, box);
       this._gltfSlices = null;
+      this._gltfTop = null;
     }
     const model = this._gltf.scene;
     const size = this._gltfSize;
@@ -186,7 +190,7 @@ export class FitViewer {
     // body) reads better than reshaping it, per Daniel's review. Bottoms: cloth simulation.
     // Set window.__clothSim = true to simulate tops too.
     try {
-      if (isTop && !window.__clothSim) this._placeRigid(model, box, R, chart, isTop);
+      if (isTop && !window.__clothSim) this._placeTop(model, box, R, chart);
       else if (isTop) this._dressTop(model, box, R, chart, garment);
       else this._dressBottoms(model, box, R, chart);
     } catch (e) {
@@ -199,114 +203,305 @@ export class FitViewer {
   }
 
   /**
-   * Plain placement: the mesh as generated, scaled per axis and placed on the body.
-   * Height = garment length on this body (chart); depth = the body's front-to-back extent over
-   * that range + ease; width = the worn width of the chart circumference (ellipse with that
-   * perimeter and depth). No per-vertex reshaping.
+   * Tops: the generated mesh kept intact, fitted by a smooth warp (no per-vertex remodelling):
+   *  - height = garment length on this body (chart);
+   *  - shoulder line = the body's shoulder width (a dropped seam goes a little down the arm);
+   *  - body of the tee = the chart circumference as an ellipse that hangs from the shoulders
+   *    where the fabric allows, otherwise pulled in to the body (fitted tee), never inside it;
+   *  - sleeves = kept as generated but hinged at the shoulder joint so they hang down along the
+   *    arm, length and width from the chart (sleeve, arm_width).
+   * Vertices still inside the body are then nudged out with the push spread to their neighbours
+   * (bumps, not spikes); everything else stays where the warp put it.
    */
-  _placeRigid(model, box, R, chart, isTop) {
+  _placeTop(model, box, R, chart) {
     const b = this.body;
-    const size = this._gltfSize;
     const bands = this._gltfBands;
-    // undo any earlier per-vertex deformation of this cached mesh
+    const h = box.max.y - box.min.y || 1;
+    const meshCx = (box.min.x + box.max.x) / 2;
+    const meshCz = (box.min.z + box.max.z) / 2;
+    if (!this._gltfTop) this._gltfTop = topProfile(model, box, meshCx, bands);
+    const P = this._gltfTop;
+    const gap = 0.005;
+
+    // --- heights: garment length from the chart ---
+    const topY = b.backNeckHeight / 100 + 0.005;
+    const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
+    const H = Math.max(0.3, topY - hemY);
+
+    // --- what the tee hangs from: upper torso extent, shoulder width, arm angle ---
+    const armpitY = this.rings.armpitY ?? b.bustHeight / 100;
+    const neckY = b.backNeckHeight / 100;
+    const legTop = this.rings.legTopY || b.insideLegHeight / 100;
+    const ext = this._bodyExtent([this.rings.torso], Math.max(hemY, armpitY - 0.25), armpitY - 0.01) ?? { xmin: -0.17, xmax: 0.17, zmin: -0.11, zmax: 0.11 };
+    // the back panel hangs from the upper back / shoulder blades, not from the chest-level back
+    const extUp = this._bodyExtent([this.rings.torso], armpitY - 0.01, neckY - 0.06);
+    const zBack = Math.min(ext.zmin, extUp?.zmin ?? ext.zmin);
+    const bodyW = ext.xmax - ext.xmin;
+    const bodyD = ext.zmax - zBack;
+    const bodyCx = (ext.xmin + ext.xmax) / 2;
+    const bodyCz = (zBack + ext.zmax) / 2;
+    const shoulderW = (b.acrossBackShoulderWidth ?? 44) / 100;
+    const armRef = this.arms?.R ?? this.arms?.L;
+    const armAng = armRef ? Math.atan2(Math.abs(armRef.hand.x - armRef.shoulder.x), Math.max(0.05, armRef.shoulder.y - armRef.hand.y)) : 0.3;
+    const chestFlat = chart.chest ?? chart.hem ?? null;
+    const shoulderRatio = chart.shoulder && chestFlat ? clamp(chart.shoulder / chestFlat, 0.75, 1.05) : 0.95;
+    const drop = chart.shoulder ? Math.max(0, chart.shoulder / 100 - shoulderW) / 2 : 0; // dropped seam: this far down the arm
+    const Ws = shoulderW + 2 * drop * Math.sin(armAng) + 0.012; // worn seam-to-seam width
+
+    // --- body of the tee: chart circumference as an ellipse ---
+    const bodyC = TWO_PI * Math.sqrt(((bodyW / 2 + gap) ** 2 + (bodyD / 2 + gap) ** 2) / 2);
+    const C = Math.max(chestFlat ? (2 * chestFlat) / 100 : bodyC, bodyC);
+    const q2 = 2 * (C / TWO_PI) ** 2;
+    let Wb = Ws;
+    let Db = 2 * Math.sqrt(Math.max(0, q2 - (Wb / 2) ** 2));
+    if (Db < bodyD + 2 * gap) {
+      // can't hang straight from the shoulders at this circumference: pulled in to the body
+      Db = bodyD + 2 * gap;
+      Wb = Math.max(bodyW + 2 * gap, 2 * Math.sqrt(Math.max(0, q2 - (Db / 2) ** 2)));
+    }
+    Db = Math.min(Db, bodyD + 0.14); // beyond this the excess is folds, not depth
+    const meshShoulderHW = P.torsoHW * shoulderRatio;
+    const sxBody = Wb / 2 / P.torsoHW;
+    const sxSh = Ws / 2 / meshShoulderHW;
+    const sz = Db / P.depth;
+    this.lastTopFit = { Ws, Wb, Db, bodyW, bodyD, armAng, drop, sleeves: {} };
+
+    // shoulder seam height in the mesh (top of the sleeve next to the torso), per side
+    const seamTopY = { R: -Infinity, L: -Infinity };
+    const meshes = [];
     model.traverse((o) => {
       if (!o.isMesh || !o.userData.origPos) return;
-      const pos = o.geometry.attributes.position;
-      pos.array.set(o.userData.origPos);
-      pos.needsUpdate = true;
+      meshes.push(o);
+      const p = o.userData.origPos;
+      for (let i = 0; i < p.length; i += 3) {
+        const ax = Math.abs(p[i] - meshCx);
+        if (ax < meshShoulderHW * 0.98 || ax > meshShoulderHW + 0.25 * P.torsoHW) continue;
+        const side = p[i] >= meshCx ? 'R' : 'L';
+        if (p[i + 1] > seamTopY[side]) seamTopY[side] = p[i + 1];
+      }
+    });
+    const seamDefault = box.max.y - 0.06 * h;
+    for (const s of ['R', 'L']) if (!Number.isFinite(seamTopY[s])) seamTopY[s] = seamDefault;
+    const vArm = P.vArmpit;
+    const vTop = clamp(((seamTopY.R + seamTopY.L) / 2 - box.min.y) / h, vArm + 0.08, 0.98);
+    const sxAt = (v) => sxBody + (sxSh - sxBody) * smoothstep(vArm, vTop, v);
+    const torsoHWAt = (v) => (v <= vArm ? P.torsoHW : P.torsoHW + (meshShoulderHW - P.torsoHW) * clamp((v - vArm) / (vTop - vArm), 0, 1));
+    const warpX = (x, v) => bodyCx + (x - meshCx) * sxAt(v);
+    const warpY = (v) => hemY + v * H;
+    const warpZ = (z) => bodyCz + (z - meshCz) * sz;
+
+    // pass 1: torso warp for every vertex + how much of a sleeve vertex it is. A dropped
+    // shoulder seam sits down the arm, so the yoke beyond the body's shoulder point slopes down
+    // to it (and the sleeve hangs from there).
+    const rampStart = 0.02 * P.torsoHW;
+    const rampLen = 0.12 * P.torsoHW;
+    const xs = shoulderW / 2;
+    const dropY = drop * Math.cos(armAng);
+    const yokeDrop = (X, v) => (dropY > 0 ? dropY * smoothstep(xs, Ws / 2, Math.abs(X - bodyCx)) * smoothstep(vArm - 0.1, vTop, v) : 0);
+    for (const o of meshes) {
+      const orig = o.userData.origPos;
+      const n = orig.length / 3;
+      const W = new Float32Array(orig.length);
+      const wgt = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const x = orig[i * 3];
+        const y = orig[i * 3 + 1];
+        const z = orig[i * 3 + 2];
+        const v = clamp((y - box.min.y) / h, 0, 1);
+        const X = warpX(x, v);
+        W[i * 3] = X;
+        W[i * 3 + 1] = warpY(v) - yokeDrop(X, v);
+        W[i * 3 + 2] = warpZ(z);
+        wgt[i] = smoothstep(rampStart, rampStart + rampLen, Math.abs(x - meshCx) - torsoHWAt(v));
+      }
+      o.userData.W = W;
+      o.userData.wgt = wgt;
+    }
+
+    // pass 2: sleeves hinge at the shoulder joint and hang along the arm
+    const tilt = 0.14 + 0.2 * clamp(drop / 0.05, 0, 1); // boxy tees stand off the arm more
+    const alpha = Math.min(1.3, armAng + tilt); // sleeve axis, angle from vertical
+    const armDiam = (b.upperArmGirthR ?? 30) / 100 / Math.PI;
+    // visible width of a sleeve worn on the arm: the flat width is half the tube's circumference,
+    // so the hanging tube shows about three quarters of it
+    const dTarget = chart.arm_width ? Math.max(armDiam + 0.025, (chart.arm_width / 100) * 0.75) : null;
+    const armholeY = box.min.y + vArm * h;
+    const farThr = 0.5 * Math.max(0.01, P.maxAx - P.torsoHW);
+    for (const [side, sgn] of [['R', 1], ['L', -1]]) {
+      // joint at the centre of the armhole; the sleeve swings down about it towards the arm
+      const dA = Math.max(0.05 * h, seamTopY[side] - armholeY);
+      const yJ = seamTopY[side] - 0.45 * dA;
+      const vJ = clamp((yJ - box.min.y) / h, 0, 1);
+      const Jx = warpX(meshCx + sgn * meshShoulderHW, vJ);
+      const J = [Jx, warpY(vJ) - yokeDrop(Jx, vJ), warpZ(meshCz)];
+      // the sleeve is centred on the arm inside it (arms hang a little in front of the torso's
+      // centre line), otherwise the arm collider inflates the sleeve's front face
+      const armZ = this.arms?.[side]?.shoulder.z ?? J[2];
+      const zShift = clamp(armZ - J[2], -0.06, 0.06);
+      // current sleeve axis: joint -> far part of the sleeve
+      let cx = 0;
+      let cy = 0;
+      let cnt = 0;
+      for (const o of meshes) {
+        const { origPos: orig, W, wgt } = o.userData;
+        for (let i = 0; i < wgt.length; i++) {
+          if (wgt[i] < 0.5 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
+          const v = clamp((orig[i * 3 + 1] - box.min.y) / h, 0, 1);
+          if (Math.abs(orig[i * 3] - meshCx) - torsoHWAt(v) < farThr) continue;
+          cx += W[i * 3];
+          cy += W[i * 3 + 1];
+          cnt++;
+        }
+      }
+      if (cnt < 10) continue; // no sleeve on this side
+      let ux = cx / cnt - J[0];
+      let uy = cy / cnt - J[1];
+      const un = Math.hypot(ux, uy);
+      if (un < 1e-3) continue;
+      ux /= un;
+      uy /= un;
+      const px = -uy;
+      const py = ux;
+      let L = 0;
+      for (const o of meshes) {
+        const { origPos: orig, W, wgt } = o.userData;
+        for (let i = 0; i < wgt.length; i++) {
+          if (wgt[i] < 0.5 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
+          const a = (W[i * 3] - J[0]) * ux + (W[i * 3 + 1] - J[1]) * uy;
+          if (a > L) L = a;
+        }
+      }
+      // sleeve width = the far half of the sleeve (the armhole end is deeper than the cuff)
+      let bMin = Infinity;
+      let bMax = -Infinity;
+      let zMin = Infinity;
+      let zMax = -Infinity;
+      for (const o of meshes) {
+        const { origPos: orig, W, wgt } = o.userData;
+        for (let i = 0; i < wgt.length; i++) {
+          if (wgt[i] < 0.5 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
+          const rx = W[i * 3] - J[0];
+          const ry = W[i * 3 + 1] - J[1];
+          const a = rx * ux + ry * uy;
+          if (a < 0.5 * L) continue;
+          const bb = rx * px + ry * py;
+          if (bb < bMin) bMin = bb;
+          if (bb > bMax) bMax = bb;
+          const z = W[i * 3 + 2];
+          if (z < zMin) zMin = z;
+          if (z > zMax) zMax = z;
+        }
+      }
+      // The sleeve keeps the proportions the mesh came with (they already scale with the size
+      // through the shoulder width); rescaling it to the chart's sleeve numbers ballooned it.
+      const d = Math.max(0.02, bMax - bMin);
+      const dz = Math.max(0.02, zMax - zMin);
+      const kL = 1;
+      // never fatter than the chart's sleeve width (some generated meshes come with balloon
+      // sleeves), never made bigger
+      const kW = dTarget ? clamp(dTarget / d, 0.7, 1) : 1;
+      // ...except front-to-back: a flat-lay sleeve is a thin pillow; it must be at least as
+      // thick as the arm inside it or the arm collider inflates it into a puff
+      const kZ = clamp((armDiam + 0.03) / dz, 1, 1.7);
+      const tx = sgn * Math.sin(alpha);
+      const ty = -Math.cos(alpha);
+      // how far the sleeve may swing: a long sleeve follows the arm, a short wide cap sleeve
+      // stays close to how it was cut (swinging it far just balloons it at the armhole)
+      const phiMax = 0.75 * clamp(L / (0.6 * d), 0.6, 1);
+      const phi = clamp(Math.atan2(ux * ty - uy * tx, ux * tx + uy * ty), -phiMax, phiMax);
+      this.lastTopFit.sleeves[side] = { J, u: [ux, uy], phi, kL, kW, kZ, L, d, dz, cnt, seamTop: seamTopY[side], armholeY, vArm, vTop, dA };
+      // rigid swing of the whole sleeve about the joint (a progressive bend left the cap
+      // pointing sideways and read as a puff sleeve)
+      const cph = Math.cos(phi);
+      const sph = Math.sin(phi);
+      for (const o of meshes) {
+        const { origPos: orig, W, wgt } = o.userData;
+        for (let i = 0; i < wgt.length; i++) {
+          const w = wgt[i];
+          if (w <= 0 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
+          const rx = W[i * 3] - J[0];
+          const ry = W[i * 3 + 1] - J[1];
+          const a = rx * ux + ry * uy;
+          const bb = kW * (rx * px + ry * py);
+          const vx = a * ux + bb * px;
+          const vy = a * uy + bb * py;
+          const qx = J[0] + vx * cph - vy * sph;
+          const qy = J[1] + vx * sph + vy * cph;
+          const qz = J[2] + zShift + kZ * (W[i * 3 + 2] - J[2]);
+          W[i * 3] += w * (qx - W[i * 3]);
+          W[i * 3 + 1] += w * (qy - W[i * 3 + 1]);
+          W[i * 3 + 2] += w * (qz - W[i * 3 + 2]);
+        }
+      }
+    }
+
+    // pass 3: nothing inside the body. The push of each vertex is spread to its neighbours so a
+    // shoulder or a hip makes a soft bump in the cloth instead of a spike.
+    const Cs = this._bodyColliders({ gap, legTop, neckY, armpitY });
+    for (const o of meshes) {
+      const W = o.userData.W;
+      const n = W.length / 3;
+      const adj = (o.userData.adj ??= buildAdjacency(o.geometry));
+      const D = new Float32Array(W.length);
+      const T = new Float32Array(W.length);
+      const collide = () => {
+        for (let i = 0; i < n; i++) {
+          if (T[i * 3 + 1] < hemY - 0.01) continue;
+          for (let pass = 0; pass < 2; pass++) for (const col of Cs.all) col(T, i);
+        }
+      };
+      for (let it = 0; it < 5; it++) {
+        for (let k = 0; k < W.length; k++) T[k] = W[k] + D[k];
+        collide();
+        for (let k = 0; k < W.length; k++) D[k] = T[k] - W[k];
+        const { canon, offsets, list } = adj;
+        for (let i = 0; i < n; i++) {
+          const c = canon[i];
+          const s = offsets[c];
+          const e = offsets[c + 1];
+          if (e === s) {
+            T[i * 3] = D[i * 3];
+            T[i * 3 + 1] = D[i * 3 + 1];
+            T[i * 3 + 2] = D[i * 3 + 2];
+            continue;
+          }
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+          for (let j = s; j < e; j++) {
+            const q = list[j] * 3;
+            ax += D[q];
+            ay += D[q + 1];
+            az += D[q + 2];
+          }
+          const inv = 0.5 / (e - s);
+          T[i * 3] = 0.5 * D[i * 3] + ax * inv;
+          T[i * 3 + 1] = 0.5 * D[i * 3 + 1] + ay * inv;
+          T[i * 3 + 2] = 0.5 * D[i * 3 + 2] + az * inv;
+        }
+        D.set(T);
+      }
+      for (let k = 0; k < W.length; k++) T[k] = W[k] + D[k];
+      collide();
+      const attr = o.geometry.attributes.position;
+      attr.array.set(T);
+      attr.needsUpdate = true;
       o.geometry.computeVertexNormals();
       o.geometry.computeBoundingSphere();
-    });
-
-    let topY;
-    let hemY;
-    if (isTop) {
-      topY = b.backNeckHeight / 100 + 0.01;
-      hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
-    } else {
-      topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
-      hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100, topY - (chart.total_length ?? b.waistHeight) / 100);
+      delete o.userData.W;
+      delete o.userData.wgt;
     }
-    const heightM = topY - hemY;
-    const sy = (heightM > 0 ? heightM : 0.6) / (size.y || 1);
-
-    const ext = this._bodyExtent(isTop ? [this.rings.torso] : [this.rings.torso, this.rings.right, this.rings.left], hemY, topY);
-    const easeR = Math.max(MIN_GAP, cmEaseToRadius(isTop ? R.chest?.ease_cm : R.hip?.ease_cm ?? R.waist?.ease_cm));
-    // Depth: the body's front-to-back extent plus the ease once (cloth hangs off the chest and
-    // shoulder blades; it doesn't stand off both sides by the full ease).
-    const depthM = ext ? ext.zmax - ext.zmin + easeR + 0.065 : size.z * sy;
-    const sz = depthM / (size.z || 1);
-
-    // Width: sits close to the body — body width plus the ease, capped by what the chart's
-    // circumference allows at that depth. Bigger sizes still widen because the ease grows.
-    const flatWidthCm = isTop ? chart.chest ?? chart.hem : chart.hip ?? chart.waist;
-    const bandWidth = isTop ? bands.bottom.width : bands.top.width;
-    let sx = sy;
-    if (flatWidthCm && bandWidth > 0.05) {
-      const C = (2 * flatWidthCm) / 100;
-      const bHalf = depthM / 2;
-      const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - bHalf ** 2));
-      const bodyW = ext ? ext.xmax - ext.xmin : 0.34;
-      const wornWidth = Math.max(bodyW + 0.02, Math.min(2 * aHalf, bodyW + easeR));
-      sx = wornWidth / bandWidth;
-    }
-    model.scale.set(sx, sy, sz);
-
-    const cx = (box.min.x + box.max.x) / 2;
-    const cz = (box.min.z + box.max.z) / 2;
-    const bodyCx = ext ? (ext.xmin + ext.xmax) / 2 : 0;
-    const bodyCz = ext ? (ext.zmin + ext.zmax) / 2 : 0;
-    model.position.set(bodyCx - cx * sx, topY - box.max.y * sy, bodyCz - cz * sz);
-
-    // Intersection fix only: vertices that land inside the body (torso rings, arm capsules,
-    // shoulder tops) are nudged out to the body surface. Everything already outside the body is
-    // left exactly where the placement put it, so the garment keeps its shape.
-    if (isTop) {
-      const pos0 = model.position;
-      const legTop = this.rings.legTopY || b.insideLegHeight / 100;
-      const C = this._bodyColliders({ gap: 0.008, legTop, neckY: b.backNeckHeight / 100, armpitY: this.rings.armpitY ?? b.bustHeight / 100 });
-      model.traverse((o) => {
-        if (!o.isMesh || !o.userData.origPos) return;
-        const orig = o.userData.origPos;
-        const attr = o.geometry.attributes.position;
-        const out = attr.array;
-        const n = attr.count;
-        const W = new Float32Array(n * 3);
-        for (let i = 0; i < n; i++) {
-          W[i * 3] = orig[i * 3] * sx + pos0.x;
-          W[i * 3 + 1] = orig[i * 3 + 1] * sy + pos0.y;
-          W[i * 3 + 2] = orig[i * 3 + 2] * sz + pos0.z;
-        }
-        let moved = 0;
-        for (let i = 0; i < n; i++) {
-          if (W[i * 3 + 1] < hemY - 0.01) continue;
-          const x0 = W[i * 3];
-          const y0 = W[i * 3 + 1];
-          const z0 = W[i * 3 + 2];
-          for (let pass = 0; pass < 2; pass++) for (const col of C.all) col(W, i);
-          if (W[i * 3] !== x0 || W[i * 3 + 1] !== y0 || W[i * 3 + 2] !== z0) {
-            out[i * 3] = (W[i * 3] - pos0.x) / sx;
-            out[i * 3 + 1] = (W[i * 3 + 1] - pos0.y) / sy;
-            out[i * 3 + 2] = (W[i * 3 + 2] - pos0.z) / sz;
-            moved++;
-          }
-        }
-        if (moved) {
-          attr.needsUpdate = true;
-          o.geometry.computeVertexNormals();
-          o.geometry.computeBoundingSphere();
-        }
-      });
-    }
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
   }
 
   /** Colliders that keep cloth outside the body: torso/leg rings, arm capsules, shoulder tops, floor. */
-  _bodyColliders({ gap = 0.008, legTop, neckY, armpitY }) {
+  _bodyColliders({ gap = 0.008, legTop, neckY, armpitY, legLo = 0, footTop = false, torsoLo = 0 }) {
     const rings = this.rings;
     const b = this.body;
-    const ringPush = (map, yHi) => (pos, i) => {
+    const ringPush = (map, yHi, yLo = 0) => (pos, i) => {
       const k = i * 3;
-      const Y = Math.min(pos[k + 1], yHi);
+      const Y = Math.max(yLo, Math.min(pos[k + 1], yHi));
       const c = sampleRing(map, Y, 0);
       if (!c) return;
       const dx = pos[k] - c.cx;
@@ -323,8 +518,13 @@ export class FitViewer {
       }
     };
     const torsoPush = ringPush(rings.torso, neckY - 0.02);
-    const legR = ringPush(rings.right, legTop - 0.005);
-    const legL = ringPush(rings.left, legTop - 0.005);
+    // seat of trousers: below the crotch it is still kept outside the fused hull of both thighs
+    // (the lowest torso ring), never tucked between them behind the pelvis
+    const hullPush = ringPush(rings.torso, neckY - 0.02, torsoLo);
+    // below legLo (the ankle) the leg is treated as a straight cylinder: trousers hang past the
+    // foot instead of wrapping its outline; the foot itself is handled by the top-of-foot lift
+    const legR = ringPush(rings.right, legTop - 0.005, legLo);
+    const legL = ringPush(rings.left, legTop - 0.005, legLo);
     const body = (pos, i) => {
       const k = i * 3;
       const Y = pos[k + 1];
@@ -343,23 +543,46 @@ export class FitViewer {
       const rUp = (b.upperArmGirthR ?? 30) / 100 / TWO_PI + gap;
       const rWr = (b.wristGirthR ?? 17) / 100 / TWO_PI + gap;
       const s0 = armAxis(a, rUp - gap);
-      arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t));
+      // the deltoid at the top of the arm is fatter than the upper-arm girth
+      arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t + rUp * 0.3 * Math.max(0, 1 - t / 0.15)));
     }
     const floor = (pos, i) => {
       if (pos[i * 3 + 1] < 0.01) pos[i * 3 + 1] = 0.01;
     };
     // Shoulder tops: cloth whose footprint is over the shoulders rests on them (only points
     // just under the surface are lifted; points beside the body are left alone).
+    const neckRing = sampleRing(rings.torso, neckY - 0.05, 0);
+    const neckR = (b.neckBaseGirth ?? 39) / 100 / TWO_PI + 0.015;
     const shoulder = (pos, i) => {
       const k = i * 3;
       const Y = pos[k + 1];
       if (Y < armpitY || !this.shoulderMap) return;
+      // the neck column is not a shoulder: a collar dipping in front of the neck stays put
+      if (neckRing && Math.hypot(pos[k] - neckRing.cx, pos[k + 2] - neckRing.cz) < neckR) return;
+      // only cloth whose footprint is over the torso can rest on it: a back or front panel
+      // hanging beside the body just below the shoulder line is left to the ring push
+      const c = sampleRing(rings.torso, Math.min(Y, neckY - 0.02), 0);
+      if (!c) return;
+      const dx = pos[k] - c.cx;
+      const dz = pos[k + 2] - c.cz;
+      const smp = sampleRing(rings.torso, Math.min(Y, neckY - 0.02), Math.atan2(dz, dx));
+      if (!smp || Math.hypot(dx, dz) > smp.r + gap) return;
       const top = this.shoulderMap.lookup(pos[k], pos[k + 2]);
-      if (top != null && Y < top + gap && Y > top - 0.05) pos[k + 1] = top + gap;
+      if (top != null && Y < top + gap && Y > top - 0.03) pos[k + 1] = top + gap;
     };
+    // Top of the foot: a trouser hem over the shoe rests on it (lifted, then hangs to the floor
+    // beside it) instead of passing through the foot.
+    const foot = (pos, i) => {
+      const k = i * 3;
+      const Y = pos[k + 1];
+      if (Y > legLo + 0.02 || !this.footMap) return;
+      const top = this.footMap.lookup(pos[k], pos[k + 2]);
+      if (top != null && Y < top + gap && Y > top - 0.2) pos[k + 1] = top + gap;
+    };
+    const bodyList = footTop ? [foot, body, floor] : [body, floor];
     // shoulder lift runs before the radial ring push: cloth over the shoulder rests on it
     // instead of being shoved sideways off the slope
-    return { body: [body, floor], arms: [...arms, floor], torso: [shoulder, body, floor], all: [shoulder, body, ...arms, floor] };
+    return { body: bodyList, seat: [hullPush, floor], arms: [...arms, floor], torso: [shoulder, body, floor], all: [shoulder, body, ...arms, floor] };
   }
 
   /** Debug: draw proxy tubes as wireframes (window.__showProxy = true). */
@@ -689,13 +912,16 @@ export class FitViewer {
     const hipY = b.hipHeight / 100;
     const neckY = b.backNeckHeight / 100;
     const armpitY = this.rings.armpitY ?? b.bustHeight / 100;
-    const legTop = this.rings.legTopY || crotchY;
+    const legTopBody = this.rings.legTopY || crotchY;
+    const legTop = legTopBody - 0.02; // the trouser crotch hangs a little below the body's
     const splitY = this.rings.crotchSplitY ?? crotchY;
-    const ankleY = 0.035; // top of the foot: the hem may reach the shoe, excess pools on it
+    const ankleTop = this.ankleTopY ?? (b.outerAnkleHeightR ?? 7) / 100 + 0.03;
+    const legYc = (Y) => clamp(Y, ankleTop, legTopBody - 0.005); // leg ring used for a height
+    const hemFloor = 0.012; // the hem may reach the floor; excess length pools on the shoe
     const hemWanted = chart.total_length != null ? topY - chart.total_length / 100 : crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100;
-    const hemY = Math.max(ankleY, hemWanted);
+    const hemY = Math.max(hemFloor, hemWanted);
     const excess = Math.max(0, hemY - hemWanted);
-    const POOL = 0.08;
+    const POOL = 0.09;
     const gap = 0.008;
 
     const vCrotch = (S.crotchBand + 1) / NB;
@@ -739,19 +965,9 @@ export class FitViewer {
     // fabric never smaller than the body it wraps
     seat.setRest((r) => Math.max(r === 0 ? waistC : circHip(seatRowY(r)), bodyCAt(this.rings.torso, Math.max(seatRowY(r), splitY))), (r) => Math.max(0.002, seatRowY(r) - seatRowY(r + 1)));
     for (let c = 0; c < cols; c++) seat.pin(0, c);
-    // crotch pinch: the front- and back-centre points of the bottom ring sit on the body midline
-    {
-      const r = srows - 1;
-      const ring = ringAt(this.rings.torso, Math.max(legTop, splitY));
-      const cFront = Math.round(((Math.PI / 2 + Math.PI) / TWO_PI) * cols) % cols;
-      const cBack = Math.round(((-Math.PI / 2 + Math.PI) / TWO_PI) * cols) % cols;
-      const f = sampleRing(this.rings.torso, Math.max(legTop, splitY), Math.PI / 2) ?? { cx: 0, cz: 0.1, r: 0 };
-      const bk = sampleRing(this.rings.torso, Math.max(legTop, splitY), -Math.PI / 2) ?? { cx: 0, cz: -0.1, r: 0 };
-      seat.set(r, cFront, ring ? ring.cx : 0, legTop, f.cz + f.r + gap);
-      seat.set(r, cBack, ring ? ring.cx : 0, legTop, bk.cz - bk.r - gap);
-      seat.pin(r, cFront);
-      seat.pin(r, cBack);
-    }
+    // No crotch pinch: the bottom of the seat is a free loop round both thighs at the crotch
+    // height (pinning its front/back centre to the body funnelled the fly into a notch); the
+    // crotch itself is the blend between this loop and the two leg tubes in the glue below.
     tubes.push(seat);
 
     // ---- legs: crotch (pinned) -> hem ----
@@ -765,7 +981,7 @@ export class FitViewer {
       const tube = new Tube(lrows, lcols);
       for (let r = 0; r < lrows; r++) {
         const Y = legRowY(r);
-        const Yc = Math.min(Y, legTop - 0.005);
+        const Yc = legYc(Y);
         const C = circLeg(side, Y);
         const base = ringAt(legMap, Yc);
         const s = base ? C / ringCircumference(base) : 1;
@@ -776,17 +992,31 @@ export class FitViewer {
           tube.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
         }
       }
-      tube.setRest((r) => Math.max(circLeg(side, legRowY(r)), bodyCAt(legMap, Math.min(legRowY(r), legTop - 0.005))), (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
+      tube.setRest((r) => Math.max(circLeg(side, legRowY(r)), bodyCAt(legMap, legYc(legRowY(r)))), (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
       for (let c = 0; c < lcols; c++) tube.pin(0, c);
+      // the two legs never cross the line between the thighs. That line is the real midline of
+      // this scan (bodies are not symmetric about x = 0), per row.
+      const midX = new Float32Array(lrows);
+      for (let r = 0; r < lrows; r++) {
+        const Yc = legYc(legRowY(r));
+        const cR = sampleRing(this.rings.right, Yc, 0);
+        const cL = sampleRing(this.rings.left, Yc, 0);
+        midX[r] = cR && cL ? (cR.cx + cL.cx) / 2 : 0;
+      }
       tube.extra = (pos, i) => {
-        if (pos[i * 3] * sgn < 0.004) pos[i * 3] = 0.004 * sgn;
+        const r = Math.min(lrows - 1, Math.floor(i / lcols));
+        const m = midX[r];
+        if ((pos[i * 3] - m) * sgn < 0.004) pos[i * 3] = m + 0.004 * sgn;
+        // crotch gusset: for the first rows under the crotch the inner side of each leg lies
+        // flat on the midline, so the two legs meet like an inseam instead of leaving a notch
+        if (r < 5 && Math.abs(pos[i * 3] - m) < 0.03) pos[i * 3] = m + 0.004 * sgn;
       };
       legs[side] = tube;
       tubes.push(tube);
     }
 
-    const Cs = this._bodyColliders({ gap, legTop, neckY, armpitY });
-    for (const t of tubes) t.colliders = Cs.body;
+    const Cs = this._bodyColliders({ gap, legTop: legTopBody, neckY, armpitY, legLo: ankleTop, footTop: true, torsoLo: splitY });
+    for (const t of tubes) t.colliders = t === seat ? Cs.seat : Cs.body;
     const t0 = performance.now();
     simulate(tubes, Cs.body);
     this.lastSimMs = performance.now() - t0;
@@ -808,14 +1038,13 @@ export class FitViewer {
         const v = clamp((y - box.min.y) / h, 0, 0.9999);
         const band = Math.floor(v * NB);
         const frontV = fr ? fr[i] === 1 : z >= 0;
-        let p;
-        if (band <= S.crotchBand) {
+        const legPos = () => {
           const side = x >= meshCx ? 'R' : 'L';
           const tube = legs[side];
           const ls = lerpStats(S.legs[side], v, NB) ?? S.nearestLeg(side, band) ?? lerpStats(S.all, v, NB);
           const u = clamp((x - ls.cx) / ls.hw, -1, 1);
           const th = frontV ? Math.acos(u) : -Math.acos(u);
-          const Yl = hemWanted + (v / vCrotch) * (legTop - hemWanted);
+          const Yl = hemWanted + (Math.min(v, vCrotch) / vCrotch) * (legTop - hemWanted);
           let Y = Yl;
           let bump = 0;
           if (excess > 0 && Yl < hemY + POOL) {
@@ -823,20 +1052,34 @@ export class FitViewer {
             Y = hemY + t * POOL;
             bump = Math.min(0.02, excess * 0.2) * Math.sin(Math.PI * t);
           }
-          p = tube.sample((legTop - Y) / dy, ((th + Math.PI) / TWO_PI) * lcols);
+          let p = tube.sample((legTop - Y) / dy, ((th + Math.PI) / TWO_PI) * lcols);
           if (bump) {
-            const cc = sampleRing(side === 'R' ? this.rings.right : this.rings.left, Math.min(Y, legTop - 0.005), 0) ?? { cx: p[0], cz: p[2] };
+            const cc = sampleRing(side === 'R' ? this.rings.right : this.rings.left, legYc(Y), 0) ?? { cx: p[0], cz: p[2] };
             const dx = p[0] - cc.cx;
             const dz = p[2] - cc.cz;
             const d = Math.hypot(dx, dz) || 1;
             p = [p[0] + (dx / d) * bump, p[1], p[2] + (dz / d) * bump];
           }
-        } else {
+          return p;
+        };
+        const seatPos = () => {
           const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
           const u = clamp((x - ms.cx) / ms.hw, -1, 1);
           const th = frontV ? Math.acos(u) : -Math.acos(u);
           const Y = legTop + ((v - vCrotch) / Math.max(1e-3, 1 - vCrotch)) * (topY - legTop);
-          p = seat.sample((topY - Y) / dy, ((th + Math.PI) / TWO_PI) * cols);
+          return seat.sample((topY - Y) / dy, ((th + Math.PI) / TWO_PI) * cols);
+        };
+        // Around the crotch the two mappings (one loop round both hips vs one per leg) are
+        // blended, so the seat and the legs join as one continuous piece of cloth.
+        const TZ = 0.05;
+        let p;
+        if (v < vCrotch - TZ) p = legPos();
+        else if (v > vCrotch + TZ) p = seatPos();
+        else {
+          const t = smoothstep(vCrotch - TZ, vCrotch + TZ, v);
+          const a = legPos();
+          const s = seatPos();
+          p = [a[0] + (s[0] - a[0]) * t, a[1] + (s[1] - a[1]) * t, a[2] + (s[2] - a[2]) * t];
         }
         out[i * 3] = p[0];
         out[i * 3 + 1] = p[1];
@@ -1428,20 +1671,45 @@ function bakeToWorld(scene) {
     const gx = Math.ceil((bb.max.x - bb.min.x) / cell) + 1;
     const gy = Math.ceil((bb.max.y - bb.min.y) / cell) + 1;
     const sumZ = new Float64Array(gx * gy);
+    const minZ = new Float32Array(gx * gy).fill(Infinity);
+    const maxZ = new Float32Array(gx * gy).fill(-Infinity);
     const cnt = new Uint32Array(gx * gy);
     const cellOf = (x, y) => Math.floor((y - bb.min.y) / cell) * gx + Math.floor((x - bb.min.x) / cell);
     for (let i = 0; i < nrm.count; i++) {
       const k = cellOf(arr[i * 3], arr[i * 3 + 1]);
-      sumZ[k] += arr[i * 3 + 2];
+      const z = arr[i * 3 + 2];
+      sumZ[k] += z;
       cnt[k]++;
+      if (z < minZ[k]) minZ[k] = z;
+      if (z > maxZ[k]) maxZ[k] = z;
     }
+    // Back layer = vertices close to the back surface of the flat-lay; everything else is front
+    // cloth, including recessed detail on the front (a fly slot, pocket edges) whose normals
+    // face sideways or backwards. Where the layers meet (edges) the normal decides.
     for (let i = 0; i < nrm.count; i++) {
+      const k = cellOf(arr[i * 3], arr[i * 3 + 1]);
+      const thick = maxZ[k] - minZ[k];
       const nz = nrm.getZ(i);
-      if (Math.abs(nz) > 0.3) front[i] = nz > 0 ? 1 : 0;
-      else {
-        const k = cellOf(arr[i * 3], arr[i * 3 + 1]);
-        front[i] = arr[i * 3 + 2] >= sumZ[k] / Math.max(1, cnt[k]) ? 1 : 0;
+      // back = near the back surface AND facing backwards; a recessed front detail (the fly
+      // slot runs as deep as the back layer at the crotch) faces forwards or sideways
+      front[i] = (thick > 1e-4 && arr[i * 3 + 2] - minZ[k] > 0.3 * thick) || nz > -0.3 ? 1 : 0;
+    }
+    // majority vote over the neighbours: no isolated flips (they would stretch a triangle
+    // from the front of the body to the back)
+    const adj = buildAdjacency(o.geometry);
+    o.userData.adj = adj;
+    for (let round = 0; round < 2; round++) {
+      const next = Uint8Array.from(front);
+      for (let i = 0; i < nrm.count; i++) {
+        const c = adj.canon[i];
+        const s = adj.offsets[c];
+        const e = adj.offsets[c + 1];
+        if (e - s < 3) continue;
+        let votes = front[i];
+        for (let j = s; j < e; j++) votes += front[adj.list[j]];
+        next[i] = votes * 2 > e - s + 1 ? 1 : 0;
       }
+      front.set(next);
     }
     o.userData.origFront = front;
     o.geometry.computeBoundingBox();
@@ -1485,7 +1753,7 @@ function sliceMesh(scene, box, NB, meshCx) {
   const mk = () => ({ xs: [], zs: [] });
   const all = Array.from({ length: NB }, mk);
   const legs = { R: Array.from({ length: NB }, mk), L: Array.from({ length: NB }, mk) };
-  const centreHit = new Uint8Array(NB);
+  const gapHW = new Float32Array(NB).fill(Infinity); // nearest vertex to the centre line per band
   scene.traverse((o) => {
     if (!o.isMesh) return;
     const p = o.userData.origPos;
@@ -1498,7 +1766,8 @@ function sliceMesh(scene, box, NB, meshCx) {
         s.xs.push(x);
         s.zs.push(z);
       }
-      if (Math.abs(x - meshCx) < w * 0.03) centreHit[band] = 1;
+      const ax = Math.abs(x - meshCx);
+      if (ax < gapHW[band]) gapHW[band] = ax;
     }
   });
   // Use percentiles, not extremes: the front of a flat-lay garment bulges (pockets, fly) while
@@ -1520,13 +1789,15 @@ function sliceMesh(scene, box, NB, meshCx) {
     legs: { R: legs.R.map(finish), L: legs.L.map(finish) },
     crotchBand: -1,
   };
-  // crotch = highest band (below the top third) whose centre line is empty
+  // crotch = highest band (below the top third) with a real gap between the legs. Generated
+  // meshes often carry a narrow crevice above the crotch (the fly); that is seat, not legs.
   for (let bnd = Math.floor(NB * 0.66); bnd >= 0; bnd--) {
-    if (!centreHit[bnd]) {
+    if (gapHW[bnd] > w * 0.03) {
       out.crotchBand = bnd;
       break;
     }
   }
+  out.gapHW = Array.from(gapHW);
   // legs may be fused (photo with legs together): then there is no leg region
   if (out.crotchBand < 2) out.crotchBand = -1;
   out.nearestLeg = (side, band) => {
@@ -1547,6 +1818,107 @@ function sliceMesh(scene, box, NB, meshCx) {
 }
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+const smoothstep = (a, b, x) => {
+  const t = clamp((x - a) / Math.max(1e-9, b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Shape facts about a flat-lay top mesh (its own units): torso half-width below the sleeves,
+ * hem half-width, depth, where the sleeves start (armpit height as a 0..1 fraction), and the
+ * widest point (sleeve tip).
+ */
+function topProfile(scene, box, meshCx, bands) {
+  const h = box.max.y - box.min.y || 1;
+  const NB = 48;
+  const maxAx = new Float32Array(NB);
+  let maxAll = 0;
+  scene.traverse((o) => {
+    if (!o.isMesh || !o.userData.origPos) return;
+    const p = o.userData.origPos;
+    for (let i = 0; i < p.length; i += 3) {
+      const band = Math.min(NB - 1, Math.max(0, Math.floor(((p[i + 1] - box.min.y) / h) * NB)));
+      const ax = Math.abs(p[i] - meshCx);
+      if (ax > maxAx[band]) maxAx[band] = ax;
+      if (ax > maxAll) maxAll = ax;
+    }
+  });
+  const hemHW = bands.bottom.width > 0 ? bands.bottom.width / 2 : (box.max.x - box.min.x) / 4;
+  const lo = Math.floor(NB * 0.15);
+  let jump = Math.round(NB * 0.7);
+  for (let k = lo; k < NB; k++) {
+    if (maxAx[k] > hemHW * 1.2) {
+      jump = k;
+      break;
+    }
+  }
+  // torso half-width: the median of the bands clearly below the sleeves (the sleeve underside
+  // slopes into the side seam, so the bands just under the jump already contain sleeve)
+  const torsoBands = Array.from(maxAx.slice(lo, Math.max(lo + 1, jump - 2))).sort((a, b) => a - b);
+  const torsoHW = torsoBands.length ? torsoBands[Math.floor(torsoBands.length / 2)] : hemHW;
+  let armBand = jump;
+  for (let k = lo; k < jump; k++) {
+    if (maxAx[k] > torsoHW * 1.03) {
+      armBand = k;
+      break;
+    }
+  }
+  const depth = bands.bottom.depth > 0.02 * h ? bands.bottom.depth : box.max.z - box.min.z || 1;
+  return { hemHW, torsoHW, depth, vArmpit: clamp(armBand / NB, 0.4, 0.85), maxAx: maxAll, bands: Array.from(maxAx), armBand };
+}
+
+/**
+ * Vertex neighbours of a mesh (CSR arrays), with vertices that share a position (UV seams)
+ * merged into one canonical vertex so smoothing crosses those seams.
+ */
+function buildAdjacency(geo) {
+  const pos = geo.attributes.position.array;
+  const n = pos.length / 3;
+  const canon = new Int32Array(n);
+  const seen = new Map();
+  for (let i = 0; i < n; i++) {
+    const key = `${Math.round(pos[i * 3] * 2000)},${Math.round(pos[i * 3 + 1] * 2000)},${Math.round(pos[i * 3 + 2] * 2000)}`;
+    const c = seen.get(key);
+    if (c === undefined) {
+      seen.set(key, i);
+      canon[i] = i;
+    } else canon[i] = c;
+  }
+  const idx = geo.getIndex()?.array;
+  const m = idx ? idx.length : n;
+  const nb = new Array(n).fill(null);
+  const add = (a, b) => {
+    const ca = canon[a];
+    const cb = canon[b];
+    if (ca === cb) return;
+    (nb[ca] ??= new Set()).add(cb);
+    (nb[cb] ??= new Set()).add(ca);
+  };
+  for (let t = 0; t + 2 < m; t += 3) {
+    const a = idx ? idx[t] : t;
+    const b = idx ? idx[t + 1] : t + 1;
+    const c = idx ? idx[t + 2] : t + 2;
+    add(a, b);
+    add(b, c);
+    add(c, a);
+  }
+  const offsets = new Int32Array(n + 1);
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    offsets[i] = total;
+    if (nb[i]) total += nb[i].size;
+  }
+  offsets[n] = total;
+  const list = new Int32Array(total);
+  for (let i = 0; i < n; i++) {
+    if (!nb[i]) continue;
+    let k = offsets[i];
+    for (const j of nb[i]) list[k++] = j;
+  }
+  return { canon, offsets, list };
+}
+
 
 /** Top of the arm's centre line: the shoulder point moved inboard and down by the arm radius. */
 function armAxis(arm, armR) {

@@ -335,7 +335,7 @@ export class FitViewer {
     const armDiam = (b.upperArmGirthR ?? 30) / 100 / Math.PI;
     // visible width of a sleeve worn on the arm: the flat width is half the tube's circumference,
     // so the hanging tube shows about three quarters of it
-    const dTarget = chart.arm_width ? Math.max(armDiam + 0.025, (chart.arm_width / 100) * 0.75) : null;
+    const dTarget = chart.arm_width ? Math.max(armDiam + 0.045, (chart.arm_width / 100) * 0.75) : null;
     const armholeY = box.min.y + vArm * h;
     const farThr = 0.5 * Math.max(0.01, P.maxAx - P.torsoHW);
     for (const [side, sgn] of [['R', 1], ['L', -1]]) {
@@ -413,12 +413,12 @@ export class FitViewer {
       const kW = dTarget ? clamp(dTarget / d, 0.7, 1) : 1;
       // ...except front-to-back: a flat-lay sleeve is a thin pillow; it must be at least as
       // thick as the arm inside it or the arm collider inflates it into a puff
-      const kZ = clamp((armDiam + 0.012) / dz, 1, 1.5);
+      const kZ = clamp((armDiam + 0.03) / dz, 1, 1.6);
       const tx = sgn * Math.sin(alpha);
       const ty = -Math.cos(alpha);
       // how far the sleeve may swing: a long sleeve follows the arm, a short wide cap sleeve
       // stays close to how it was cut (swinging it far just balloons it at the armhole)
-      const phiMax = 0.75 * clamp(L / (0.6 * d), 0.6, 1);
+      const phiMax = 0.75 * clamp(L / (0.6 * d), 0.6, 1) * (1 - 0.7 * clamp(drop / 0.05, 0, 1));
       const phi = clamp(Math.atan2(ux * ty - uy * tx, ux * tx + uy * ty), -phiMax, phiMax);
       this.lastTopFit.sleeves[side] = { J, u: [ux, uy], phi, kL, kW, kZ, L, d, dz, cnt, seamTop: seamTopY[side], armholeY, vArm, vTop, dA };
       // rigid swing of the whole sleeve about the joint (a progressive bend left the cap
@@ -940,7 +940,7 @@ export class FitViewer {
     const splitY = this.rings.crotchSplitY ?? crotchY;
     const ankleTop = this.ankleTopY ?? (b.outerAnkleHeightR ?? 7) / 100 + 0.03;
     const legYc = (Y) => clamp(Y, ankleTop, legTopBody - 0.005); // leg ring used for a height
-    const hemFloor = 0.03; // the hem breaks on the shoe just above the floor; excess length pools there
+    const hemFloor = 0.012; // the hem reaches the floor; excess length pools on the shoe
     const hemWanted = chart.total_length != null ? topY - chart.total_length / 100 : crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100;
     const hemY = Math.max(hemFloor, hemWanted);
     const excess = Math.max(0, hemY - hemWanted);
@@ -1002,20 +1002,34 @@ export class FitViewer {
       const sgn = side === 'R' ? 1 : -1;
       const legMap = side === 'R' ? this.rings.right : this.rings.left;
       const tube = new Tube(lrows, lcols);
+      // Baggy legs hang straight down from the widest part of the leg (thigh); only a leg cut
+      // close to the body follows the knee and calf. 8 cm of ease at the thigh = fully straight.
+      const thighY = legTop - 0.04;
+      const straight = clamp((circLeg(side, thighY) - bodyCAt(legMap, legYc(thighY))) / 0.08, 0, 1);
+      const colMax = new Float32Array(lcols);
+      const restHang = new Float32Array(lrows);
+      let hangC = 0;
       for (let r = 0; r < lrows; r++) {
         const Y = legRowY(r);
         const Yc = legYc(Y);
         const C = circLeg(side, Y);
         const base = ringAt(legMap, Yc);
         const s = base ? C / ringCircumference(base) : 1;
+        hangC = Math.max(hangC, C, bodyCAt(legMap, Yc));
+        restHang[r] = hangC;
         for (let c = 0; c < lcols; c++) {
           const th = (c / lcols) * TWO_PI - Math.PI;
           const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: sgn * 0.09, cz: -0.08 };
-          const rr = Math.max(smp.r + gap, smp.r * s);
+          const rr0 = Math.max(smp.r + gap, smp.r * s);
+          if (rr0 > colMax[c]) colMax[c] = rr0;
+          const rr = rr0 + straight * (colMax[c] - rr0);
           tube.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
         }
       }
-      tube.setRest((r) => Math.max(circLeg(side, legRowY(r)), bodyCAt(legMap, legYc(legRowY(r)))), (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
+      tube.setRest((r) => {
+        const base = Math.max(circLeg(side, legRowY(r)), bodyCAt(legMap, legYc(legRowY(r))));
+        return base + straight * (restHang[r] - base);
+      }, (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
       for (let c = 0; c < lcols; c++) tube.pin(0, c);
       // the two legs never cross the line between the thighs. That line is the real midline of
       // this scan (bodies are not symmetric about x = 0), per row.

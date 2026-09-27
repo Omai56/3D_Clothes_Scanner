@@ -324,3 +324,13 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Known limits:** slim-tee sleeves still fuller than the photo (generated mesh has oversized armholes); heavyweight sleeve caps show a crease; jeans side edge shows speckles in a pure side view; a small fold under the crotch.
 **Verified:** jeans 29 back / below / side, heavyweight S front + back, slim L; 24 tests pass.
 **Files:** `public/js/viewer.js`, `server/index.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 09:05 — Baggy legs hang straight to the floor; sleeve tube clears the arm
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`):**
+- **Bottoms**: a leg with 8 cm or more of ease at the thigh hangs straight down from its widest ring (per column running maximum, and the rest circumference of every row below is at least the thigh's); a tight leg still follows knee and calf; in between it blends. The hem now reaches the floor (was 3 cm above) and the excess pools on the shoe.
+- **Tops**: boxy tees swing their sleeves only a little (the cap distorted), fitted tees still hang theirs along the arm; the sleeve tube is kept at least 4.5 cm wider and 3 cm deeper than the arm so it cannot sink into it.
+**Verified:** jeans 29/34 front + 34 side (straight, on the floor), heavyweight S, slim L; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

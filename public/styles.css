@@ -1687,6 +1687,7 @@ body::before { display: none; }
 .steps .lbl { white-space: nowrap; }
 
 /* Step indicator, final word: dot, connector and label sit side by side whatever else applies */
-.steps li { position: relative; display: inline-flex; align-items: center; gap: 8px; }
-.steps .dot, .steps .lbl { position: static; margin: 0; transform: none; flex: none; }
-.steps li + li::before { position: static; display: inline-block; flex: none; margin: 0 4px 0 0; }
+.steps li { position: relative; display: inline-flex; align-items: center; gap: 0; }
+.steps .dot { position: static; display: inline-grid; box-sizing: border-box; min-width: 18px; width: 18px; height: 18px; margin: 0; transform: none; flex: none; }
+.steps .lbl { position: static; margin: 0 0 0 8px; transform: none; flex: none; }
+.steps li + li::before { position: static; display: inline-block; flex: none; width: 24px; margin: 0 8px 0 0; }

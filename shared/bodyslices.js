@@ -20,6 +20,7 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
   const shoulderY = neckY - 0.06;
 
   const torso = new Map();
+  const torsoRaw = new Map(); // fused outline above the armpit (torso + arm roots), unclipped
   const right = new Map();
   const left = new Map();
   const armR = [];
@@ -94,6 +95,7 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
     const bound = torsoBound(y);
     const loop = Number.isFinite(bound) ? clipLoopX(main, bound, torsoCx) : main;
     torso.set(iy, ringFromLoop(loop, y));
+    if (Number.isFinite(bound)) torsoRaw.set(iy, ringFromLoop(main, y));
     for (const lp of arms) (lp.cx > 0 ? armR : armL).push({ x: lp.cx, y, z: lp.cz, area: lp.area });
   }
   // Highest slice where both legs exist = where the leg shells should start.
@@ -105,7 +107,8 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
   smoothAcrossSlices(left);
   armR.sort((a, b) => a.y - b.y);
   armL.sort((a, b) => a.y - b.y);
-  return { torso, right, left, armR, armL, armpitY, torsoHalfAtArmpit, torsoCx, crotchSplitY, legTopY };
+  smoothAcrossSlices(torsoRaw);
+  return { torso, torsoRaw, right, left, armR, armL, armpitY, torsoHalfAtArmpit, torsoCx, crotchSplitY, legTopY };
 }
 
 /** Clamp a loop's x to ±bound (flattens fused arms into vertical torso sides). */

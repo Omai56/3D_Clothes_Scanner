@@ -169,8 +169,15 @@
 <script src="app.js"></script>
 <script src="decor.js" defer></script>
 <script type="module">
-  import { importLink } from './fit-main.js';
+  import { importLink, fromServerGarment } from './fit-main.js';
   import { mountFit3D } from './fit3d.js';
+  // The pieces saved on the server (imported earlier, with real charts and 3D meshes) hang in
+  // the wardrobe from the start; ones folded into the drawer stay there.
+  try {
+    const saved = await (await fetch('/api/garments')).json();
+    const drawer = new Set(Fit.loadDrawer().map((d) => d.id));
+    for (const g of saved.slice().reverse()) if (!Fit.getGarment(g.id) && !drawer.has(g.id)) Fit.saveCustom(fromServerGarment(g));
+  } catch (e) { console.warn('saved pieces unavailable', e); }
   const saved = Fit.loadBody();
   const body = saved || Fit.DEMO_BODY;
   const short = { height: 'Height', chest: 'Chest', waist: 'Waist', hip: 'Hips', inseam: 'Inseam', shoulder: 'Shoulders' };
@@ -189,7 +196,8 @@
   const prevBtn = $('wdPrev'), nextBtn = $('wdNext'), pager = $('wdPager');
   const HANGER = '<svg class="hook" viewBox="0 0 120 44" aria-hidden="true"><path d="M60 22 V14 C60 8 66 6 69 9 C72 12 70 16 66 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M60 22 L10 40 H110 Z" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/></svg>';
   let page = 0, perPage = 4, view3d = null;
-  let worn = null; // garment on the model
+  let worn = null; // garment whose fit is shown (the last one put on)
+  const wornBy = { top: null, bottom: null }; // a top and a bottom can be on together
   // Right column shows one pane at a time: the wardrobe, or the fit & sizes of what's on the model.
   const tabW = $('tabWardrobe'), tabF = $('tabFit'), paneW = $('paneWardrobe'), paneF = $('wearing');
   const wardrobeShown = () => !paneW.hidden;
@@ -471,7 +479,7 @@
   const legend2d = legend.innerHTML;
   let view = null;
   const ready = mountFit3D({ stage, picker: $('bodyPicker'), legend })
-    .then(v => { view = v; if (worn) view.wear(worn, size); })
+    .then(v => { view = v; for (const k of ['bottom', 'top']) if (wornBy[k]) view.wear(wornBy[k], wornBy[k] === worn ? size : undefined); })
     .catch(err => {
       console.warn('3D view unavailable, showing the 2D figure:', err);
       stage.hidden = true;
@@ -504,14 +512,16 @@
     const g = Fit.getGarment(id);
     if (!g) return;
     worn = g;
+    wornBy[g.category === 'top' ? 'top' : 'bottom'] = g;
     try { history.replaceState(null, '', 'shop.html?id=' + encodeURIComponent(g.id)); } catch (e) { /* ignore */ }
     report = Fit.fitReport(g, body);
     order = Object.keys(g.sizes);
     size = report.recommended;
     renderWearing(g);
-    hangers.querySelectorAll('.hanger').forEach(h => h.classList.toggle('worn', h.dataset.id === g.id));
+    hangers.querySelectorAll('.hanger').forEach(h => h.classList.toggle('worn', Object.values(wornBy).some(w => w && w.id === h.dataset.id)));
     $('dropHint').hidden = true;
     $('takeOff').hidden = false;
+    $('takeOff').textContent = wornBy.top && wornBy.bottom ? `Take off ${g.category === 'top' ? 'top' : 'bottoms'}` : 'Take off';
     tabF.disabled = false;
     document.title = `${g.name} · Try on · Fitting Room`;
     if (view) view.wear(g, size);
@@ -522,6 +532,12 @@
   }
 
   function takeOff() {
+    if (!worn) return;
+    const cat = worn.category === 'top' ? 'top' : 'bottom';
+    wornBy[cat] = null;
+    if (view) view.takeOff(cat);
+    const other = wornBy.top || wornBy.bottom;
+    if (other) { wear(other.id); return; } // the other piece stays on; its fit is shown now
     worn = null; report = null;
     showPane('wardrobe');
     tabF.disabled = true;
@@ -529,7 +545,6 @@
     $('dropHint').hidden = false;
     $('takeOff').hidden = true;
     hangers.querySelectorAll('.hanger').forEach(h => h.classList.remove('worn'));
-    if (view) view.takeOff();
     figure.querySelectorAll('.region').forEach(g => g.classList.remove('lv-good', 'lv-warn', 'lv-bad'));
     document.title = 'Try On · Fitting Room';
     try { history.replaceState(null, '', 'shop.html'); } catch (e) { /* ignore */ }

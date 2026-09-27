@@ -1,5 +1,7 @@
-// 3D fit view for the FitCheck pages: the team's viewer (js/viewer.js, same as the main app)
-// showing a saved 3D body scan wearing the garment, coloured by fit.
+// 3D fit view for the Fitting Room try-on page: the saved 3D body scan wearing the garments.
+// Imported items (with a real size chart and a Tripo mesh) are shown as the actual garment mesh,
+// scaled from the chart and set on the body; a top and a bottom can be worn together. Pieces
+// without a mesh (standard-chart items) are shown as the measured shell coloured by fit.
 import { FitViewer } from '/js/viewer.js';
 import { fitReport, VERDICT_COLOR, VERDICT_LABEL } from '/shared/fit.js';
 
@@ -32,22 +34,28 @@ export function toViewerGarment(g) {
   };
 }
 
+const slotOf = (g) => (g.category === 'top' ? 'top' : 'bottom');
+
 /**
  * Mount the 3D view in `stage`. `picker` gets a body selector (saved scans), `legend` the colour key.
- * Returns { wear(garment), show(size), takeOff() }, or throws if 3D can't run (no WebGL, no saved bodies).
+ * Returns { wear(garment, size), show(size), takeOff(category?), worn() }, or throws if 3D can't run.
  */
-export async function mountFit3D({ stage, picker, legend, preferScan = 'demo' }) {
+export async function mountFit3D({ stage, picker, legend, preferScan = null }) {
   const scans = await (await fetch('/api/scans')).json();
   if (!scans.length) throw new Error('No saved 3D bodies');
   const viewer = new FitViewer(stage);
-  let vg = null; // garment on the model, in the viewer's chart format
+  viewer.setMode('look');
+  window.__viewer = viewer;
   let bodyCm = null;
-  let report = null;
-  let size = null;
+  const worn = { top: null, bottom: null }; // { garment, vg, report, size }
+  let active = null;
 
   let current;
   try { current = sessionStorage.getItem('fit3dScan'); } catch { /* storage blocked */ }
-  if (!scans.some((s) => s.name === current)) current = scans.some((s) => s.name === preferScan) ? preferScan : scans[0].name;
+  if (!scans.some((s) => s.name === current)) {
+    // the newest real phone scan, else the requested / demo body
+    current = scans.find((s) => s.input?.photos)?.name ?? (scans.some((s) => s.name === preferScan) ? preferScan : scans[0].name);
+  }
 
   picker.innerHTML = `<label>3D body <select>${scans.map((s) => `<option value="${s.name}">${s.label}</option>`).join('')}</select></label>`;
   const select = picker.querySelector('select');
@@ -65,39 +73,66 @@ export async function mountFit3D({ stage, picker, legend, preferScan = 'demo' })
       if (!res.ok) throw new Error('Saved body not found');
       const scan = await res.json();
       await viewer.loadBody(scan.objUrl, scan.measurements_cm);
+      viewer.frameBody();
       if (request !== loading) return;
       bodyCm = scan.measurements_cm;
-      report = vg ? fitReport(bodyCm, vg) : null;
       try { sessionStorage.setItem('fit3dScan', name); } catch { /* storage blocked */ }
-      render();
+      // re-fit everything that is on
+      for (const k of ['top', 'bottom']) if (worn[k]) { worn[k].report = fitReport(bodyCm, worn[k].vg); await render(k); }
     } finally {
       if (request === loading) delete stage.dataset.loading;
     }
   }
 
-  function render() {
-    const ev = report?.sizes[size];
-    if (vg && ev) viewer.showFit(vg, ev);
-    else viewer.garmentGroup.clear();
+  async function render(k) {
+    const w = worn[k];
+    if (!w || !w.report) return;
+    const ev = w.report.sizes[w.size] ?? w.report.sizes[w.report.recommended];
+    const glb = w.garment.chart?.model?.glb ?? w.garment.model?.glb;
+    if (glb) {
+      stage.dataset.loading = 'Putting it on you…';
+      try {
+        await viewer.loadGarmentModel(glb, w.vg, ev);
+      } finally {
+        delete stage.dataset.loading;
+      }
+    } else {
+      viewer.clearGarmentModel(k);
+      viewer.showFit(w.vg, ev);
+    }
+    viewer.setMode('look');
   }
 
   await loadScan(current);
   return {
-    /** Put a garment on the model (FitCheck garment; imported items carry the store's real chart). */
-    wear(garment, s) {
-      vg = garment.chart ?? toViewerGarment(garment);
-      report = bodyCm ? fitReport(bodyCm, vg) : null;
-      size = s ?? size;
-      render();
+    /** Put a garment on (it takes the slot of its category; the other category stays on). */
+    async wear(garment, s) {
+      const k = slotOf(garment);
+      const vg = garment.chart ?? toViewerGarment(garment);
+      const report = bodyCm ? fitReport(bodyCm, vg) : null;
+      worn[k] = { garment, vg, report, size: s ?? report?.recommended };
+      active = k;
+      await render(k);
     },
-    show(s) {
-      size = s;
-      render();
+    async show(s) {
+      if (!active || !worn[active]) return;
+      worn[active].size = s;
+      await render(active);
     },
-    takeOff() {
-      vg = null;
-      report = null;
-      render();
+    takeOff(category) {
+      const ks = category ? [category] : ['top', 'bottom'];
+      for (const k of ks) {
+        worn[k] = null;
+        viewer.clearGarmentModel(k);
+      }
+      viewer.garmentGroup.clear();
+      active = worn.top ? 'top' : worn.bottom ? 'bottom' : null;
+      if (active) render(active);
     },
+    setActive(category) {
+      if (worn[category]) active = category;
+    },
+    worn: () => ({ ...worn }),
+    viewer,
   };
 }

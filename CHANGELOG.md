@@ -702,3 +702,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Clear wording:** the × on a hanger is now a ↓ arrow (orange outline, filled on hover); after using it, a note above the drawer says "Folded into the drawer below." with a **Show me** button that opens it (hides after 5 s); the drawer front has an orange ↓ arrow (points up when open); inside, a plain sentence "Clothes you took off the rail. **Tap one to hang it back up.**"; empty, it says "**Nothing in here yet.** Tap **↓** on a piece in the wardrobe and it's folded in here, so you can hang it back later."
 **Verified:** headless Chrome at 390 and 1280px: empty drawer, badge after removing pieces, open drawer with folded pieces, hang back (drawer and rail counts correct); no page errors; 24 tests pass.
 **Files:** `public/app.js`, `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — One UI: Omai's + Raelyn's pages with the real 3D try-on inside; sleeve, waistband and layering fixes
+**By:** Claude (Fable 5.1), per Daniel ("use Omai and Raelyn's UI, combine those")
+**What:**
+- Merged `origin/fit-pages-wardrobe` (Omai's Fitting Room rename, decorations, wardrobe drawer). Root is Omai's measure page again (`public/index.html`), the try-on is `public/shop.html`; the plain 3D room from last night stays at `/room.html` (`app.html` redirects there). A shortcut on the measure page goes straight to the fitting room for people who already scanned.
+- `public/fit3d.js` — rewritten: the try-on page's 3D stage is now the real Look view (garment meshes scaled from the chart, boxers, phone scan as the default body, per-category slots so a top and a bottom are on together, size change re-drapes). Pieces without a mesh (standard-chart items) still show the measured shell.
+- `public/shop.html` — the server's saved items (imported Zara pieces with charts and meshes) hang in the wardrobe from the start (`fromServerGarment` in `public/fit-main.js`); wearing a top keeps the bottoms on and vice versa; "Take off top / bottoms" removes one and the other's fit stays up.
+- `public/js/viewer.js`, `shared/bodyslices.js` — sleeves stay outside the fused torso + arm-root outline above the armpit (`torsoRaw` rings; arms no longer show through the brown tee's back); trouser waistband moulded to the body over its top 12 cm with the chart's waist slack (29 sits tight, 34 loose); a top's lower part flares gently (≤ 2 cm) over a worn bottom instead of the bottom cutting through it; the bottom is clipped 3 cm above the top's hem.
+**Verified:** headless: measure page → shop.html with jeans + heavyweight tee (Daniel's scan), slim tee S→L; slim S back (arms covered), jeans 29/34 (waistband), pairs front/side; 24 tests pass.
+**Files:** `public/index.html`, `public/shop.html`, `public/fit3d.js`, `public/fit-main.js`, `public/room.html`, `public/app.html`, `public/measure.html`, `public/js/viewer.js`, `shared/bodyslices.js`, `CHANGELOG.md`

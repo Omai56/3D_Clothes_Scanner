@@ -290,7 +290,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     const top = this.slots.top;
     const bottom = this.slots.bottom;
     if (!bottom) return;
-    const planes = top?.fit ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), top.fit.hemY + 0.012)] : [];
+    const planes = top?.fit ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), top.fit.hemY + 0.03)] : [];
     for (const m of bottom.materials) {
       m.clippingPlanes = planes;
       m.clipShadows = true;
@@ -425,34 +425,101 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
       }
     }
 
-    // a top over a bottom: below the bottom's waistband the top stays outside the bottom's
-    // actual placed geometry (its hull, recorded per height and direction when it was placed)
-    const hull = isTop && window.__underPush ? this.slots.bottom?.hull : null; // off: the bottom is clipped instead (see _updateLayering)
-    const clearUnder = hull
-      ? (P0, i) => {
-          const k = i * 3;
-          const Y = P0[k + 1];
-          if (Y > hull.yMax || Y < hull.yMin) return;
-          const c = sampleRing(this.rings.torso, Math.max(Y, this.rings.crotchSplitY ?? legTop), 0);
-          if (!c) return;
-          const dx = P0[k] - c.cx;
-          const dz = P0[k + 2] - c.cz;
-          const rb = hull.at(Y, Math.atan2(dz, dx)) + 0.012;
-          const d = Math.hypot(dx, dz);
-          if (d < rb) {
-            const f = rb / Math.max(d, 1e-6);
-            P0[k] = c.cx + dx * f;
-            P0[k + 2] = c.cz + dz * f;
-          }
+    // A top over a bottom: the top's lower part flares out over the bottom (one smooth ring =
+    // the widest the bottom gets between the top's hem and its waistband, smoothed round, so
+    // pockets and folds do not print through), blending in from 12 cm above the waistband.
+    const under = isTop ? this.slots.bottom : null;
+    let clearUnder = null;
+    if (under?.hull && under.fit) {
+      const hull = under.hull;
+      const NA = 48;
+      const ring = new Float32Array(NA);
+      const yLo = Math.max(hull.yMin, hemY - 0.03);
+      const yHi = Math.min(hull.yMax, under.fit.topY + 0.01);
+      for (let a2 = 0; a2 < NA; a2++) {
+        const th = (a2 / NA) * TWO_PI - Math.PI;
+        let sum = 0;
+        let cnt = 0;
+        for (let Y = yLo; Y <= yHi; Y += 0.01) {
+          sum += hull.at(Y, th);
+          cnt++;
         }
-      : null;
+        ring[a2] = cnt ? sum / cnt : 0;
+      }
+      for (let it = 0; it < 6; it++) {
+        const r2 = new Float32Array(NA);
+        for (let a2 = 0; a2 < NA; a2++) r2[a2] = (ring[(a2 + NA - 1) % NA] + 2 * ring[a2] + ring[(a2 + 1) % NA]) / 4;
+        ring.set(r2);
+      }
+      const wbY = under.fit.topY;
+      const refY = Math.max(this.rings.crotchSplitY ?? legTop, hemY);
+      clearUnder = (P0, i) => {
+        const k = i * 3;
+        const Y = P0[k + 1];
+        if (Y > wbY + 0.08) return;
+        const w = 1 - smoothstep(wbY - 0.02, wbY + 0.08, Y);
+        const c = sampleRing(this.rings.torso, Math.max(Y, refY), 0);
+        if (!c) return;
+        const dx = P0[k] - c.cx;
+        const dz = P0[k + 2] - c.cz;
+        const th = Math.atan2(dz, dx);
+        const fa = ((th + Math.PI) / TWO_PI) * NA;
+        const ia = ((Math.floor(fa) % NA) + NA) % NA;
+        const ta = fa - Math.floor(fa);
+        const rb = ring[ia] * (1 - ta) + ring[(ia + 1) % NA] * ta + 0.004;
+        const d = Math.hypot(dx, dz);
+        if (d < rb) {
+          const f = 1 + (w * Math.min(0.02, rb - d)) / Math.max(d, 1e-6); // never more than 2 cm out: a hem lying on the jeans, not a box
+          P0[k] = c.cx + dx * f;
+          P0[k + 2] = c.cz + dz * f;
+        }
+      };
+    }
+
+    // Bottoms: the waistband is moulded to the body. Over the top 12 cm the cloth is pulled in
+    // to the body's outline plus whatever slack the chart's waist has over the body's waist
+    // (a size that is snug at the waist sits tight; a big size stays loose).
+    let mouldWaist = null;
+    if (!isTop) {
+      const wRing = ringAt(this.rings.torso, topY);
+      const bodyWaistC = wRing ? ringCircumference(wRing) : 0;
+      const chartWaistC = chart.waist ? (2 * chart.waist) / 100 : bodyWaistC;
+      const slackR = clamp((chartWaistC - bodyWaistC) / TWO_PI, 0, 0.03);
+      const refLo = this.rings.crotchSplitY ?? legTop;
+      mouldWaist = (P0, i) => {
+        const k = i * 3;
+        const Y = P0[k + 1];
+        if (Y < topY - 0.12) return;
+        const w = smoothstep(topY - 0.12, topY - 0.03, Y);
+        const c = sampleRing(this.rings.torso, Math.max(Y, refLo), 0);
+        if (!c) return;
+        const dx = P0[k] - c.cx;
+        const dz = P0[k + 2] - c.cz;
+        const smp = sampleRing(this.rings.torso, Math.max(Y, refLo), Math.atan2(dz, dx));
+        if (!smp) return;
+        const target = smp.r + gap + slackR;
+        const d = Math.hypot(dx, dz);
+        if (d > target) {
+          const f = 1 - (w * (d - target)) / d;
+          P0[k] = c.cx + dx * f;
+          P0[k + 2] = c.cz + dz * f;
+        }
+      };
+    }
 
     // bake the scale into the vertices, then push what is inside the body out (smoothed)
     const Cs = this._bodyColliders({ gap, legTop, neckY, armpitY, torsoLo: this.rings.crotchSplitY ?? legTop });
-    const cols = isTop ? Cs.all : Cs.body;
+    // tops: the sleeves (beyond the torso's width in the flat mesh) also stay outside the fused
+    // torso + arm-root outline above the armpit, so the arms never show through them; the
+    // torso panels themselves are left to the clipped rings (or the back bulks up)
+    const P = isTop ? (this._gltfTop ??= topProfile(model, box, (box.min.x + box.max.x) / 2, bands)) : null;
+    const meshCx0 = (box.min.x + box.max.x) / 2;
     for (const o of meshes) {
       const orig = o.userData.origPos;
       const n = orig.length / 3;
+      const sleeveMask = isTop ? new Uint8Array(n) : null;
+      if (sleeveMask) for (let i = 0; i < n; i++) sleeveMask[i] = Math.abs(orig[i * 3] - meshCx0) > P.torsoHW * 1.02 ? 1 : 0;
+      const cols = isTop ? [...Cs.all, (pos, i) => { if (sleeveMask[i]) Cs.raw(pos, i); }] : Cs.body;
       const W = new Float32Array(orig.length);
       for (let i = 0; i < n; i++) {
         W[i * 3] = orig[i * 3] * sx + px;
@@ -468,6 +535,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
       const collide = (withUnder = true) => {
         for (let i = 0; i < n; i++) {
           if (T[i * 3 + 1] < hemY - (isTop ? 0.08 : 0.01)) continue;
+          if (mouldWaist) mouldWaist(T, i);
           for (let pass = 0; pass < 2; pass++) for (const col of cols) col(T, i);
           if (withUnder && clearUnder) clearUnder(T, i);
         }
@@ -504,7 +572,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
         D.set(T);
       }
       for (let k = 0; k < W.length; k++) T[k] = W[k] + D[k];
-      collide(false);
+      collide(true);
       if (!isTop) {
         // hull of the placed seat (waistband down to just under the crotch): max distance from
         // the torso ring centre per 1 cm of height and 24 directions, for a top worn over it
@@ -1028,6 +1096,13 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
       }
     };
     const torsoPush = ringPush(rings.torso, neckY - 0.02);
+    // above the armpit the real outline is torso + arm roots fused (the clipped torso rings drop
+    // the arm roots so the shell has no lumps): cloth there stays outside the fused outline
+    const rawRing = rings.torsoRaw && rings.torsoRaw.size ? ringPush(rings.torsoRaw, neckY - 0.03) : null;
+    const raw = (pos, i) => {
+      const Y = pos[i * 3 + 1];
+      if (rawRing && Y >= armpitY && Y <= neckY - 0.03) rawRing(pos, i);
+    };
     // seat of trousers: below the crotch it is still kept outside the fused hull of both thighs
     // (the lowest torso ring), never tucked between them behind the pelvis
     const hullPush = ringPush(rings.torso, neckY - 0.02, torsoLo);
@@ -1125,7 +1200,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     const bodyList = footTop ? [foot, body, floor] : [body, floor];
     // shoulder lift runs before the radial ring push: cloth over the shoulder rests on it
     // instead of being shoved sideways off the slope
-    return { body: bodyList, seat: [hullPush, floor], arms: [...arms, floor], torso: [shoulder, body, floor], all: [shoulder, body, ...arms, floor] };
+    return { body: bodyList, seat: [hullPush, floor], arms: [...arms, floor], torso: [shoulder, body, floor], all: [shoulder, body, ...arms, floor], raw };
   }
 
   /** Debug: draw proxy tubes as wireframes (window.__showProxy = true). */

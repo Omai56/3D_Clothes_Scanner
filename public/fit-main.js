@@ -86,6 +86,30 @@ function artFor(g) {
  * Read the product page behind a link (Zara only for now). Returns a FitCheck garment with the
  * store's real chart, or null when the store isn't supported. Throws if the page can't be read.
  */
+/** A garment saved on the server (data/garments, from an earlier import) as a wardrobe piece. */
+export function fromServerGarment(g) {
+  const colorKey = Object.keys(COLORS).find((c) => new RegExp(`\b${c}\b`, 'i').test(g.color ?? ''));
+  return {
+    id: g.id,
+    custom: true,
+    imported: true,
+    url: g.url ?? '',
+    name: g.name,
+    brand: g.brand,
+    art: artFor(g),
+    category: g.category,
+    color: colorKey ? COLORS[colorKey] : '#8d8f93',
+    colorName: g.color,
+    image: g.images?.[0] ?? null,
+    bg: '#ece6dc',
+    price: g.price ?? 'Price on store site',
+    fabric: g.fabric ?? '',
+    chart: g,
+    sizes: g.sizes,
+    addedAt: Date.now(),
+  };
+}
+
 export async function importLink(url) {
   let host;
   try { host = new URL(url).hostname; } catch { return null; }

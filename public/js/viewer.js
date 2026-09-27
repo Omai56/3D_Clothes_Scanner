@@ -410,15 +410,16 @@ export class FitViewer {
       const kL = 1;
       // never fatter than the chart's sleeve width (some generated meshes come with balloon
       // sleeves), never made bigger
-      const kW = dTarget ? clamp(dTarget / d, 0.7, 1) : 1;
+      const kW = window.__sleeveSwing !== false && dTarget ? clamp(dTarget / d, 0.7, 1) : 1;
       // ...except front-to-back: a flat-lay sleeve is a thin pillow; it must be at least as
       // thick as the arm inside it or the arm collider inflates it into a puff
-      const kZ = clamp((armDiam + 0.03) / dz, 1, 1.6);
+      const kZ = window.__sleeveSwing !== false ? clamp((armDiam + 0.03) / dz, 1, 1.6) : 1;
       const tx = sgn * Math.sin(alpha);
       const ty = -Math.cos(alpha);
       // how far the sleeve may swing: a long sleeve follows the arm, a short wide cap sleeve
       // stays close to how it was cut (swinging it far just balloons it at the armhole)
-      const phiMax = 0.75 * clamp(L / (0.6 * d), 0.6, 1) * (1 - 0.7 * clamp(drop / 0.05, 0, 1));
+      // window.__sleeveSwing = false keeps the sleeves at the angle they were generated with
+      const phiMax = window.__sleeveSwing === false ? 0 : 0.75 * clamp(L / (0.6 * d), 0.6, 1);
       const phi = clamp(Math.atan2(ux * ty - uy * tx, ux * tx + uy * ty), -phiMax, phiMax);
       this.lastTopFit.sleeves[side] = { J, u: [ux, uy], phi, kL, kW, kZ, L, d, dz, cnt, seamTop: seamTopY[side], armholeY, vArm, vTop, dA };
       // rigid swing of the whole sleeve about the joint (a progressive bend left the cap
@@ -439,8 +440,10 @@ export class FitViewer {
           const qx = J[0] + vx * cph - vy * sph;
           const qy = J[1] + vx * sph + vy * cph;
           const qz = J[2] + zShift + kZ * (W[i * 3 + 2] - J[2]);
-          W[i * 3] += w * (qx - W[i * 3]);
-          W[i * 3 + 1] += w * (qy - W[i * 3 + 1]);
+          // the swing builds up along the sleeve: none at the armhole cap, full from 60 % out
+          const wa = w * smoothstep(0.2 * L, 0.6 * L, a);
+          W[i * 3] += wa * (qx - W[i * 3]);
+          W[i * 3 + 1] += wa * (qy - W[i * 3 + 1]);
           W[i * 3 + 2] += w * (qz - W[i * 3 + 2]);
         }
       }
@@ -556,6 +559,25 @@ export class FitViewer {
       const s0 = armAxis(a, rUp - gap);
       // the deltoid at the top of the arm is fatter than the upper-arm girth
       arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t + rUp * 0.12 * Math.max(0, 1 - t / 0.15)));
+      // shoulder joint / armpit wedge: the torso rings are clipped here and the arm capsule
+      // starts lower, so without this cloth pushed into the armpit stays inside the body
+      const sg = Math.sign(a.shoulder.x) || 1;
+      const jx = a.shoulder.x - sg * rUp * 0.45;
+      const jy = a.shoulder.y - rUp * 1.15;
+      const jz = a.shoulder.z;
+      const jr = rUp * 1.35;
+      arms.push((pos, i) => {
+        const k = i * 3;
+        const ox = pos[k] - jx;
+        const oy = pos[k + 1] - jy;
+        const oz = pos[k + 2] - jz;
+        const d = Math.hypot(ox, oy, oz);
+        if (d >= jr || d < 1e-6) return;
+        const sc = jr / d;
+        pos[k] = jx + ox * sc;
+        pos[k + 1] = jy + oy * sc;
+        pos[k + 2] = jz + oz * sc;
+      });
     }
     const floor = (pos, i) => {
       if (pos[i * 3 + 1] < 0.01) pos[i * 3 + 1] = 0.01;
@@ -1005,7 +1027,8 @@ export class FitViewer {
       // Baggy legs hang straight down from the widest part of the leg (thigh); only a leg cut
       // close to the body follows the knee and calf. 8 cm of ease at the thigh = fully straight.
       const thighY = legTop - 0.04;
-      const straight = clamp((circLeg(side, thighY) - bodyCAt(legMap, legYc(thighY))) / 0.08, 0, 1);
+      const straight = clamp((circLeg(side, thighY) - bodyCAt(legMap, legYc(thighY))) / 0.05, 0, 1);
+      const thighC = sampleRing(legMap, legYc(thighY), 0);
       const colMax = new Float32Array(lcols);
       const restHang = new Float32Array(lrows);
       let hangC = 0;
@@ -1023,7 +1046,10 @@ export class FitViewer {
           const rr0 = Math.max(smp.r + gap, smp.r * s);
           if (rr0 > colMax[c]) colMax[c] = rr0;
           const rr = rr0 + straight * (colMax[c] - rr0);
-          tube.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
+          // a straight leg hangs on one front-to-back axis (the thigh's); the calf's backward
+          // bulge below must not pull the cloth with it
+          const cz = thighC ? smp.cz + straight * (thighC.cz - smp.cz) : smp.cz;
+          tube.set(r, c, smp.cx + rr * Math.cos(th), Y, cz + rr * Math.sin(th));
         }
       }
       tube.setRest((r) => {

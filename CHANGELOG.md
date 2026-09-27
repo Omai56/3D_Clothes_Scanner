@@ -334,3 +334,14 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - **Tops**: boxy tees swing their sleeves only a little (the cap distorted), fitted tees still hang theirs along the arm; the sleeve tube is kept at least 4.5 cm wider and 3 cm deeper than the arm so it cannot sink into it.
 **Verified:** jeans 29/34 front + 34 side (straight, on the floor), heavyweight S, slim L; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 10:00 — Jeans straight from the back too; sleeves bend along their length; brown mesh diagnosed
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`):**
+- **Bottoms**: a straight (baggy) leg now hangs on one front-to-back axis taken from the thigh, so the calf's backward bulge no longer pulls the cloth with it (from the back the legs were following the calves); fully straight from 5 cm of thigh ease.
+- **Tops**: the sleeve swing builds up along the sleeve (none at the armhole cap, full from 60 % out) instead of turning the whole sleeve at the seam — cuffs hang down, caps keep their shape. A shoulder-joint sphere collider covers the deltoid/armpit wedge that neither the clipped torso rings nor the arm capsule reached. `window.__sleeveSwing = false` keeps the sleeves as generated.
+- **Diagnosis**: the slim tee's skin patches at the back collar, back armpits and hem are holes in the generated GLB itself (rendered the raw mesh alone: same holes). No placement change affects them; the item needs a regenerated mesh (tripo3d.ai → "Add .glb model" card).
+**Verified:** jeans 29 back (straight), heavyweight S front/back, slim L front/back; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

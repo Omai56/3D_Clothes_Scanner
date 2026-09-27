@@ -574,3 +574,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `public/js/viewer.js` — shoulder tips per side from the scan silhouette (`shoulderTipsFromScan`: outermost 1 cm column whose top is within 9.5 cm of the neck base). On Daniel they are at 1.42 m / 1.41 m, 8–9 cm below the neck base (the code assumed 5 cm), 23.5 cm right / 18.5 cm left of x = 0. The arm capsules start at these tips; the tee is centred between them, its seam-to-seam width is tip to tip (+ dropped-seam allowance), and the yoke slopes down to each side's own tip height. Shoulder height map covers 3–12.5 cm below the neck base.
 **Verified:** heavyweight S front (both shoulders level, no bump, no punched-in side) and back; slim L front (seam on the shoulder) and back; 24 tests pass.
 **Files:** `shared/bodyslices.js`, `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 12:15 — Back-of-shoulder collider closes the armpit sliver on the black tee
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js` `_bodyColliders`):** a sphere at the back of each shoulder joint (posterior deltoid) fills the wedge of body that neither the clipped torso rings nor the arm capsule cover; with the arm capsules now placed on the scan's real shoulder tips it no longer distorts the cap. `window.__jointSphere = false` disables it.
+**Verified:** heavyweight S back (both sides: no skin at the armpit seam), front unchanged; slim L front/back unchanged (its back holes are in the mesh); 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

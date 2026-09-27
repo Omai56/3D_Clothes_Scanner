@@ -560,6 +560,27 @@ export class FitViewer {
       const s0 = armAxis(a, rUp - gap);
       // the deltoid at the top of the arm is fatter than the upper-arm girth
       arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t + rUp * 0.12 * Math.max(0, 1 - t / 0.15)));
+      // back of the shoulder joint (posterior deltoid): between the clipped torso rings and the
+      // arm capsule there is a wedge of body no collider covers; cloth there showed skin
+      if (window.__jointSphere !== false) {
+        const sg = Math.sign(a.shoulder.x) || 1;
+        const jx = a.shoulder.x - sg * rUp * 0.35;
+        const jy = a.shoulder.y - rUp * 1.3;
+        const jz = a.shoulder.z - 0.02;
+        const jr = rUp * 1.25;
+        arms.push((pos, i) => {
+          const k = i * 3;
+          const ox = pos[k] - jx;
+          const oy = pos[k + 1] - jy;
+          const oz = pos[k + 2] - jz;
+          const d = Math.hypot(ox, oy, oz);
+          if (d >= jr || d < 1e-6) return;
+          const sc = jr / d;
+          pos[k] = jx + ox * sc;
+          pos[k + 1] = jy + oy * sc;
+          pos[k + 2] = jz + oz * sc;
+        });
+      }
     }
     const floor = (pos, i) => {
       if (pos[i * 3 + 1] < 0.01) pos[i * 3 + 1] = 0.01;

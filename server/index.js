@@ -147,6 +147,14 @@ app.post('/api/import', async (req, res) => {
         imgDir: path.join(ROOT, 'public', 'img'),
         log: (m) => console.log('[zara import]', m),
       });
+      // A 3D mesh made earlier for this item (public/models/<id>.glb) is linked straight away,
+      // so re-importing an item brings its Look back without another upload.
+      try {
+        await fs.access(path.join(MODELS_DIR, `${garment.id}.glb`));
+        garment.model = { glb: `/models/${garment.id}.glb`, source: 'existing mesh in public/models', generated: new Date().toISOString().slice(0, 10) };
+        await fs.writeFile(path.join(GARMENTS_DIR, `${garment.id}.json`), JSON.stringify(garment, null, 2) + '
+');
+      } catch { /* no mesh yet: the Add .glb card / Meshy handle it */ }
       return res.json({ imported: true, garment });
     }
     const result = await importProduct(url);

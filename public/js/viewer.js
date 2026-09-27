@@ -528,7 +528,8 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
       const orig = o.userData.origPos;
       const n = orig.length / 3;
       const sleeveMask = isTop ? new Uint8Array(n) : null;
-      if (sleeveMask) for (let i = 0; i < n; i++) sleeveMask[i] = Math.abs(orig[i * 3] - meshCx0) > P.torsoHW * 1.02 ? 1 : 0;
+      // sleeves plus the torso's shoulder strip beside them (the back armpit is where arms peek through)
+      if (sleeveMask) for (let i = 0; i < n; i++) sleeveMask[i] = Math.abs(orig[i * 3] - meshCx0) > P.torsoHW * 0.72 ? 1 : 0;
       const cols = isTop ? [...Cs.all, (pos, i) => { if (sleeveMask[i]) Cs.raw(pos, i); }] : Cs.body;
       const W = new Float32Array(orig.length);
       for (let i = 0; i < n; i++) {
@@ -1108,7 +1109,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     const torsoPush = ringPush(rings.torso, neckY - 0.02);
     // above the armpit the real outline is torso + arm roots fused (the clipped torso rings drop
     // the arm roots so the shell has no lumps): cloth there stays outside the fused outline
-    const rawRing = rings.torsoRaw && rings.torsoRaw.size ? ringPush(rings.torsoRaw, neckY - 0.03) : null;
+    const rawRing = rings.torsoRaw && rings.torsoRaw.size ? ringPush(rings.torsoRaw, neckY - 0.03) : null; // gap as the others
     const raw = (pos, i) => {
       const Y = pos[i * 3 + 1];
       if (rawRing && Y >= armpitY && Y <= neckY - 0.03) rawRing(pos, i);

@@ -171,6 +171,11 @@
 <script type="module">
   import { importLink, fromServerGarment } from './fit-main.js';
   import { mountFit3D } from './fit3d.js';
+  // shop.html?reset clears this phone's wardrobe and drawer (demo: start from an empty closet)
+  if (new URLSearchParams(location.search).has('reset')) {
+    try { localStorage.removeItem('fit.custom'); localStorage.removeItem('fit.drawer'); sessionStorage.removeItem('fit3dScan'); } catch (e) { /* ignore */ }
+    history.replaceState(null, '', 'shop.html');
+  }
   // The pieces saved on the server (imported earlier, with real charts and 3D meshes) hang in
   // the wardrobe from the start; ones folded into the drawer stay there.
   try {

@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildRings, armLine, parseObj, ringAt, ringCircumference, RING_BINS, SLICE_STEP } from '/shared/bodyslices.js';
 import { VERDICT_COLOR, effectiveInseam, waistbandHeight } from '/shared/fit.js';
+import { Tube, simulate, capsuleCollider } from '/js/cloth.js';
 
 const TWO_PI = Math.PI * 2;
 const MIN_GAP = 0.006; // metres: shell never sits closer than this so it stays visible
@@ -103,8 +104,9 @@ export class FitViewer {
     const shoulderY = bodyCm.backNeckHeight / 100 - 0.05;
     const shoulderX = bodyCm.acrossBackShoulderWidth / 200 - 0.01;
     // Height map of the shoulders (top of the body between armpit and neck base) for draping.
-    // (neck and head excluded: only the shoulder tops, up to just below the neck base)
-    this.shoulderMap = buildTopMap(positions, (this.rings.armpitY ?? bodyCm.bustHeight / 100) - 0.05, bodyCm.backNeckHeight / 100 - 0.045);
+    // Only the top ~5 cm of the shoulders (near-horizontal surface); the sloping sides are handled
+    // by the ring colliders. Neck and head excluded.
+    this.shoulderMap = buildTopMap(positions, bodyCm.backNeckHeight / 100 - 0.1, bodyCm.backNeckHeight / 100 - 0.045);
     this.arms = {};
     for (const [side, sign] of [['R', 1], ['L', -1]]) {
       const line = armLine(this.rings['arm' + side]);
@@ -180,11 +182,524 @@ export class FitViewer {
       }
     });
 
-    // A flat-lay mesh is two flat slabs. Reshape it vertex by vertex around the body.
-    if (isTop) this._deformTop(model, box, R, chart, garment);
-    else this._deformBottoms(model, box, R, chart);
+    // A flat-lay mesh is two flat slabs. Simulate a clean proxy garment (sized from the chart)
+    // on the body and glue the mesh onto it; fall back to the analytic mapping if that fails.
+    try {
+      if (isTop) this._dressTop(model, box, R, chart, garment);
+      else this._dressBottoms(model, box, R, chart);
+    } catch (e) {
+      console.warn('cloth simulation failed, using analytic mapping', e);
+      if (isTop) this._deformTop(model, box, R, chart, garment);
+      else this._deformBottoms(model, box, R, chart);
+    }
     this.meshyGroup.add(model);
     this.setMode(this.mode ?? 'look');
+  }
+
+  /** Colliders that keep cloth outside the body: torso/leg rings, arm capsules, shoulder tops, floor. */
+  _bodyColliders({ gap = 0.008, legTop, neckY, armpitY }) {
+    const rings = this.rings;
+    const b = this.body;
+    const ringPush = (map, yHi) => (pos, i) => {
+      const k = i * 3;
+      const Y = Math.min(pos[k + 1], yHi);
+      const c = sampleRing(map, Y, 0);
+      if (!c) return;
+      const dx = pos[k] - c.cx;
+      const dz = pos[k + 2] - c.cz;
+      const th = Math.atan2(dz, dx);
+      const smp = sampleRing(map, Y, th);
+      if (!smp) return;
+      const rb = smp.r + gap;
+      const d = Math.hypot(dx, dz);
+      if (d < rb) {
+        const s = rb / Math.max(d, 1e-6);
+        pos[k] = c.cx + dx * s;
+        pos[k + 2] = c.cz + dz * s;
+      }
+    };
+    const torsoPush = ringPush(rings.torso, neckY - 0.02);
+    const legR = ringPush(rings.right, legTop - 0.005);
+    const legL = ringPush(rings.left, legTop - 0.005);
+    const body = (pos, i) => {
+      const k = i * 3;
+      const Y = pos[k + 1];
+      if (Y < legTop) {
+        const cR = sampleRing(rings.right, Y, 0);
+        const cL = sampleRing(rings.left, Y, 0);
+        if (cR && cL) (Math.abs(pos[k] - cR.cx) < Math.abs(pos[k] - cL.cx) ? legR : legL)(pos, i);
+        else if (cR) legR(pos, i);
+        else if (cL) legL(pos, i);
+      } else torsoPush(pos, i);
+    };
+    const arms = [];
+    for (const side of ['R', 'L']) {
+      const a = this.arms?.[side];
+      if (!a) continue;
+      const rUp = (b.upperArmGirthR ?? 30) / 100 / TWO_PI + gap;
+      const rWr = (b.wristGirthR ?? 17) / 100 / TWO_PI + gap;
+      const s0 = armAxis(a, rUp - gap);
+      arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t));
+    }
+    const floor = (pos, i) => {
+      if (pos[i * 3 + 1] < 0.01) pos[i * 3 + 1] = 0.01;
+    };
+    // Shoulder tops: cloth whose footprint is over the shoulders rests on them (only points
+    // just under the surface are lifted; points beside the body are left alone).
+    const shoulder = (pos, i) => {
+      const k = i * 3;
+      const Y = pos[k + 1];
+      if (Y < armpitY || !this.shoulderMap) return;
+      const top = this.shoulderMap.lookup(pos[k], pos[k + 2]);
+      if (top != null && Y < top + gap && Y > top - 0.012) pos[k + 1] = top + gap;
+    };
+    return { body: [body, floor], arms: [...arms, floor], torso: [body, shoulder, floor], all: [body, ...arms, shoulder, floor] };
+  }
+
+  /** Debug: draw proxy tubes as wireframes (window.__showProxy = true). */
+  _showProxies(tubes) {
+    if (!window.__showProxy) return;
+    for (const t of tubes) {
+      const pts = [];
+      for (let r = 0; r < t.rows; r++) {
+        for (let c = 0; c < t.cols; c++) {
+          const a = t.get(r, c);
+          const b = t.get(r, c + 1);
+          pts.push(...a, ...b);
+          if (r + 1 < t.rows) {
+            const d = t.get(r + 1, c);
+            pts.push(...a, ...d);
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      this.meshyGroup.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x00aaff })));
+    }
+    this.debugTubes = tubes;
+  }
+
+  /**
+   * Tops via cloth simulation: a torso tube pinned along the shoulder line + a tube per sleeve
+   * pinned at the shoulder joint, each ring sized from the chart (chest) with the mesh's own
+   * width profile, dropped under gravity against the body. The AI mesh is then glued to it.
+   */
+  _dressTop(model, box, R, chart, garment) {
+    const b = this.body;
+    const NB = 64;
+    const h = box.max.y - box.min.y || 1;
+    const meshCx = (box.min.x + box.max.x) / 2;
+    if (!this._gltfSlices) this._gltfSlices = sliceTopMesh(model, box, NB, meshCx);
+    const S = this._gltfSlices;
+
+    const neckY = b.backNeckHeight / 100;
+    const topY = neckY + 0.015;
+    const shoulderY = neckY - 0.06;
+    const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
+    const bustY = b.bustHeight / 100;
+    const armpitY = this.rings.armpitY ?? bustY - 0.04;
+    const legTop = this.rings.legTopY || b.insideLegHeight / 100;
+    const gap = 0.008;
+
+    // mesh flat width (its units) -> real flat width: anchor at the chest. The width profile is
+    // median-smoothed and capped (underarm gussets left in the torso bands otherwise bulge).
+    const vOf = (Y) => clamp((Y - hemY) / (topY - hemY), 0, 0.9999);
+    const prof = smoothProfile(S.all, NB);
+    const hwRaw = (v) => {
+      const f = v * NB - 0.5;
+      const b0 = clamp(Math.floor(f), 0, NB - 1);
+      const b1 = Math.min(NB - 1, b0 + 1);
+      const t = clamp(f - b0, 0, 1);
+      return prof[b0] * (1 - t) + prof[b1] * t;
+    };
+    const capHw = Math.max(hwRaw(0.02), hwRaw(vOf(bustY))) * 1.0;
+    const hwAt = (v) => Math.min(hwRaw(v), capHw);
+    const bustRing = ringAt(this.rings.torso, bustY);
+    const fallbackFlat = bustRing ? (ringCircumference(bustRing) + 2 * Math.max(MIN_GAP, cmEaseToRadius(R.chest?.ease_cm)) * TWO_PI) / 2 : 0.5;
+    const chestFlat = chart.chest ? chart.chest / 100 : fallbackFlat;
+    const hemFlat = chart.hem ? chart.hem / 100 : chestFlat;
+    const k = chestFlat / (2 * hwAt(vOf(bustY)));
+    const sChest = bustRing ? (2 * chestFlat) / ringCircumference(bustRing) : 1.1;
+    // Circumference of the garment at a height: from the chart (hem -> chest, then chest up to
+    // the shoulder line); over the shoulders the yoke lies on the body, so follow the body
+    // outline with the chest's ease.
+    const circAt = (Y) => {
+      let flat;
+      if (Y <= bustY) flat = hemFlat + (chestFlat - hemFlat) * clamp((Y - hemY) / Math.max(0.01, bustY - hemY), 0, 1);
+      else flat = chestFlat;
+      const fromChart = 2 * flat;
+      if (Y < shoulderY - 0.03) return fromChart;
+      const ring = ringAt(this.rings.torso, Y);
+      const fromBody = ring ? ringCircumference(ring) * sChest : fromChart;
+      const t = clamp((Y - (shoulderY - 0.03)) / 0.03, 0, 1);
+      return fromChart + (fromBody - fromChart) * t;
+    };
+
+    // ---- torso tube: from the neckline (pinned) down to the hem ----
+    // The yoke between neck and shoulder points lies on the shoulders (collider); the body of
+    // the tee hangs from the shoulder points under gravity.
+    const dy = 0.015;
+    const neckTopY = neckY - 0.005; // a crew neck sits at the neck base
+    const rows = Math.max(3, Math.ceil((neckTopY - hemY) / dy) + 1);
+    const cols = 48;
+    const torso = new Tube(rows, cols);
+    const rowY = (r) => neckTopY - r * dy;
+    const neckRing = ringAt(this.rings.torso, neckY + 0.02);
+    const neckC = neckRing ? ringCircumference(neckRing) * 1.15 : 0.5;
+    // fabric never smaller than the body it wraps (a tight knit stretches over the body)
+    const bodyC = (Y) => {
+      const ring = ringAt(this.rings.torso, Math.min(Y, shoulderY - 0.01));
+      return ring ? ringCircumference(ring) + TWO_PI * gap : 0;
+    };
+    const circRow = (r) => (r === 0 ? neckC : Math.max(neckC, circAt(rowY(r)), rowY(r) < shoulderY ? bodyC(rowY(r)) : 0));
+    for (let r = 0; r < rows; r++) {
+      const Y = rowY(r);
+      const C = circRow(r);
+      const base = ringAt(this.rings.torso, Y);
+      const s = base ? C / ringCircumference(base) : 1;
+      for (let c = 0; c < cols; c++) {
+        const th = (c / cols) * TWO_PI - Math.PI;
+        const smp = sampleRing(this.rings.torso, Y, th) ?? { r: 0.15, cx: 0, cz: 0 };
+        const rr = r === 0 ? smp.r * s : Math.max(smp.r + gap, smp.r * s);
+        torso.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
+      }
+    }
+    torso.setRest(circRow, () => dy);
+    // the yoke (neckline -> shoulder line) is a cone lying on the shoulders: its vertical links
+    // are as long as the geometry says, not dy, or the rows would collapse onto the neck
+    torso.restDownFromGeometry(0, Math.ceil((neckTopY - (shoulderY - 0.02)) / dy));
+    for (let c = 0; c < cols; c++) torso.pin(0, c); // neckline holds the tee up
+
+    // ---- sleeves ----
+    const tubes = [torso];
+    const sleeveLen = (chart.sleeve ?? 20) / 100;
+    const armBodyR = (b.upperArmGirthR ?? 30) / 100 / TWO_PI;
+    const sleeves = {};
+    const arms = {};
+    for (const side of ['R', 'L']) {
+      const a = this.arms?.[side];
+      const F = S.frames[side];
+      if (!a || !F) continue;
+      // arm centre line: from the arm-root centre (inboard/below the shoulder point by the
+      // upper-arm radius) to the hand centre
+      const ax0 = armAxis(a, armBodyR);
+      const Sx = ax0.x;
+      const Sy = ax0.y;
+      const Sz = ax0.z;
+      let dx = a.hand.x - Sx;
+      let dyy = a.hand.y - Sy;
+      let dz = a.hand.z - Sz;
+      const len = Math.hypot(dx, dyy, dz) || 1;
+      dx /= len;
+      dyy /= len;
+      dz /= len;
+      let nx = -dyy;
+      let ny = dx;
+      const nl = Math.hypot(nx, ny) || 1;
+      nx /= nl;
+      ny /= nl;
+      if (nx * Math.sign(Sx) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      const Cs = Math.max(chart.arm_width ? (2 * chart.arm_width) / 100 : 4 * F.hw * F.L * k, TWO_PI * (armBodyR + gap));
+      const rs = Cs / TWO_PI;
+      const drop = rs - (armBodyR + gap);
+      const srows = Math.max(3, Math.ceil(sleeveLen / dy) + 1);
+      const scols = 24;
+      const tube = new Tube(srows, scols);
+      // Sleeve cap: the top edge is slanted like an armhole — it meets the shoulder at the top
+      // of the arm and sits `capDepth` lower under the arm. The slant fades out down the sleeve.
+      const capDepth = Math.min(0.14, sleeveLen * 0.6);
+      const capRows = Math.max(1, Math.floor(srows * 0.45));
+      for (let r = 0; r < srows; r++) {
+        const fade = Math.max(0, 1 - r / capRows);
+        for (let c = 0; c < scols; c++) {
+          const phi = (c / scols) * TWO_PI - Math.PI;
+          const u = Math.cos(phi); // +1 = top of the arm, -1 = underarm
+          const along = Math.min(sleeveLen, r * dy + capDepth * ((1 - u) / 2) * fade);
+          const cx = Sx + dx * along - nx * drop;
+          const cy = Sy + dyy * along - ny * drop;
+          const cz = Sz + dz * along;
+          tube.set(r, c, cx + rs * u * nx, cy + rs * u * ny, cz + rs * Math.sin(phi));
+        }
+      }
+      tube.setRest(() => Cs, () => dy);
+      for (let c = 0; c < scols; c++) tube.pin(0, c);
+      sleeves[side] = tube;
+      arms[side] = { Sx, Sy, Sz, dx, dy: dyy, dz, nx, ny, rs, drop };
+      tubes.push(tube);
+    }
+
+    // torso fabric passes between arm and body, so it collides with the body only;
+    // sleeves collide with the arm and the body.
+    const C = this._bodyColliders({ gap, legTop, neckY, armpitY });
+    torso.colliders = C.torso;
+    for (const t of Object.values(sleeves)) t.colliders = C.arms; // sleeves wrap the arm, not the torso
+    const t0 = performance.now();
+    simulate(tubes, C.all);
+    this.lastSimMs = performance.now() - t0;
+    this._showProxies(tubes);
+    if (window.__debugTop) {
+      // classification histogram of the mesh's sleeve/gusset vertices per side
+      const hist = { R: { sleeve: 0, gusset: 0, sBins: new Array(10).fill(0), uBins: new Array(8).fill(0), front: 0 }, L: { sleeve: 0, gusset: 0, sBins: new Array(10).fill(0), uBins: new Array(8).fill(0), front: 0 } };
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        const orig = o.userData.origPos;
+        const fr = o.userData.origFront;
+        for (let i = 0; i < orig.length / 3; i++) {
+          const x = orig[i * 3];
+          const ax = Math.abs(x - meshCx);
+          if (ax <= S.torsoHalf) continue;
+          const side = x >= meshCx ? 'R' : 'L';
+          const sv = S.sleeveOf(x, orig[i * 3 + 1], orig[i * 3 + 2]);
+          const H = hist[side];
+          if (!sv) { H.gusset++; continue; }
+          H.sleeve++;
+          H.sBins[Math.min(9, Math.floor(sv.s * 10))]++;
+          H.uBins[Math.min(7, Math.floor(((sv.u + 1) / 2) * 8))]++;
+          if (fr[i]) H.front++;
+        }
+      });
+      this.debugTop = { frames: S.frames, torsoHalf: S.torsoHalf, sleeveLen: S.sleeveLen, hist, simMs: this.lastSimMs };
+    }
+
+    // ---- glue the mesh to the simulated proxies ----
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const geo = o.geometry;
+      const orig = o.userData.origPos;
+      const fr = o.userData.origFront;
+      const pos = geo.attributes.position;
+      const out = pos.array;
+      const n = pos.count;
+      for (let i = 0; i < n; i++) {
+        const x = orig[i * 3];
+        const y = orig[i * 3 + 1];
+        const z = orig[i * 3 + 2];
+        const v = clamp((y - box.min.y) / h, 0, 0.9999);
+        const sv = S.sleeveOf(x, y, z);
+        const ax = Math.abs(x - meshCx);
+        const frontV = fr ? fr[i] === 1 : z >= 0;
+        if (sv || ax > S.torsoHalf) {
+          const side = sv ? sv.side : x >= meshCx ? 'R' : 'L';
+          const tube = sleeves[side];
+          if (tube) {
+            const s = sv ? sv.s : 0.02;
+            const u = sv ? sv.u : -1;
+            const front = frontV;
+            const phi = front ? Math.acos(u) : -Math.acos(u);
+            const p = tube.sample(s * (tube.rows - 1), ((phi + Math.PI) / TWO_PI) * tube.cols);
+            out[i * 3] = p[0];
+            out[i * 3 + 1] = p[1];
+            out[i * 3 + 2] = p[2];
+            continue;
+          }
+        }
+        const Y = hemY + v * (topY - hemY);
+        const band = Math.floor(v * NB);
+        const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
+        // across the torso panel: per band (smoothed width), so the narrow collar band still
+        // spans the whole ring and the underarm bands don't swing vertices around the ring
+        const u = clamp((x - ms.cx) / Math.max(1e-3, hwAt(v)), -1, 1);
+        const th = frontV ? Math.acos(u) : -Math.acos(u);
+        const colF = ((th + Math.PI) / TWO_PI) * cols;
+        const p = torso.sample((neckTopY - Y) / dy, colF);
+        out[i * 3] = p[0];
+        out[i * 3 + 1] = p[1];
+        out[i * 3 + 2] = p[2];
+      }
+      pos.needsUpdate = true;
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+    });
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
+  }
+
+  /**
+   * Trousers via cloth simulation: a seat tube (waistband, pinned -> crotch) whose bottom ring is
+   * pinched at the front and back centre of the crotch, so it forms two lobes over the thighs, and
+   * a tube per leg hanging from the crotch. Rings are sized from the chart (hip / waist) with the
+   * mesh's own width profile. The AI mesh is glued onto the result.
+   */
+  _dressBottoms(model, box, R, chart) {
+    const b = this.body;
+    const NB = 64;
+    const h = box.max.y - box.min.y || 1;
+    const meshCx = (box.min.x + box.max.x) / 2;
+    if (!this._gltfSlices) this._gltfSlices = sliceMesh(model, box, NB, meshCx);
+    const S = this._gltfSlices;
+    if (S.crotchBand < 0) throw new Error('no separate legs in mesh');
+
+    const crotchY = b.insideLegHeight / 100;
+    const topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
+    const hipY = b.hipHeight / 100;
+    const neckY = b.backNeckHeight / 100;
+    const armpitY = this.rings.armpitY ?? b.bustHeight / 100;
+    const legTop = this.rings.legTopY || crotchY;
+    const splitY = this.rings.crotchSplitY ?? crotchY;
+    const ankleY = (b.outerAnkleHeightR ?? 7) / 100 + 0.005;
+    const hemWanted = chart.total_length != null ? topY - chart.total_length / 100 : crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100;
+    const hemY = Math.max(ankleY, hemWanted);
+    const excess = Math.max(0, hemY - hemWanted);
+    const POOL = 0.06;
+    const gap = 0.008;
+
+    const vCrotch = (S.crotchBand + 1) / NB;
+    const vOfHip = (Y) => clamp(vCrotch + ((Y - legTop) / Math.max(0.01, topY - legTop)) * (1 - vCrotch), vCrotch, 0.9999);
+    const vOfLeg = (Y) => clamp(((Y - hemWanted) / Math.max(0.01, legTop - hemWanted)) * vCrotch, 0, vCrotch);
+    const hwAll = (v) => (lerpStats(S.all, v, NB) ?? S.nearestAll(Math.floor(v * NB))).hw;
+    const hwLeg = (side, v) => (lerpStats(S.legs[side], v, NB) ?? S.nearestLeg(side, Math.floor(v * NB)) ?? { hw: hwAll(v) / 2 }).hw;
+    const hipFlat = chart.hip ? chart.hip / 100 : null;
+    const hipRing = ringAt(this.rings.torso, Math.max(hipY, splitY));
+    const fallbackFlat = hipRing ? (ringCircumference(hipRing) + 2 * Math.max(MIN_GAP, cmEaseToRadius(R.hip?.ease_cm)) * TWO_PI) / 2 : 0.5;
+    const k = (hipFlat ?? fallbackFlat) / (2 * hwAll(vOfHip(Math.max(hipY, legTop + 0.01))));
+    const circHip = (Y) => 4 * hwAll(vOfHip(Y)) * k; // whole garment around both hips
+    const circLeg = (side, Y) => 4 * hwLeg(side, vOfLeg(Y)) * k;
+    const waistC = chart.waist ? (2 * chart.waist) / 100 : circHip(topY);
+
+    const dy = 0.015;
+    const tubes = [];
+
+    // ---- seat tube: waistband (pinned) -> crotch, pinched front/back at the bottom ----
+    const cols = 48;
+    const srows = Math.max(3, Math.ceil((topY - legTop) / dy) + 1);
+    const seat = new Tube(srows, cols);
+    const seatRowY = (r) => Math.max(legTop, topY - r * dy);
+    for (let r = 0; r < srows; r++) {
+      const Y = seatRowY(r);
+      const Yc = Math.max(Y, splitY);
+      const C = r === 0 ? waistC : circHip(Y);
+      const base = ringAt(this.rings.torso, Yc);
+      const s = base ? C / ringCircumference(base) : 1;
+      for (let c = 0; c < cols; c++) {
+        const th = (c / cols) * TWO_PI - Math.PI;
+        const smp = sampleRing(this.rings.torso, Yc, th) ?? { r: 0.15, cx: 0, cz: 0 };
+        const rr = Math.max(smp.r + gap, smp.r * s);
+        seat.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
+      }
+    }
+    const bodyCAt = (map, Y) => {
+      const ring = ringAt(map, Y);
+      return ring ? ringCircumference(ring) + TWO_PI * gap : 0;
+    };
+    // fabric never smaller than the body it wraps
+    seat.setRest((r) => Math.max(r === 0 ? waistC : circHip(seatRowY(r)), bodyCAt(this.rings.torso, Math.max(seatRowY(r), splitY))), (r) => Math.max(0.002, seatRowY(r) - seatRowY(r + 1)));
+    for (let c = 0; c < cols; c++) seat.pin(0, c);
+    // crotch pinch: the front- and back-centre points of the bottom ring sit on the body midline
+    {
+      const r = srows - 1;
+      const ring = ringAt(this.rings.torso, Math.max(legTop, splitY));
+      const cFront = Math.round(((Math.PI / 2 + Math.PI) / TWO_PI) * cols) % cols;
+      const cBack = Math.round(((-Math.PI / 2 + Math.PI) / TWO_PI) * cols) % cols;
+      const f = sampleRing(this.rings.torso, Math.max(legTop, splitY), Math.PI / 2) ?? { cx: 0, cz: 0.1, r: 0 };
+      const bk = sampleRing(this.rings.torso, Math.max(legTop, splitY), -Math.PI / 2) ?? { cx: 0, cz: -0.1, r: 0 };
+      seat.set(r, cFront, ring ? ring.cx : 0, legTop, f.cz + f.r + gap);
+      seat.set(r, cBack, ring ? ring.cx : 0, legTop, bk.cz - bk.r - gap);
+      seat.pin(r, cFront);
+      seat.pin(r, cBack);
+    }
+    tubes.push(seat);
+
+    // ---- legs: crotch (pinned) -> hem ----
+    const lcols = 32;
+    const lrows = Math.max(3, Math.ceil((legTop - hemY) / dy) + 1);
+    const legRowY = (r) => Math.max(hemY, legTop - r * dy);
+    const legs = {};
+    for (const side of ['R', 'L']) {
+      const sgn = side === 'R' ? 1 : -1;
+      const legMap = side === 'R' ? this.rings.right : this.rings.left;
+      const tube = new Tube(lrows, lcols);
+      for (let r = 0; r < lrows; r++) {
+        const Y = legRowY(r);
+        const Yc = Math.min(Y, legTop - 0.005);
+        const C = circLeg(side, Y);
+        const base = ringAt(legMap, Yc);
+        const s = base ? C / ringCircumference(base) : 1;
+        for (let c = 0; c < lcols; c++) {
+          const th = (c / lcols) * TWO_PI - Math.PI;
+          const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: sgn * 0.09, cz: -0.08 };
+          const rr = Math.max(smp.r + gap, smp.r * s);
+          tube.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
+        }
+      }
+      tube.setRest((r) => Math.max(circLeg(side, legRowY(r)), bodyCAt(legMap, Math.min(legRowY(r), legTop - 0.005))), (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
+      for (let c = 0; c < lcols; c++) tube.pin(0, c);
+      tube.extra = (pos, i) => {
+        if (pos[i * 3] * sgn < 0.004) pos[i * 3] = 0.004 * sgn;
+      };
+      legs[side] = tube;
+      tubes.push(tube);
+    }
+
+    const Cs = this._bodyColliders({ gap, legTop, neckY, armpitY });
+    for (const t of tubes) t.colliders = Cs.body;
+    const t0 = performance.now();
+    simulate(tubes, Cs.body);
+    this.lastSimMs = performance.now() - t0;
+    this._showProxies(tubes);
+
+    // ---- glue ----
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const geo = o.geometry;
+      const orig = o.userData.origPos;
+      const fr = o.userData.origFront;
+      const pos = geo.attributes.position;
+      const out = pos.array;
+      const n = pos.count;
+      for (let i = 0; i < n; i++) {
+        const x = orig[i * 3];
+        const y = orig[i * 3 + 1];
+        const z = orig[i * 3 + 2];
+        const v = clamp((y - box.min.y) / h, 0, 0.9999);
+        const band = Math.floor(v * NB);
+        const frontV = fr ? fr[i] === 1 : z >= 0;
+        let p;
+        if (band <= S.crotchBand) {
+          const side = x >= meshCx ? 'R' : 'L';
+          const tube = legs[side];
+          const ls = lerpStats(S.legs[side], v, NB) ?? S.nearestLeg(side, band) ?? lerpStats(S.all, v, NB);
+          const u = clamp((x - ls.cx) / ls.hw, -1, 1);
+          const th = frontV ? Math.acos(u) : -Math.acos(u);
+          const Yl = hemWanted + (v / vCrotch) * (legTop - hemWanted);
+          let Y = Yl;
+          let bump = 0;
+          if (excess > 0 && Yl < hemY + POOL) {
+            const t = clamp((Yl - hemWanted) / (hemY + POOL - hemWanted), 0, 1);
+            Y = hemY + t * POOL;
+            bump = Math.min(0.012, excess * 0.12) * Math.sin(Math.PI * t);
+          }
+          p = tube.sample((legTop - Y) / dy, ((th + Math.PI) / TWO_PI) * lcols);
+          if (bump) {
+            const cc = sampleRing(side === 'R' ? this.rings.right : this.rings.left, Math.min(Y, legTop - 0.005), 0) ?? { cx: p[0], cz: p[2] };
+            const dx = p[0] - cc.cx;
+            const dz = p[2] - cc.cz;
+            const d = Math.hypot(dx, dz) || 1;
+            p = [p[0] + (dx / d) * bump, p[1], p[2] + (dz / d) * bump];
+          }
+        } else {
+          const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
+          const u = clamp((x - ms.cx) / ms.hw, -1, 1);
+          const th = frontV ? Math.acos(u) : -Math.acos(u);
+          const Y = legTop + ((v - vCrotch) / Math.max(1e-3, 1 - vCrotch)) * (topY - legTop);
+          p = seat.sample((topY - Y) / dy, ((th + Math.PI) / TWO_PI) * cols);
+        }
+        out[i * 3] = p[0];
+        out[i * 3 + 1] = p[1];
+        out[i * 3 + 2] = p[2];
+      }
+      pos.needsUpdate = true;
+      if (!o.userData.hemCut) {
+        openBottom(geo, orig, box.min.y + h * 0.015);
+        o.userData.hemCut = true;
+      }
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+    });
+    model.position.set(0, 0, 0);
+    model.scale.set(1, 1, 1);
   }
 
   /**
@@ -751,6 +1266,32 @@ function bakeToWorld(scene) {
     o.geometry.deleteAttribute('normal');
     o.geometry.deleteAttribute('tangent');
     o.geometry.computeVertexNormals();
+    // Which layer of the flat-lay garment a vertex belongs to (front layer faces +z, back layer
+    // faces -z). Use the surface normal where it clearly faces front/back; elsewhere (hem strips,
+    // folds) compare the vertex to the local mid-surface between the two layers.
+    const nrm = o.geometry.attributes.normal;
+    const front = new Uint8Array(nrm.count);
+    const bb = o.geometry.boundingBox;
+    const cell = Math.max(1e-3, (bb.max.x - bb.min.x) / 60);
+    const gx = Math.ceil((bb.max.x - bb.min.x) / cell) + 1;
+    const gy = Math.ceil((bb.max.y - bb.min.y) / cell) + 1;
+    const sumZ = new Float64Array(gx * gy);
+    const cnt = new Uint32Array(gx * gy);
+    const cellOf = (x, y) => Math.floor((y - bb.min.y) / cell) * gx + Math.floor((x - bb.min.x) / cell);
+    for (let i = 0; i < nrm.count; i++) {
+      const k = cellOf(arr[i * 3], arr[i * 3 + 1]);
+      sumZ[k] += arr[i * 3 + 2];
+      cnt[k]++;
+    }
+    for (let i = 0; i < nrm.count; i++) {
+      const nz = nrm.getZ(i);
+      if (Math.abs(nz) > 0.3) front[i] = nz > 0 ? 1 : 0;
+      else {
+        const k = cellOf(arr[i * 3], arr[i * 3 + 1]);
+        front[i] = arr[i * 3 + 2] >= sumZ[k] / Math.max(1, cnt[k]) ? 1 : 0;
+      }
+    }
+    o.userData.origFront = front;
     o.geometry.computeBoundingBox();
     o.geometry.computeBoundingSphere();
   }
@@ -854,6 +1395,12 @@ function sliceMesh(scene, box, NB, meshCx) {
 }
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
+/** Top of the arm's centre line: the shoulder point moved inboard and down by the arm radius. */
+function armAxis(arm, armR) {
+  const s = Math.sign(arm.shoulder.x) || 1;
+  return { x: arm.shoulder.x - s * armR * 0.7, y: arm.shoulder.y - armR * 0.9, z: arm.shoulder.z };
+}
 
 /** Top-of-body height map (max y per 1 cm x/z cell) for vertices with yMin <= y <= yMax. */
 function buildTopMap(positions, yMin, yMax) {
@@ -959,6 +1506,28 @@ function sampleRing(ringsMap, Y, theta) {
   return { r: ra * (1 - ty) + rb * ty, cx: a.cx * (1 - ty) + b.cx * ty, cz: a.cz * (1 - ty) + b.cz * ty };
 }
 
+/** Half-width per band, gaps filled from neighbours, 5-band median-smoothed. */
+function smoothProfile(bands, NB) {
+  const raw = new Array(NB).fill(null);
+  for (let b = 0; b < NB; b++) raw[b] = bands[b]?.hw ?? null;
+  for (let b = 0; b < NB; b++) {
+    if (raw[b] != null) continue;
+    for (let d = 1; d < NB; d++) {
+      if (raw[b - d] != null) { raw[b] = raw[b - d]; break; }
+      if (raw[b + d] != null) { raw[b] = raw[b + d]; break; }
+    }
+    if (raw[b] == null) raw[b] = 0.1;
+  }
+  const out = new Array(NB);
+  for (let b = 0; b < NB; b++) {
+    const w = [];
+    for (let d = -2; d <= 2; d++) if (raw[b + d] != null) w.push(raw[b + d]);
+    w.sort((x, y) => x - y);
+    out[b] = w[Math.floor(w.length / 2)];
+  }
+  return out;
+}
+
 /** Band statistics interpolated between band centres (no stair-steps between bands). */
 function lerpStats(arr, v, NB) {
   const f = v * NB - 0.5;
@@ -1054,7 +1623,8 @@ function sliceTopMesh(scene, box, NB, meshCx) {
     for (let i = cols.length - 1; i >= 0; i--) if (cols[i]) { last = cols[i]; break; }
     if (!first || !last || sleeveLen <= 0.01) continue;
     const sgn = side === 'R' ? 1 : -1;
-    const seam = { x: meshCx + sgn * torsoHalf, y: first.yc + first.yh };
+    // axis through the sleeve's centre line: middle of the armhole edge -> middle of the cuff
+    const seam = { x: meshCx + sgn * torsoHalf, y: first.yc };
     const cuff = { x: meshCx + sgn * (torsoHalf + sleeveLen * 0.97), y: last.yc };
     let ax = cuff.x - seam.x;
     let ay = cuff.y - seam.y;

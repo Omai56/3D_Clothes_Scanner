@@ -220,3 +220,17 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Tests: expectations updated (worn leg length, mid-rise default); 24 pass.
 **Known:** a horizontal crease band remains on the tee at armpit height (ring-shape change where the arm roots are clipped).
 **Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `shared/fit.js`, `server/index.js`, `tests/fit.test.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 01:30 — Cloth simulation: garments now drape on the body
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/cloth.js` — small position-based cloth solver: tube grids with per-row rest circumference and per-gap/per-column vertical rest lengths, gravity, distance + compression-only shear constraints, pinned rows, pluggable colliders, quasi-static settle with top-down "follow-the-leader" vertical links (verified: a free-hanging tube keeps its exact length; a tube narrower than the body wraps it without stretching).
+- `public/js/viewer.js`
+  - `_dressTop`: torso tube from the neckline (pinned) to the hem, rows sized from the chart (hem→chest flat widths ×2; over the shoulders the yoke follows the body outline with the chest's ease, and its vertical links are taken from geometry so the cone over the shoulders doesn't collapse); one tube per sleeve with a slanted sleeve cap, pinned at the arm root, sized from the chart's arm width, resting on the arm with slack underneath. Colliders: body rings (torso / each leg), arm capsules (sleeves only), shoulder-top height map, floor. Fabric never smaller than the body it wraps (tight = hugs).
+  - `_dressBottoms`: seat tube pinned at the waistband, pinched front/back at the crotch, plus a tube per leg hanging from the crotch; same sizing rules; pooling at the ankle kept.
+  - AI mesh glued to the simulated proxies by (height, angle); front/back layer decided from surface normals (mid-surface fallback at seams); smoothed width profile; analytic mapping kept as fallback.
+- Debug hooks: `window.__showProxy` (wireframe proxies), `window.__debugTop`, `__viewer.lastSimMs` (~0.35–0.6 s per size on the laptop).
+**Verified:** headless renders of all three garments; jeans and slim tee front/side good; heavyweight tee front good, S/XL differ. Known: notch at the back hem and small holes at the shoulder seams (layer classification), underarm gap (no gusset bridging yet).
+**Files:** `public/js/cloth.js`, `public/js/viewer.js`, `CHANGELOG.md`

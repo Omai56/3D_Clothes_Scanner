@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Choose Clothes · FitCheck</title>
+  <title>Try On · FitCheck</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,16 +17,36 @@
 <header class="topbar">
   <div class="topbar-inner">
     <a class="logo" href="index.html"><span class="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#2b2170"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M11 9.5l3-1.5c.6 1.3 1.1 2 2 2s1.4-.7 2-2l3 1.5 3 4-2.4 1.6-1.1-1.4V23h-9v-9.3l-1.1 1.4L8 13.5z" fill="#fff" opacity=".95"/><path d="M12.5 19.5h7" stroke="#d9b36a" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 1.6"/></svg></span><span class="logo-word">Fit<em>Check</em></span></a>
-    <ol class="steps" aria-label="Step 2 of 3"><li class="done"><span class="dot">1</span><span class="lbl">Measure</span></li><li class="current" aria-current="step"><span class="dot">2</span><span class="lbl">Choose</span></li><li class=""><span class="dot">3</span><span class="lbl">Fit</span></li></ol>
+    <ol class="steps" aria-label="Step 2 of 2"><li class="done"><span class="dot">1</span><span class="lbl">Measure</span></li><li class="current" aria-current="step"><span class="dot">2</span><span class="lbl">Try on</span></li></ol>
   </div>
 </header>
-<main class="page">
-  <p class="eyebrow">Step 2 of 3 · Your wardrobe</p>
-  <h1>Pick something to <em>try on</em></h1>
-  <p class="lede">Paste a link from any store to try it on. Everything you try is hung in your wardrobe, ready to open again.</p>
-
+<main class="page page-tryon">
+  <div class="tryon-intro">
+    <p class="eyebrow">Step 2 of 2 · Try on</p>
+    <h1>Dress your <em>model</em></h1>
+    <p class="lede">Drag a piece from your wardrobe onto the model, then swipe through the sizes to see how each one fits.</p>
+  </div>
   <div class="card measure-chip" id="chip"></div>
 
+  <div class="tryon">
+    <section class="card model-card" aria-labelledby="modelTitle">
+      <h2 class="sr-only" id="modelTitle">Your 3D model</h2>
+      <div class="model-drop" id="dropzone">
+        <div id="viewer3d" class="stage stage-3d"></div>
+        <div id="figure" class="stage figure-2d" hidden></div>
+        <div class="drop-hint" id="dropHint">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7.5V6a1.7 1.7 0 1 1 1.7 1.7M12 7.5 3 13.2h18z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><b>Drag a piece onto the model</b><span class="drop-sub">or tap one in the wardrobe</span></span>
+        </div>
+        <div class="drop-target" aria-hidden="true"><span>Drop to try it on</span></div>
+      </div>
+      <div class="model-foot">
+        <div id="bodyPicker" class="body-picker"></div>
+        <button type="button" class="btn ghost take-off" id="takeOff" hidden>Take off</button>
+      </div>
+    </section>
+
+    <div class="tryon-side">
   <section class="card link-panel" aria-labelledby="linkTitle">
     <div class="link-head">
       <span class="link-icon" aria-hidden="true">
@@ -54,7 +74,6 @@
       <button class="btn primary" type="submit" id="linkSubmit">Try it on</button>
     </form>
   </section>
-
   <section class="wardrobe-section" aria-labelledby="wardrobeTitle">
     <div class="section-head">
       <h2 id="wardrobeTitle">Your <em class="accent-word">wardrobe</em></h2>
@@ -103,11 +122,38 @@
       <button type="button" class="btn" id="toggleWardrobe">Open wardrobe</button>
     </div>
   </section>
+      <section class="card wearing" id="wearing" hidden aria-labelledby="name">
+        <div id="notice"></div>
+        <div class="wearing-head">
+          <div class="img" id="garmentImg"></div>
+          <div class="head">
+            <div class="brand" id="brand"></div>
+            <h2 id="name"></h2>
+            <div class="size-badge" id="badge"></div>
+          </div>
+        </div>
+        <p class="fabric" id="fabric"></p>
+        <div class="size-tabs" id="tabs" role="group" aria-label="Sizes"></div>
+        <div class="size-carousel" id="sizes" tabindex="0" aria-label="Fit for each size. Swipe or scroll sideways to compare sizes."></div>
+        <p class="swipe-hint" aria-hidden="true"><span>←</span> Swipe to compare sizes <span>→</span></p>
+        <div class="legend" id="legend">
+          <span><i style="background:var(--good)"></i>Good fit</span>
+          <span><i style="background:var(--warn)"></i>Slightly tight or loose</span>
+          <span><i style="background:var(--bad)"></i>Too tight or too loose</span>
+        </div>
+        <p class="ease-note" id="easeNote">Numbers are garment minus body, so plus means extra room.</p>
+        <div class="why">
+          <h3>Why this size</h3>
+          <ul id="why"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
 </main>
-
 <script src="app.js"></script>
 <script type="module">
   import { importLink } from './fit-main.js';
+  import { mountFit3D } from './fit3d.js';
   const saved = Fit.loadBody();
   const body = saved || Fit.DEMO_BODY;
   const short = { height: 'Height', chest: 'Chest', waist: 'Waist', hip: 'Hips', inseam: 'Inseam', shoulder: 'Shoulders' };
@@ -117,28 +163,31 @@
     '<a href="index.html">Edit</a>';
 
   const esc = Fit.esc;
+  const $ = id => document.getElementById(id);
 
   // ---- Wardrobe: every item tried from a link is hung here, a few per rail page ----
-  const wardrobe = document.getElementById('wardrobe');
-  const hangers = document.getElementById('hangers');
-  const toggleBtn = document.getElementById('toggleWardrobe');
-  const prevBtn = document.getElementById('wdPrev'), nextBtn = document.getElementById('wdNext'), pager = document.getElementById('wdPager');
+  const wardrobe = $('wardrobe');
+  const hangers = $('hangers');
+  const toggleBtn = $('toggleWardrobe');
+  const prevBtn = $('wdPrev'), nextBtn = $('wdNext'), pager = $('wdPager');
   const HANGER = '<svg class="hook" viewBox="0 0 120 44" aria-hidden="true"><path d="M60 22 V14 C60 8 66 6 69 9 C72 12 70 16 66 17" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M60 22 L10 40 H110 Z" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/></svg>';
   let page = 0, perPage = 4, view3d = null;
+  let worn = null; // garment on the model
 
   const perPageFor = () => { const w = hangers.clientWidth || 600; return w >= 560 ? 3 : 2; };
 
   function hangerHtml(g, i) {
     const report = Fit.fitReport(g, body);
     const worst = report.sizes[report.recommended].worst;
+    const on = worn && worn.id === g.id;
     return `
-      <div class="hanger" style="--i:${i}" data-i="${i}">
-        <a class="hanger-link" href="result.html?id=${encodeURIComponent(g.id)}" aria-label="${esc(g.brand)} ${esc(g.name)}, your size ${report.recommended}. Open fit.">
+      <div class="hanger${on ? ' worn' : ''}" style="--i:${i}" data-i="${i}" data-id="${esc(g.id)}">
+        <a class="hanger-link" href="shop.html?id=${encodeURIComponent(g.id)}" data-id="${esc(g.id)}" draggable="false" aria-label="${esc(g.brand)} ${esc(g.name)}, your size ${report.recommended}. Put it on the model.">
           ${HANGER}
           <span class="cloth">${Fit.garmentArt(g)}</span>
-          <span class="tag"><span class="tag-brand"><span class="size-chip lv-${worst}">${report.recommended}</span>${esc(g.brand)}</span><span class="tag-name">${esc(g.name)}</span></span>
+          <span class="tag"><span class="worn-badge">On model</span><span class="tag-brand"><span class="size-chip lv-${worst}">${report.recommended}</span>${esc(g.brand)}</span><span class="tag-name">${esc(g.name)}</span></span>
         </a>
-        <button type="button" class="unhang" data-id="${g.id}" aria-label="Remove ${esc(g.name)} from wardrobe">×</button>
+        <button type="button" class="unhang" data-id="${esc(g.id)}" aria-label="Remove ${esc(g.name)} from wardrobe">×</button>
       </div>`;
   }
 
@@ -164,11 +213,11 @@
     pager.innerHTML = many
       ? Array.from({ length: pages }, (_, p) => `<button type="button" class="${p === page ? 'on' : ''}" data-p="${p}" aria-label="Rail ${p + 1} of ${pages}"${p === page ? ' aria-current="true"' : ''}></button>`).join('') + `<span>${page + 1} / ${pages}</span>`
       : '';
-    document.getElementById('wdEmpty').hidden = list.length > 0;
-    document.getElementById('plaqueCount').textContent = list.length;
-    document.getElementById('plaqueUnit').textContent = list.length === 1 ? 'piece' : 'pieces';
-    document.getElementById('wardrobeNote').textContent = list.length
-      ? `${list.length} piece${list.length === 1 ? '' : 's'} you tried · tap one to see the fit again`
+    $('wdEmpty').hidden = list.length > 0;
+    $('plaqueCount').textContent = list.length;
+    $('plaqueUnit').textContent = list.length === 1 ? 'piece' : 'pieces';
+    $('wardrobeNote').textContent = list.length
+      ? `${list.length} piece${list.length === 1 ? '' : 's'} · drag one onto the model`
       : 'Clothes you try on from links are kept here';
     syncTabs();
   }
@@ -178,15 +227,15 @@
   nextBtn.addEventListener('click', () => goPage(page + 1));
   pager.addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if (b) goPage(+b.dataset.p); });
 
-  // Swipe between rails on touch screens.
+  // Swipe between rails on touch screens (a quick swipe; press-and-hold picks a piece up instead).
   let sx = null;
   hangers.addEventListener('pointerdown', e => { sx = e.clientX; });
   hangers.addEventListener('pointerup', e => {
     if (sx == null) return;
     const dx = e.clientX - sx; sx = null;
+    if (drag && drag.active) return;
     if (Math.abs(dx) > 50) { hangers.dataset.swiped = '1'; setTimeout(() => { delete hangers.dataset.swiped; }, 60); goPage(page + (dx < 0 ? 1 : -1)); }
   });
-  hangers.addEventListener('click', e => { if (e.target.closest('.hanger-link') && hangers.dataset.swiped) e.preventDefault(); }, true);
 
   function syncTabs() {
     const open = isOpen();
@@ -205,11 +254,22 @@
   toggleBtn.addEventListener('click', () => setOpen(!isOpen()));
   wardrobe.querySelectorAll('.wd-door').forEach(d => d.addEventListener('click', () => setOpen(!isOpen())));
 
+  // Tap (or Enter) on a piece puts it on the model; a swipe or a drag doesn't.
+  hangers.addEventListener('click', e => {
+    const link = e.target.closest('.hanger-link');
+    if (!link) return;
+    e.preventDefault();
+    if (hangers.dataset.swiped || dragEnded) return;
+    wear(link.dataset.id);
+  });
   hangers.addEventListener('click', e => {
     const b = e.target.closest('.unhang');
     if (!b) return;
     b.closest('.hanger').classList.add('leaving');
-    setTimeout(() => { Fit.removeCustom(b.dataset.id); renderWardrobe(); setOpen(true); }, 280);
+    setTimeout(() => {
+      if (worn && worn.id === b.dataset.id) takeOff();
+      Fit.removeCustom(b.dataset.id); renderWardrobe(); setOpen(true);
+    }, 280);
   });
   hangers.addEventListener('mouseover', e => { const h = e.target.closest('.hanger'); if (view3d) view3d.hover(h ? +h.dataset.i : null); });
   hangers.addEventListener('mouseleave', () => { if (view3d) view3d.hover(null); });
@@ -223,13 +283,14 @@
     { url: 'https://www.mango.com/us/en/p/men/coats/quilted-puffer-jacket-red_87010643', art: 'jacket' },
     { url: 'https://www.uniqlo.com/us/en/products/E455498-000/00?name=smart-ankle-chino-pants-beige', art: 'chinos' },
   ];
-  document.getElementById('addSamples').addEventListener('click', () => {
+  $('addSamples').addEventListener('click', () => {
     SAMPLES.slice().reverse().forEach(s => { const p = Fit.parseProductLink(s.url); Fit.saveCustom(Fit.makeCustomGarment({ ...p, art: s.art })); });
     page = 0;
     renderWardrobe();
     setOpen(true);
-    wardrobe.classList.remove('swing'); void wardrobe.offsetWidth; wardrobe.classList.add('swing');
+    swing();
   });
+  function swing() { wardrobe.classList.remove('swing'); void wardrobe.offsetWidth; wardrobe.classList.add('swing'); }
 
   // Keep the first visible piece in view when the number per rail changes.
   new ResizeObserver(() => {
@@ -241,7 +302,7 @@
   // Upgrade to the 3D rail when three.js loads; otherwise the flat hangers stay.
   window.addEventListener('wardrobe3d', e => {
     try {
-      view3d = e.detail(document.getElementById('wdCanvas'));
+      view3d = e.detail($('wdCanvas'));
       wardrobe.classList.add('has-3d');
       view3d.resize();
       renderWardrobe();
@@ -249,11 +310,248 @@
     } catch (err) { view3d = null; wardrobe.classList.remove('has-3d'); console.warn('3D wardrobe unavailable', err); }
   });
 
+  // ---- Drag a piece from the wardrobe onto the model ----
+  // Mouse: drag straight away. Touch: press and hold, so quick swipes still flip the rail.
+  const dropzone = $('dropzone');
+  let drag = null, dragEnded = false, ghost = null;
+  hangers.addEventListener('pointerdown', e => {
+    const link = e.target.closest('.hanger-link');
+    if (!link || e.button > 0 || !isOpen()) return;
+    if (e.pointerType === 'mouse') e.preventDefault(); // no text selection or native link drag
+    drag = { id: link.dataset.id, hanger: link.closest('.hanger'), pointerId: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false };
+    if (e.pointerType !== 'mouse') drag.timer = setTimeout(() => drag && startDrag(), 300);
+  });
+  function startDrag() {
+    const g = Fit.getGarment(drag.id);
+    if (!g) { drag = null; return; }
+    drag.active = true;
+    clearTimeout(drag.timer);
+    navigator.vibrate?.(12);
+    ghost = document.createElement('div');
+    ghost.className = 'drag-ghost';
+    ghost.innerHTML = Fit.garmentArt(g);
+    document.body.appendChild(ghost);
+    document.body.classList.add('is-dragging');
+    drag.hanger.classList.add('lifting');
+    moveGhost();
+  }
+  function overDrop() {
+    const r = dropzone.getBoundingClientRect();
+    return drag.x >= r.left && drag.x <= r.right && drag.y >= r.top && drag.y <= r.bottom;
+  }
+  function moveGhost() {
+    ghost.style.left = drag.x + 'px';
+    ghost.style.top = drag.y + 'px';
+    dropzone.classList.toggle('drop-over', overDrop());
+  }
+  function endDrag(drop) {
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    if (drag.active) {
+      const hit = drop && overDrop();
+      const id = drag.id;
+      dragEnded = true; setTimeout(() => { dragEnded = false; }, 0);
+      ghost.classList.add(hit ? 'dropped' : 'returning');
+      const g = ghost; setTimeout(() => g.remove(), 220);
+      ghost = null;
+      document.body.classList.remove('is-dragging');
+      dropzone.classList.remove('drop-over');
+      drag.hanger.classList.remove('lifting');
+      if (hit) wear(id);
+    }
+    drag = null;
+  }
+  window.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.x = e.clientX; drag.y = e.clientY;
+    const moved = Math.hypot(drag.x - drag.x0, drag.y - drag.y0);
+    if (!drag.active) {
+      if (drag.type === 'mouse' && moved > 6) startDrag();
+      else if (drag.type !== 'mouse' && moved > 10) { clearTimeout(drag.timer); drag = null; } // a swipe or a scroll
+      return;
+    }
+    moveGhost();
+  });
+  window.addEventListener('pointerup', e => { if (drag && e.pointerId === drag.pointerId) endDrag(true); });
+  window.addEventListener('pointercancel', e => { if (drag && e.pointerId === drag.pointerId) endDrag(false); });
+  // While a piece is held, the finger moves it instead of scrolling the page.
+  document.addEventListener('touchmove', e => { if (drag && drag.active) e.preventDefault(); }, { passive: false });
+  hangers.addEventListener('contextmenu', e => { if (e.target.closest('.hanger-link')) e.preventDefault(); });
+
+  // ---- The model: 3D body (same viewer as the main app); 2D figure if 3D can't run ----
+  const stage = $('viewer3d'), figure = $('figure'), legend = $('legend');
+  const legend2d = legend.innerHTML;
+  let view = null;
+  const ready = mountFit3D({ stage, picker: $('bodyPicker'), legend })
+    .then(v => { view = v; if (worn) view.wear(worn, size); })
+    .catch(err => {
+      console.warn('3D view unavailable, showing the 2D figure:', err);
+      stage.hidden = true;
+      figure.hidden = false;
+      figure.innerHTML = Fit.bodyFigure('Body outline coloured by fit');
+      legend.innerHTML = legend2d;
+      $('bodyPicker').innerHTML = '';
+      if (worn) colourFigure();
+    });
+  if (!stage.hidden) $('easeNote').textContent = 'Numbers are garment minus body, so plus means extra room. Drag the model to turn it.';
+
+  // ---- What's on the model: product, sizes (swipe sideways), why ----
+  let report = null, size = null, order = [];
+  const sizesEl = $('sizes'), tabsEl = $('tabs');
+
+  // Colour each row the way the 3D view does: roomy is blue, snug amber, tight red.
+  function verdictOf(r) {
+    if (r.verdict) return r.verdict;
+    if (r.level === 'good' || r.ease == null) return 'good';
+    const roomy = r.goodMax != null ? r.ease > r.goodMax : r.ease > 0;
+    return r.level === 'warn' ? (roomy ? 'loose' : 'snug') : (roomy ? 'very_loose' : 'tight');
+  }
+  function fmtEase(r) {
+    if (r.ease == null) return r.detail ?? '';
+    return `${r.ease > 0 ? '+' : ''}${r.ease} cm`;
+  }
+  const sizeName = s => Fit.SIZE_NAMES[s] ?? `Size ${s}`;
+
+  function wear(id) {
+    const g = Fit.getGarment(id);
+    if (!g) return;
+    worn = g;
+    try { history.replaceState(null, '', 'shop.html?id=' + encodeURIComponent(g.id)); } catch (e) { /* ignore */ }
+    report = Fit.fitReport(g, body);
+    order = Object.keys(g.sizes);
+    size = report.recommended;
+    renderWearing(g);
+    hangers.querySelectorAll('.hanger').forEach(h => h.classList.toggle('worn', h.dataset.id === g.id));
+    $('dropHint').hidden = true;
+    $('takeOff').hidden = false;
+    document.title = `${g.name} · Try on · FitCheck`;
+    if (view) view.wear(g, size);
+    colourFigure();
+    selectSize(size, { instant: true });
+    dropzone.classList.remove('put-on'); void dropzone.offsetWidth; dropzone.classList.add('put-on');
+  }
+
+  function takeOff() {
+    worn = null; report = null;
+    $('wearing').hidden = true;
+    $('dropHint').hidden = false;
+    $('takeOff').hidden = true;
+    hangers.querySelectorAll('.hanger').forEach(h => h.classList.remove('worn'));
+    if (view) view.takeOff();
+    figure.querySelectorAll('.region').forEach(g => g.classList.remove('lv-good', 'lv-warn', 'lv-bad'));
+    document.title = 'Try On · FitCheck';
+    try { history.replaceState(null, '', 'shop.html'); } catch (e) { /* ignore */ }
+  }
+  $('takeOff').addEventListener('click', takeOff);
+
+  function renderWearing(g) {
+    const notices = [];
+    if (!saved) notices.push('Showing results for the demo body. <a href="index.html">Enter your measurements</a> for your own fit.');
+    if (g.custom && !g.chart) notices.push(`We couldn’t read ${esc(g.brand)}’s size chart from the link, so this uses a standard chart for this type of item. Check the store’s own chart before you buy.`);
+    $('notice').innerHTML = notices.map(n => `<p class="notice">${n}</p>`).join('');
+    $('garmentImg').innerHTML = g.image ? `<img class="product-photo" src="${esc(g.image)}" alt="${esc(g.name)}">` : Fit.garmentArt(g);
+    $('garmentImg').style.background = g.image ? '' : (g.bg || '');
+    $('brand').textContent = g.brand;
+    $('name').textContent = g.name;
+    const fabric = $('fabric');
+    fabric.textContent = [g.price, g.colorName, g.fabric].filter(Boolean).join(' · ');
+    if (g.custom && /^https?:\/\//.test(g.url)) {
+      const a = document.createElement('a');
+      a.className = 'store-link'; a.href = g.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.textContent = `View on ${g.brand} ↗`;
+      fabric.append(document.createElement('br'), a);
+    }
+    const rec = report.sizes[report.recommended];
+    const badge = $('badge');
+    badge.innerHTML = `<span class="dot">${esc(report.recommended)}</span>Your size: ${esc(sizeName(report.recommended))}`;
+    badge.classList.toggle('bad', rec.worst === 'bad');
+    $('why').innerHTML = report.notes.map(n => `<li>${n}</li>`).join('');
+
+    tabsEl.innerHTML = order.map(s => `
+      <button class="size-tab" type="button" data-size="${esc(s)}" aria-pressed="false"
+        aria-label="Size ${esc(sizeName(s))}${s === report.recommended ? ', recommended' : ''}">
+        ${esc(s)}${s === report.recommended ? '<span class="rec"></span>' : ''}
+      </button>`).join('');
+    sizesEl.innerHTML = order.map(s => {
+      const res = report.sizes[s];
+      return `
+        <article class="size-panel" data-size="${esc(s)}" aria-label="Size ${esc(sizeName(s))}">
+          <div class="panel-head">
+            <span class="panel-size">${esc(s)}</span>
+            <span class="panel-name">${esc(sizeName(s))}</span>
+            ${s === report.recommended ? '<span class="rec-pill">Best fit</span>' : `<span class="worst-pill lv-${res.worst}">${res.worst === 'good' ? 'Fits' : res.worst === 'warn' ? 'Close' : 'Poor fit'}</span>`}
+          </div>
+          <p class="panel-summary">${esc(res.summary)}</p>
+          <ul class="regions">${res.regions.map(r => `
+            <li class="lv-${r.level} v-${verdictOf(r)}">
+              <button type="button" class="region-row" data-region="${esc(r.key)}" aria-pressed="false">
+                <span class="swatch"></span>
+                <span class="rtext"><span class="rname">${esc(r.label)}</span><br><span class="rdetail">${esc(fmtEase(r))}</span></span>
+                <span class="chip lv-${r.level}">${esc(r.chip)}</span>
+              </button>
+            </li>`).join('')}
+          </ul>
+        </article>`;
+    }).join('');
+    $('wearing').hidden = false;
+  }
+
+  // Swiping the size panels picks the size; the tabs follow (and jump to a panel when tapped).
+  let settling = null;
+  function selectSize(s, { instant = false, fromScroll = false } = {}) {
+    if (!report || !report.sizes[s]) return;
+    size = s;
+    tabsEl.querySelectorAll('.size-tab').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === s)));
+    if (view) view.show(s);
+    colourFigure();
+    if (!fromScroll) {
+      const i = order.indexOf(s);
+      clearTimeout(settling);
+      settling = setTimeout(() => { settling = null; }, instant ? 50 : 600);
+      sizesEl.scrollTo({ left: i * sizesEl.clientWidth, behavior: instant ? 'instant' : 'smooth' });
+    }
+  }
+  tabsEl.addEventListener('click', e => { const b = e.target.closest('.size-tab'); if (b) selectSize(b.dataset.size); });
+  let raf = 0;
+  sizesEl.addEventListener('scroll', () => {
+    if (settling || raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      const s = order[Math.round(sizesEl.scrollLeft / Math.max(1, sizesEl.clientWidth))];
+      if (s && s !== size) selectSize(s, { fromScroll: true });
+    });
+  }, { passive: true });
+  sizesEl.addEventListener('keydown', e => {
+    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    const s = d && order[order.indexOf(size) + d];
+    if (s) { e.preventDefault(); selectSize(s); }
+  });
+  new ResizeObserver(() => { if (report) selectSize(size, { instant: true }); }).observe(sizesEl);
+
+  // 2D fallback: colour the outline, and tap a row to find that part on the body.
+  let focused = null;
+  function colourFigure() {
+    if (figure.hidden || !report) return;
+    const levels = Object.fromEntries(report.sizes[size].regions.map(r => [r.key, r.level]));
+    figure.querySelectorAll('.region').forEach(g => {
+      g.classList.remove('lv-good', 'lv-warn', 'lv-bad');
+      if (levels[g.dataset.region]) g.classList.add('lv-' + levels[g.dataset.region]);
+    });
+  }
+  sizesEl.addEventListener('click', e => {
+    const b = e.target.closest('.region-row');
+    if (!b || figure.hidden) return;
+    focused = focused === b.dataset.region ? null : b.dataset.region;
+    $('wearing').toggleAttribute('data-focus', !!focused);
+    figure.querySelectorAll('.region').forEach(g => g.classList.toggle('focus', g.dataset.region === focused));
+    sizesEl.querySelectorAll('.region-row').forEach(r => r.setAttribute('aria-pressed', String(r.dataset.region === focused)));
+  });
+
   // ---- Paste a link ----
-  const input = document.getElementById('linkInput');
-  const typeSel = document.getElementById('linkType');
-  const detect = document.getElementById('linkDetect');
-  const errorEl = document.getElementById('linkError');
+  const input = $('linkInput');
+  const typeSel = $('linkType');
+  const detect = $('linkDetect');
+  const errorEl = $('linkError');
   typeSel.innerHTML = Fit.TYPES.map(t => `<option value="${t.art}">${t.label}</option>`).join('');
   let parsed = null, typeTouched = false;
 
@@ -262,14 +560,14 @@
     errorEl.textContent = '';
     detect.hidden = !parsed;
     if (!parsed) return;
-    document.getElementById('linkStore').textContent = parsed.store;
-    document.getElementById('linkName').textContent = parsed.name;
+    $('linkStore').textContent = parsed.store;
+    $('linkName').textContent = parsed.name;
     if (!typeTouched) typeSel.value = parsed.art;
   }
   input.addEventListener('input', () => { typeTouched = false; onLink(); });
   typeSel.addEventListener('change', () => { typeTouched = true; });
 
-  const pasteBtn = document.getElementById('pasteBtn');
+  const pasteBtn = $('pasteBtn');
   if (window.isSecureContext && navigator.clipboard && navigator.clipboard.readText) {
     pasteBtn.hidden = false;
     pasteBtn.addEventListener('click', async () => {
@@ -278,8 +576,8 @@
     });
   }
 
-  const submitBtn = document.getElementById('linkSubmit');
-  document.getElementById('linkForm').addEventListener('submit', async e => {
+  const submitBtn = $('linkSubmit');
+  $('linkForm').addEventListener('submit', async e => {
     e.preventDefault();
     if (submitBtn.disabled) return;
     if (!input.value.trim()) { errorEl.textContent = 'Paste a product link first.'; input.focus(); return; }
@@ -295,8 +593,13 @@
     submitBtn.textContent = 'Try it on';
     if (!g) g = Fit.makeCustomGarment({ ...parsed, art: typeSel.value });
     Fit.saveCustom(g);
-    try { sessionStorage.setItem('wd.open', '1'); } catch (err) { /* ignore */ }
-    location.href = 'result.html?id=' + encodeURIComponent(g.id);
+    input.value = ''; onLink();
+    // Hang it first on the rail, open the wardrobe and put it straight on the model.
+    page = 0;
+    renderWardrobe();
+    setOpen(true);
+    swing();
+    wear(g.id);
   });
 
   renderWardrobe();
@@ -304,7 +607,12 @@
   // Open by default when something is hanging, unless it was closed earlier this visit.
   try { startOpen = sessionStorage.getItem('wd.open') !== '0'; } catch (e) { startOpen = true; }
   setOpen(false);
-  if (startOpen && Fit.loadCustom().length) setTimeout(() => { setOpen(true); wardrobe.classList.add('swing'); }, 350);
+  if (startOpen && Fit.loadCustom().length) setTimeout(() => { setOpen(true); swing(); }, 350);
+
+  // Opened from a link to one piece (or an old result page link): put it on straight away.
+  const wantId = new URLSearchParams(location.search).get('id');
+  if (wantId && Fit.getGarment(wantId)) wear(wantId);
+  await ready;
 </script>
 <script type="module">
   import { createWardrobe3D } from './wardrobe3d.js';

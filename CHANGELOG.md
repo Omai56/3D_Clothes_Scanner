@@ -337,3 +337,17 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** Colour layer on top of the redesign (`public/styles.css`, end of file): violet → pink brand gradient (logo, current step, primary buttons, size tabs, unit toggle, progress bar, one italic accent word per page heading), pastel washes behind the page, tinted cards (butter measurements bar and notices, lilac link box, peach/pink "Why this size"), lilac-to-peach backdrops behind the mannequin and 3D body, lilac wardrobe doors and drawer. Fit colours (red/amber/green/blue) unchanged and still only used for fit. Dark mode has matching dark tints.
 **Verified:** screenshots of all pages at desktop and phone width, open wardrobe, active field, dark mode; tests pass.
 **Files:** `public/styles.css`, `public/index.html`, `public/shop.html`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — FitCheck: wardrobe and fit merged into one try-on page
+**By:** Claude (Opus 5.5)
+**What:**
+- `public/shop.html` is now the try-on page: 3D model on the left (pinned while you scroll; pinned at the top on phones), a thinner wardrobe on the right. Steps are now Measure → Try on.
+- Put clothes on the model by dragging a piece from the wardrobe onto it (mouse: drag straight away; touch: press and hold, so quick swipes still flip the rail). Tapping a piece also puts it on. "Take off" clears the model; the worn piece is marked "On model" on its hanger.
+- Sizes are a swipeable strip, one panel per size (fit summary + each area); swiping left/right changes the size and the 3D model follows. Size tabs follow the swipe and jump to a size when tapped; arrow keys work too.
+- Product details (photo, brand, name, your size, price · colour · fabric, store link), notices and "Why this size" appear under the wardrobe once something is on the model.
+- Pasting a link hangs the piece and puts it straight on the model. `?id=` in the address keeps what's worn; `result.html` now redirects there, so old links still work.
+- `public/fit3d.js` — one 3D view that can wear, switch and take off garments.
+**Verified:** headless runs on desktop (mouse drag, scroll/tab size switching, tap, take off, paste a Zara link) and phone (press-and-hold drag, finger swipe through sizes), old result links, measure page → try-on; tests pass.
+**Files:** `public/shop.html`, `public/result.html`, `public/index.html`, `public/fit3d.js`, `public/styles.css`, `CHANGELOG.md`

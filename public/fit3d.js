@@ -34,13 +34,14 @@ export function toViewerGarment(g) {
 
 /**
  * Mount the 3D view in `stage`. `picker` gets a body selector (saved scans), `legend` the colour key.
- * Returns { show(size) } or throws if 3D can't run (no WebGL, no saved bodies).
+ * Returns { wear(garment), show(size), takeOff() }, or throws if 3D can't run (no WebGL, no saved bodies).
  */
-export async function mountFit3D({ stage, picker, legend, garment, preferScan = 'demo' }) {
+export async function mountFit3D({ stage, picker, legend, preferScan = 'demo' }) {
   const scans = await (await fetch('/api/scans')).json();
   if (!scans.length) throw new Error('No saved 3D bodies');
-  const vg = garment.chart ?? toViewerGarment(garment); // imported items carry the store's real chart
   const viewer = new FitViewer(stage);
+  let vg = null; // garment on the model, in the viewer's chart format
+  let bodyCm = null;
   let report = null;
   let size = null;
 
@@ -65,9 +66,10 @@ export async function mountFit3D({ stage, picker, legend, garment, preferScan = 
       const scan = await res.json();
       await viewer.loadBody(scan.objUrl, scan.measurements_cm);
       if (request !== loading) return;
-      report = fitReport(scan.measurements_cm, vg);
+      bodyCm = scan.measurements_cm;
+      report = vg ? fitReport(bodyCm, vg) : null;
       try { sessionStorage.setItem('fit3dScan', name); } catch { /* storage blocked */ }
-      if (size) render();
+      render();
     } finally {
       if (request === loading) delete stage.dataset.loading;
     }
@@ -75,13 +77,26 @@ export async function mountFit3D({ stage, picker, legend, garment, preferScan = 
 
   function render() {
     const ev = report?.sizes[size];
-    if (ev) viewer.showFit(vg, ev);
+    if (vg && ev) viewer.showFit(vg, ev);
+    else viewer.garmentGroup.clear();
   }
 
   await loadScan(current);
   return {
+    /** Put a garment on the model (FitCheck garment; imported items carry the store's real chart). */
+    wear(garment, s) {
+      vg = garment.chart ?? toViewerGarment(garment);
+      report = bodyCm ? fitReport(bodyCm, vg) : null;
+      size = s ?? size;
+      render();
+    },
     show(s) {
       size = s;
+      render();
+    },
+    takeOff() {
+      vg = null;
+      report = null;
       render();
     },
   };

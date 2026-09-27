@@ -68,17 +68,38 @@ export const REGION_DEFS = {
  */
 export function effectiveInseam(chart) {
   if (chart.inseam != null) return chart.inseam;
-  if (chart.total_length != null && chart.rise != null) return Math.round((chart.total_length - chart.rise + 1) * 10) / 10;
+  // outseam minus the vertical part of the rise (the rise is measured along the curve)
+  if (chart.total_length != null && chart.rise != null) return Math.round((chart.total_length - chart.rise * RISE_VERTICAL) * 10) / 10;
   return null;
 }
 
-/** Height (cm from ground) where a bottoms' waistband sits: front rise above the crotch, never above the natural waist. */
-export function waistbandHeight(chart, body) {
+const RISE_VERTICAL = 0.88; // fraction of the front-rise length that stands vertically
+const STYLE_DROP = { high: 0, mid: 4, low: 8 }; // cm below the natural waist a rise style is worn
+
+/** 'high' | 'mid' | 'low' from the garment's fields or description. */
+export function riseStyle(garment) {
+  if (garment?.rise_style) return garment.rise_style;
+  const d = `${garment?.description ?? ''} ${garment?.name ?? ''}`;
+  if (/high[- ]?(rise|waist)/i.test(d)) return 'high';
+  if (/low[- ]?(rise|waist)/i.test(d)) return 'low';
+  return 'mid';
+}
+
+/**
+ * Height (cm from ground) where a bottoms' waistband sits: the front rise above the crotch,
+ * capped at the natural waist minus the drop of its rise style, plus the wearer's own offset
+ * (a slider in the app: negative = worn lower).
+ */
+export function waistbandHeight(chart, body, opts = {}) {
   const crotch = body.insideLegHeight;
   const waist = body.waistHeight;
-  if (chart.rise == null || crotch == null) return waist;
-  const h = crotch + chart.rise * 0.88; // rise is measured along the curve, so it stands a bit less than its length
-  return waist != null ? Math.min(h, waist) : h;
+  const offset = Number(opts.waistOffsetCm ?? 0) || 0;
+  const drop = STYLE_DROP[opts.riseStyle ?? 'mid'] ?? 4;
+  if (crotch == null || waist == null) return (waist ?? 100) + offset;
+  let h = chart.rise != null ? crotch + chart.rise * RISE_VERTICAL : waist;
+  h = Math.min(h, waist - drop) + offset;
+  const lo = (body.topHipHeight ?? body.hipHeight + 8) - 2;
+  return Math.max(lo, Math.min(waist + 2, h));
 }
 
 function bandVerdict(ease, bands, stretchShift = 0) {
@@ -151,7 +172,7 @@ const round = (x) => (x == null ? null : Math.round(x * 10) / 10);
  * @param garment garment JSON
  * @param size  size key, e.g. "M"
  */
-export function evaluateSize(body, garment, size) {
+export function evaluateSize(body, garment, size, opts = {}) {
   const chart = garment.sizes[size];
   if (!chart) throw new Error(`Unknown size ${size}`);
   const defs = REGION_DEFS[garment.category];
@@ -219,7 +240,7 @@ export function evaluateSize(body, garment, size) {
       regions[region] = { label: def.label, garment_cm: v, ...r };
     } else if (def.kind === 'waistband') {
       // Compare the waistband to the body girth at the height where the waistband actually sits.
-      const h = waistbandHeight(chart, body);
+      const h = waistbandHeight(chart, body, { riseStyle: riseStyle(garment), waistOffsetCm: opts.waistOffsetCm });
       const bodyV = girthAtHeight(body, h);
       if (bodyV == null) continue;
       const garmentV = chartGirth(v, garment);
@@ -236,14 +257,20 @@ export function evaluateSize(body, garment, size) {
     } else if (def.kind === 'inseam') {
       const bodyV = body.insideLegHeight;
       if (bodyV == null) continue;
-      const ease = v - bodyV;
+      // With an outseam we know the hem exactly: outseam down from where the waistband is worn.
+      let legLen = v;
+      if (chart.total_length != null) {
+        const wb = waistbandHeight(chart, body, { riseStyle: riseStyle(garment), waistOffsetCm: opts.waistOffsetCm });
+        legLen = Math.round((chart.total_length - (wb - bodyV)) * 10) / 10;
+      }
+      const ease = legLen - bodyV;
       let verdict = 'good';
       let lands_at = 'at the ankle';
       if (ease < -8) [verdict, lands_at] = ['tight', 'well above the ankle'];
       else if (ease < -2.5) [verdict, lands_at] = ['snug', 'just above the ankle (cropped look)'];
       else if (ease > 8) [verdict, lands_at] = ['very_loose', 'bunching on the shoe'];
       else if (ease > 3) [verdict, lands_at] = ['loose', 'over the shoe'];
-      regions[region] = { label: def.label, garment_cm: v, body_cm: round(bodyV), ease_cm: round(ease), lands_at, verdict };
+      regions[region] = { label: def.label, garment_cm: legLen, body_cm: round(bodyV), ease_cm: round(ease), lands_at, verdict };
     }
   }
 
@@ -313,9 +340,9 @@ function summarize(regions, garment) {
  * Full fit report: every size evaluated + recommendation.
  * @returns {{ recommended: string, sizes: Object, garment_id: string }}
  */
-export function fitReport(body, garment) {
+export function fitReport(body, garment, opts = {}) {
   const sizes = {};
-  for (const size of Object.keys(garment.sizes)) sizes[size] = evaluateSize(body, garment, size);
+  for (const size of Object.keys(garment.sizes)) sizes[size] = evaluateSize(body, garment, size, opts);
 
   const order = Object.keys(garment.sizes);
   let best = null;
@@ -341,5 +368,12 @@ export function fitReport(body, garment) {
     if (why.length) notes.push(`${order[idx + 1]} would be looser ${joinList(why)}.`);
   }
 
-  return { garment_id: garment.id, recommended, sizes, notes, size_order: order };
+  return {
+    garment_id: garment.id,
+    recommended,
+    sizes,
+    notes,
+    size_order: order,
+    ...(garment.category === 'bottom' ? { rise_style: riseStyle(garment), waist_offset_cm: Number(opts.waistOffsetCm ?? 0) || 0 } : {}),
+  };
 }

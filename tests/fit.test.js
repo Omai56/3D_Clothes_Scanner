@@ -69,12 +69,15 @@ test('real Zara loose jeans: inseam derived from total length - rise; waistband 
   const r = fitReport(body, jeans);
   const s30 = r.sizes['30'];
   assert.ok(s30.regions.inseam, 'inseam region missing');
-  assert.equal(s30.regions.inseam.garment_cm, Math.round((107.4 - 33 + 1) * 10) / 10);
+  // leg length as worn = outseam − (waistband height − crotch height)
+  const wornLeg = 107.4 - (s30.regions.waist.height_cm - body.insideLegHeight);
+  assert.ok(Math.abs(s30.regions.inseam.garment_cm - wornLeg) < 0.2, `${s30.regions.inseam.garment_cm} vs ${wornLeg}`);
   assert.ok(s30.regions.waist.height_cm <= body.waistHeight + 0.01);
   assert.ok(!s30.regions.thigh, 'no thigh data in this chart');
   // demo body waist 77.9: 30 (78.2) snug, 36 (94) very loose
   assert.equal(r.sizes['36'].regions.waist.verdict, 'very_loose');
-  assert.ok(['29', '30', '31'].includes(r.recommended), `got ${r.recommended}`);
+  // mid-rise: worn ~4 cm below the natural waist, where the demo body is a little wider
+  assert.ok(['30', '31', '32'].includes(r.recommended), `got ${r.recommended}`);
   assert.match(s30.summary, /Waistband sits/);
 });
 

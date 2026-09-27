@@ -105,6 +105,10 @@ button:disabled { opacity: .5; }
 .size .dots { display: flex; gap: 3px; justify-content: center; margin-top: 5px; }
 .size .dots i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 
+.waist-control { display: flex; align-items: center; gap: 12px; padding: 4px 2px 12px; font-size: 13px; color: var(--muted); }
+.waist-control label { flex: none; }
+.waist-control label span { color: var(--ink); font-weight: 600; }
+.waist-control input { flex: 1; accent-color: var(--ink); }
 .viewer-wrap { position: relative; background: #ffffff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 #viewer { width: 100%; height: min(58vh, 520px); touch-action: none; }
 #viewer canvas { display: block; }

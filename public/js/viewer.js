@@ -232,14 +232,16 @@ export class FitViewer {
     // Torso below the armpit: point on the ring at Y by angle; below the chest never narrower
     // than the chest (cloth hangs).
     const shoulderY = neckY - 0.06;
+    // Gravity: below the chest the cloth is never narrower than anything above it (it hangs).
+    const hangTorso = hangingRings(this.rings.torso, bustY, hemY - 0.02);
     const torsoPoint = (Y, u, front) => {
       const theta = front ? Math.acos(u) : -Math.acos(u);
       const smp = sampleRing(this.rings.torso, Math.min(Y, shoulderY - 0.01), theta);
       if (!smp) return null;
       let r = smp.r + easeCached(Y) + 0.006;
       if (Y < bustY) {
-        const bust = sampleRing(this.rings.torso, bustY, theta);
-        if (bust) r = Math.max(r, bust.r + bustEase + 0.006);
+        const hg = sampleRing(hangTorso, Y, theta);
+        if (hg) r = Math.max(r, hg.r + bustEase + 0.006);
       }
       return [smp.cx + r * Math.cos(theta), smp.cz + r * Math.sin(theta)];
     };
@@ -266,8 +268,9 @@ export class FitViewer {
     for (const side of ['R', 'L']) {
       const a = this.arms?.[side];
       if (!a) continue;
+      // arm axis starts a little below the shoulder top (the joint), not on it
       const Sx = a.shoulder.x;
-      const Sy = a.shoulder.y;
+      const Sy = a.shoulder.y - 0.03;
       const Sz = a.shoulder.z;
       let dx = a.hand.x - Sx;
       let dy = a.hand.y - Sy;
@@ -291,14 +294,18 @@ export class FitViewer {
     // Half sleeve width as a fraction of sleeve length (flat width = chart arm width).
     const sleeveHalfM = chart.arm_width ? chart.arm_width / 200 : armR * 1.6;
     const sleeveHalfN = sleeveHalfM / Math.max(0.05, sleeveLen);
+    // A sleeve rests on top of the arm and its slack hangs underneath: the tube's centre is
+    // pushed down/inward so its top surface touches the arm.
+    const armBodyR = (b.upperArmGirthR ?? 30) / 100 / TWO_PI;
     const sleevePoint = (side, s, u, front) => {
       const A = arms[side];
       if (!A) return null;
       const phi = front ? Math.acos(u) : -Math.acos(u);
       const along = s * sleeveLen;
-      const r = armR * (1 - 0.12 * s);
-      const px = A.Sx + A.dx * along;
-      const py = A.Sy + A.dy * along;
+      const r = Math.max(armBodyR + 0.008, armR * (1 - 0.12 * s));
+      const drop = r - (armBodyR + 0.008); // slack hangs under the arm
+      const px = A.Sx + A.dx * along - A.nx * drop;
+      const py = A.Sy + A.dy * along - A.ny * drop;
       const pz = A.Sz + A.dz * along;
       return [px + r * Math.cos(phi) * A.nx, py + r * Math.cos(phi) * A.ny, pz + r * Math.sin(phi)];
     };
@@ -318,8 +325,11 @@ export class FitViewer {
         let p = null;
         // Sleeve vertex? (position along/across the sleeve's own axis in the flat mesh)
         const sv = S.sleeveOf(x, y, z);
-        if (sv) {
-          const q = sleevePoint(sv.side, sv.s, sv.u, sv.front);
+        const ax = Math.abs(x - meshCx);
+        if (sv || ax > S.torsoHalf) {
+          // sleeve, or the underarm gusset beside it (tucked to the sleeve's underarm root)
+          const side = x >= meshCx ? 'R' : 'L';
+          const q = sv ? sleevePoint(sv.side, sv.s, sv.u, sv.front) : sleevePoint(side, 0.02, -1, z >= (S.frames[side]?.zc ?? 0));
           if (q) {
             out[i * 3] = q[0];
             out[i * 3 + 1] = q[1];
@@ -330,7 +340,9 @@ export class FitViewer {
         const band = Math.floor(v * NB);
         const ms = lerpStats(S.all, v, NB) ?? S.nearestAll(band);
         const Y = hemY + v * (topY - hemY);
-        const u = clamp((x - ms.cx) / ms.hw, -1, 1);
+        // across the torso: normalised by the constant torso width (the flat torso is a rectangle),
+        // so the mapping is smooth from hem to shoulder
+        const u = clamp((x - meshCx) / S.torsoHalf, -1, 1);
         const pr = Y < blendHi ? torsoPoint(Y, u, z >= ms.cz) : null;
         const pu = Y > blendLo ? upperPoint(x, z) : null;
         if (pr && pu) {
@@ -382,10 +394,17 @@ export class FitViewer {
     // Body targets.
     const crotchY = b.insideLegHeight / 100;
     const topY = (R.waist?.height_cm ?? b.waistHeight) / 100;
-    const hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100 + 0.01, topY - (chart.total_length ?? b.waistHeight) / 100);
+    // Where the hem wants to be: the outseam down from where the waistband is worn (a long rise
+    // worn lower means a lower crotch and a lower hem, as in real life).
+    const hemWanted = chart.total_length != null ? topY - chart.total_length / 100 : crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100;
+    // Hem never goes below the ankle: a too-long leg bunches on the shoe rather than covering the foot.
+    const hemY = Math.max((b.outerAnkleHeightR ?? 7) / 100 + 0.005, hemWanted);
     const kneeY = (b.kneeHeightR ?? 48) / 100;
     const midThighY = (crotchY + kneeY) / 2;
     const hipY = b.hipHeight / 100;
+    // Pooling: a leg longer than the wearer's bunches up at the ankle instead of vanishing.
+    const excess = Math.max(0, hemY - hemWanted); // metres of leg that has nowhere to go
+    const POOL = 0.06;
     const easeHip = Math.max(MIN_GAP, cmEaseToRadius(R.hip?.ease_cm ?? R.waist?.ease_cm));
     const easeWaist = Math.max(MIN_GAP, cmEaseToRadius(R.waist?.ease_cm ?? R.hip?.ease_cm));
     const legEase = Math.max(MIN_GAP, cmEaseToRadius(R.thigh?.ease_cm ?? R.hip?.ease_cm) + 0.004);
@@ -439,9 +458,19 @@ export class FitViewer {
       // Vertical mapping: mesh hem -> body hem, mesh crotch -> the height where the body's legs
       // split, mesh top -> waistband. Piecewise so leg geometry never wraps the torso.
       const vCrotch = S.crotchBand >= 0 ? (S.crotchBand + 1) / NB : null;
+      // Legs run from the wanted hem (may be below the ankle) to the split; the part below the
+      // ankle is squashed into an 8 cm pool just above the hem, flaring out a little.
+      const legBottom = hemWanted;
+      const mapYLeg = (v) => {
+        const Yl = legBottom + (v / (vCrotch ?? 1)) * (legTop - legBottom);
+        if (excess <= 0 || Yl >= hemY + POOL) return { Y: Yl, bump: 0 };
+        const t = clamp((Yl - legBottom) / (hemY + POOL - legBottom), 0, 1);
+        // gentle stack of folds: a few mm out, more the longer the excess
+        return { Y: hemY + t * POOL, bump: Math.min(0.012, excess * 0.12) * Math.sin(Math.PI * t) };
+      };
       const mapY = (v) => {
         if (vCrotch == null) return hemY + v * (topY - hemY);
-        if (v <= vCrotch) return hemY + (v / vCrotch) * (legTop - hemY);
+        if (v <= vCrotch) return mapYLeg(v).Y;
         return legTop + ((v - vCrotch) / (1 - vCrotch)) * (topY - legTop);
       };
       // Each vertex is placed by ANGLE on the body's own cross-section ring at its height:
@@ -450,7 +479,13 @@ export class FitViewer {
       // (legs) or scaled to the chart's circumference (hips/waist). A flat mesh thus becomes a
       // real tube that follows the body instead of a lens with thin edges.
       const splitY = this.rings.crotchSplitY ?? crotchY;
-      const legRings = { R: this.rings.right, L: this.rings.left };
+      // Gravity: legs hang straight from their widest point (upper thigh); the seat likewise
+      // down to the crotch. Cloth only follows the body where the body is wider than the cloth.
+      const legRings = {
+        R: hangingRings(this.rings.right, legTop - 0.005, hemY - 0.02),
+        L: hangingRings(this.rings.left, legTop - 0.005, hemY - 0.02),
+      };
+      const hangTorso = hangingRings(this.rings.torso, hipY, splitY - 0.01);
       const BLEND = 0.06; // metres below the crotch where legs blend into the hip mapping
       const chartC = (Y) => {
         if (waistC && hipC) {
@@ -473,16 +508,19 @@ export class FitViewer {
         const theta = front ? Math.acos(u) : -Math.acos(u);
         const smp = sampleRing(this.rings.torso, t.Yc, theta);
         if (!smp) return null;
-        const r = Math.max(smp.r + t.ease, smp.r * t.s);
+        let r = Math.max(smp.r + t.ease, smp.r * t.s);
+        if (Y < hipY) {
+          const hg = sampleRing(hangTorso, t.Yc, theta);
+          if (hg) r = Math.max(r, hg.r * t.s, hg.r + t.ease);
+        }
         return [smp.cx + r * Math.cos(theta), smp.cz + r * Math.sin(theta)];
       };
-      // Leg target: point on that leg's ring, never narrower than the thigh (straight leg), + ease.
-      const legPoint = (side, Y, u, front) => {
+      // Leg target: point on the hanging profile of that leg (straight from the widest point) + ease.
+      const legPoint = (side, Y, u, front, bump = 0) => {
         const theta = front ? Math.acos(u) : -Math.acos(u);
         const smp = sampleRing(legRings[side], Math.min(Y, legTop - 0.005), theta);
         if (!smp) return null;
-        const th = sampleRing(legRings[side], midThighY, theta);
-        const r = Math.max(smp.r, th ? th.r : 0) + legEase;
+        const r = smp.r + legEase + bump;
         return [smp.cx + r * Math.cos(theta), smp.cz + r * Math.sin(theta)];
       };
       for (let i = 0; i < n; i++) {
@@ -502,7 +540,8 @@ export class FitViewer {
           const ls = lerpStats(S.legs[side], v, NB) ?? S.nearestLeg(side, band);
           if (ls) {
             const u = clamp((x - ls.cx) / ls.hw, -1, 1);
-            p = legPoint(side, Y, u, z >= ls.cz);
+            const pool = vCrotch != null ? mapYLeg(v).bump : 0;
+            p = legPoint(side, Y, u, z >= ls.cz, pool);
             // blend into the hip mapping just below the crotch so there is no shelf
             if (p && Y > legTop - BLEND) {
               const q = torsoPoint(Y, uAll, frontAll, yk);
@@ -653,7 +692,7 @@ export class FitViewer {
     const chart = garment.sizes[ev.size] ?? {};
     const crotchY = b.insideLegHeight / 100;
     const splitY = this.rings.legTopY || crotchY; // where the two leg shells meet the torso shell
-    const waistbandY = waistbandHeight(chart, b) / 100;
+    const waistbandY = (R.waist?.height_cm ?? waistbandHeight(chart, b)) / 100;
     const ankleY = (b.outerAnkleHeightR ?? 7) / 100 + 0.01;
     // Hem never goes below the ankle: a too-long leg bunches on the shoe rather than covering the foot.
     const hemY = Math.max(ankleY, crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100);
@@ -869,6 +908,33 @@ function buildTopMap(positions, yMin, yMax) {
       return wsum > 0.25 ? sum / wsum : null;
     },
   };
+}
+
+/**
+ * "Hanging" rings: going down from yTop, each ring's radii are the running maximum of every
+ * ring above it (fabric falls straight down from the widest point it passes). Returns a new
+ * ring map for the range [yBottom, yTop].
+ */
+function hangingRings(ringsMap, yTop, yBottom) {
+  const out = new Map();
+  const iTop = Math.round(yTop / SLICE_STEP);
+  const iBot = Math.max(0, Math.floor(yBottom / SLICE_STEP));
+  let acc = null;
+  for (let iy = iTop; iy >= iBot; iy--) {
+    const ring = ringsMap.get(iy);
+    if (!ring) {
+      if (acc) out.set(iy, { y: iy * SLICE_STEP, cx: acc.cx, cz: acc.cz, r: acc.r });
+      continue;
+    }
+    if (!acc) acc = { cx: ring.cx, cz: ring.cz, r: Float32Array.from(ring.r) };
+    else {
+      const r = new Float32Array(ring.r.length);
+      for (let j = 0; j < r.length; j++) r[j] = Math.max(acc.r[j], ring.r[j]);
+      acc = { cx: ring.cx, cz: ring.cz, r };
+    }
+    out.set(iy, { y: ring.y, cx: ring.cx, cz: ring.cz, r: acc.r });
+  }
+  return out;
 }
 
 /**

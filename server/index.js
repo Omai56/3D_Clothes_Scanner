@@ -213,7 +213,8 @@ app.post('/api/fit', async (req, res) => {
   const g = garment ?? (await readGarment(garment_id));
   if (!g) return res.status(404).json({ error: 'garment not found' });
   try {
-    res.json({ report: fitReport(body, g), body_cm: body, landmarks_cm: bodyLandmarks(body) });
+    const opts = { waistOffsetCm: Math.max(-12, Math.min(6, Number(req.body?.waist_offset_cm ?? 0) || 0)) };
+    res.json({ report: fitReport(body, g, opts), body_cm: body, landmarks_cm: bodyLandmarks(body) });
   } catch (e) {
     res.status(400).json({ error: String(e.message) });
   }

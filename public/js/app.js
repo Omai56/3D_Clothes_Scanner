@@ -148,18 +148,23 @@ $('#import-form').addEventListener('submit', async (e) => {
   }
 });
 
+async function fetchFit(g) {
+  return fetch('/api/fit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scan: state.scan.name, garment_id: g.id, waist_offset_cm: state.waistOffset ?? 0 }),
+  });
+}
+
 async function selectGarment(g) {
   if (!state.scan?.name) return show('body');
   state.garment = g;
   state.meshyUrl = null;
+  state.waistOffset = 0;
   clearInterval(meshyTimer);
   if (viewer) viewer.clearGarmentModel();
   showViewMode(false);
-  const r = await fetch('/api/fit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scan: state.scan.name, garment_id: g.id }),
-  });
+  const r = await fetchFit(g);
   const data = await r.json();
   if (r.status === 404 && data.error?.includes('body')) {
     // The saved body disappeared (renamed/removed on the server): refresh the list and go back.
@@ -203,6 +208,16 @@ async function renderFit() {
       renderFit();
     });
     sizesEl.appendChild(btn);
+  }
+
+  // waistband position (bottoms only)
+  const wc = $('#waist-control');
+  wc.hidden = g.category !== 'bottom';
+  if (g.category === 'bottom') {
+    $('#waist-slider').value = String(state.waistOffset ?? 0);
+    const off = state.waistOffset ?? 0;
+    const style = rep.rise_style ? `${rep.rise_style}-rise` : '';
+    $('#waist-label').textContent = off === 0 ? `${style} default` : off < 0 ? `${Math.abs(off)} cm lower` : `${off} cm higher`;
   }
 
   const ev = rep.sizes[state.size];
@@ -319,6 +334,25 @@ function setMeshyStatus(msg) {
   el.textContent = msg;
   el.hidden = !msg;
 }
+
+// Waistband slider: re-run the fit at the new height (waist compared where it actually sits) and redraw.
+let waistTimer = null;
+$('#waist-slider').addEventListener('input', (e) => {
+  state.waistOffset = Number(e.target.value);
+  const off = state.waistOffset;
+  $('#waist-label').textContent = off === 0 ? `${state.report?.rise_style ?? ''}-rise default` : off < 0 ? `${Math.abs(off)} cm lower` : `${off} cm higher`;
+  clearTimeout(waistTimer);
+  waistTimer = setTimeout(async () => {
+    if (!state.garment) return;
+    const r = await fetchFit(state.garment);
+    const data = await r.json();
+    if (!r.ok) return;
+    state.report = data.report;
+    if (!state.report.sizes[state.size]) state.size = state.report.recommended;
+    await renderFit();
+    if (state.meshyUrl && viewer) await viewer.loadGarmentModel(state.meshyUrl, state.garment, state.report.sizes[state.size]);
+  }, 200);
+});
 
 $('#btn-another').addEventListener('click', () => show('item'));
 

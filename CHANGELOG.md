@@ -203,3 +203,20 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Look/Fit semantics: Look always encloses the body (a tight garment hugs with a small gap); Fit shows where it's tight/loose in colour.
 **Verified:** headless renders — heavyweight tee S/XL front + side, slim tee front + back, jeans regression: enclosed everywhere, no console errors; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 22:20 — Gravity for garments, waistband slider, sleeves that lie on the arm
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/viewer.js`
+  - **Gravity rule** (`hangingRings`): going down from the chest (tops) / hip and upper thigh (trousers), the cloth radius is the running maximum of everything above it — fabric falls straight from the widest point and only follows the body where the body is wider than the cloth. Loose jeans now hang straight and flat; tight ones hug.
+  - **Sleeves** rest on top of the arm with the slack hanging underneath (tube centre offset down/inward so its top touches the arm), arm axis starts at the shoulder joint; torso mapping normalised by the constant torso width; the underarm gusset is tucked to the sleeve root. No more box shoulders.
+  - **Pooling**: when the leg is longer than the wearer's (outseam down from where the waistband is worn), the extra length stacks in a soft 6 cm roll above the hem instead of vanishing; hem never covers the foot.
+- `shared/fit.js`
+  - Waistband height now honours the **rise style** (mid-rise worn 4 cm below the natural waist, low 8, high 0; from `rise_style` or the description) and a per-user **waist offset**; the waist is compared to the body girth at that height; the **leg length as worn** = outseam − (waistband height − crotch) (a long rise worn lower drops the crotch and the hem). Inseam fallback uses the vertical part of the rise (×0.88).
+- `server/index.js` — `/api/fit` accepts `waist_offset_cm` (−12…+6).
+- **Waistband slider** on the fit screen for bottoms (`#waist-control`): drag to wear the jeans higher/lower; fit report, size recommendation and the 3D mesh update. For Daniel: default → 29 (waist +4 cm), 6 cm lower → 32 (waist tight at the hips).
+- Tests: expectations updated (worn leg length, mid-rise default); 24 pass.
+**Known:** a horizontal crease band remains on the tee at armpit height (ring-shape change where the arm roots are clipped).
+**Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `shared/fit.js`, `server/index.js`, `tests/fit.test.js`, `CHANGELOG.md`

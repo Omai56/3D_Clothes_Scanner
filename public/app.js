@@ -232,6 +232,50 @@
   ];
 
   function garmentArt(g) { return ART[g.art](g.color); }
+
+  // A piece folded flat, as it lies in the wardrobe drawer (seen from above, viewBox 0 0 80 60).
+  // Tops: sleeves tucked behind, hem folded up, neckline on top. Bottoms: legs folded over, waistband on top.
+  // Every piece shows its folded layers along the front edge.
+  function foldedArt(g) {
+    const c = g.color, dark = 'rgba(0,0,0,.28)', shade = 'rgba(0,0,0,.12)', soft = 'rgba(0,0,0,.07)', hi = 'rgba(255,255,255,.4)';
+    const layers = `<path d="M7 45h66v6a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z" fill="${c}"/><path d="M7 45h66v6a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z" fill="${shade}"/>
+      <path d="M8 48.5h64M8.5 51.5h63" stroke="${dark}" stroke-width=".6" opacity=".6"/>`;
+    const slab = `<rect x="7" y="7" width="66" height="40" rx="4" fill="${c}"/>`;
+    if (g.category === 'bottom') {
+      const stitch = g.art === 'jeans' ? 'rgba(240,185,100,.95)' : null;
+      return `<svg viewBox="0 0 80 60" aria-hidden="true">${layers}${slab}
+        <rect x="7" y="7" width="66" height="8" rx="3" fill="${shade}"/>
+        ${[16, 30, 50, 64].map(x => `<rect x="${x - 1.5}" y="6" width="3" height="10" rx="1" fill="${c}"/><rect x="${x - 1.5}" y="6" width="3" height="10" rx="1" fill="${soft}"/>`).join('')}
+        <circle cx="40" cy="11" r="2.2" fill="#d9b36a"/><circle cx="39.3" cy="10.3" r=".7" fill="#fff" opacity=".7"/>
+        <path d="M40 15v9q0 4-4 5" fill="none" stroke="${dark}" stroke-width="1"/>
+        <path d="${g.art === 'jeans' ? 'M10 16q3 9 14 8M70 16q-3 9-14 8' : 'M12 16l8 10M68 16l-8 10'}" fill="none" stroke="${dark}" stroke-width="1"/>
+        ${stitch ? `<path d="M9 13h62M11 17.5q3 8.5 13 7.8M69 17.5q-3 8.5-13 7.8" fill="none" stroke="${stitch}" stroke-width=".8" stroke-dasharray="1.6 1.4"/>` : ''}
+        <rect x="7" y="31" width="66" height="16" rx="3" fill="${soft}"/>
+        <path d="M8 31h64" stroke="${hi}" stroke-width="1.2"/><path d="M8 32.2h64" stroke="${shade}" stroke-width="1"/>
+        <path d="M40 33v14" stroke="${dark}" stroke-width=".9"/>
+        <path d="M8 44h64" stroke="${stitch || shade}" stroke-width=".8" ${stitch ? 'stroke-dasharray="1.6 1.4"' : ''}/></svg>`;
+    }
+    const collar = {
+      tee: `<path d="M29 7q11 12 22 0" fill="${dark}"/><path d="M29 7q11 12 22 0" fill="none" stroke="${c}" stroke-width="2.2"/><path d="M29 7q11 12 22 0" fill="none" stroke="${shade}" stroke-width="2.2"/><path d="M28 7.2q12 13.6 24 0" fill="none" stroke="${hi}" stroke-width=".8"/>`,
+      shirt: `<path d="M30 7h20l-10 7z" fill="${dark}"/><path d="M30 7l10 7-3 7-10-9zM50 7l-10 7 3 7 10-9z" fill="${c}"/><path d="M30 7l10 7-3 7-10-9zM50 7l-10 7 3 7 10-9z" fill="${hi}"/>
+        <path d="M30 7l10 7-3 7-10-9zM50 7l-10 7 3 7 10-9z" fill="none" stroke="${shade}" stroke-width=".8"/>
+        <path d="M40 14v17" stroke="${shade}" stroke-width="1"/><circle cx="41.5" cy="19" r="1" fill="${dark}"/><circle cx="41.5" cy="26" r="1" fill="${dark}"/>`,
+      hoodie: `<path d="M24 7q16-9 32 0l-3 13q-13 6-26 0z" fill="${c}"/><path d="M24 7q16-9 32 0l-3 13q-13 6-26 0z" fill="${shade}"/>
+        <path d="M30 9q10 8 20 0" fill="${dark}"/><path d="M36 17l-1 11M44 17l1 11" stroke="${hi}" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="35" cy="28.5" r="1.2" fill="#d9b36a"/><circle cx="45" cy="28.5" r="1.2" fill="#d9b36a"/>`,
+      jacket: `<rect x="28" y="3" width="24" height="8" rx="3" fill="${c}"/><rect x="28" y="3" width="24" height="8" rx="3" fill="${shade}"/>
+        <path d="M40 7v24" stroke="#cfcac2" stroke-width="1.4"/><rect x="38.6" y="11" width="2.8" height="5" rx="1" fill="#b8b2a8"/>
+        ${[17, 24].map(y => `<path d="M8 ${y}Q40 ${y + 3} 72 ${y}" fill="none" stroke="${shade}" stroke-width="1"/>`).join('')}`,
+    }[g.art] || '';
+    return `<svg viewBox="0 0 80 60" aria-hidden="true">${layers}${slab}
+      <rect x="7" y="7" width="9" height="40" rx="3" fill="${soft}"/><rect x="64" y="7" width="9" height="40" rx="3" fill="${soft}"/>
+      <path d="M16 8v38M64 8v38" stroke="${shade}" stroke-width=".9"/>
+      <rect x="7" y="31" width="66" height="16" rx="3" fill="${soft}"/>
+      <path d="M8 31h64" stroke="${hi}" stroke-width="1.2"/><path d="M8 32.2h64" stroke="${shade}" stroke-width="1"/>
+      ${g.art === 'hoodie' ? `<path d="M9 42h62" stroke="${shade}" stroke-width="3"/>` : ''}
+      ${collar}</svg>`;
+  }
+
   function getGarment(id) { return GARMENTS.find(g => g.id === id) || loadCustom().find(g => g.id === id) || null; }
 
   // ---------- Items from a pasted product link ----------
@@ -294,11 +338,25 @@
     try { const list = JSON.parse(localStorage.getItem(CUSTOM_KEY)); return Array.isArray(list) ? list : []; } catch (e) { return []; }
   }
   function saveCustom(g) {
+    takeFromDrawer(g.id);
     const list = [g, ...loadCustom().filter(x => x.id !== g.id)].slice(0, 12);
     try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
   }
   function removeCustom(id) {
     try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(loadCustom().filter(x => x.id !== id))); } catch (e) { /* ignore */ }
+  }
+
+  // Pieces taken off the rail are folded into the drawer (newest first) so they can be hung back.
+  const DRAWER_KEY = 'fit.drawer';
+  function loadDrawer() {
+    try { const list = JSON.parse(localStorage.getItem(DRAWER_KEY)); return Array.isArray(list) ? list : []; } catch (e) { return []; }
+  }
+  function foldIntoDrawer(g) {
+    const list = [g, ...loadDrawer().filter(x => x.id !== g.id)].slice(0, 8);
+    try { localStorage.setItem(DRAWER_KEY, JSON.stringify(list)); } catch (e) { /* ignore */ }
+  }
+  function takeFromDrawer(id) {
+    try { localStorage.setItem(DRAWER_KEY, JSON.stringify(loadDrawer().filter(x => x.id !== id))); } catch (e) { /* ignore */ }
   }
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -399,5 +457,6 @@
     FIELDS, DEMO_BODY, SIZE_NAMES, GARMENTS, CM_PER_IN: 2.54,
     bodyFigure, setFigureValue, garmentArt, getGarment, fitReport, saveBody, loadBody,
     TYPES, parseProductLink, makeCustomGarment, loadCustom, saveCustom, removeCustom, esc,
+    foldedArt, loadDrawer, foldIntoDrawer, takeFromDrawer,
   };
 })();

@@ -669,3 +669,36 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `public/js/app.js`, `public/index.html`, `public/css/style.css` — worn state is per slot; the side panel shows **Top / Bottom** tabs when both are on, sizes and the waistband slider act on the selected one, Take off / drag-to-closet removes only that item; the closet marks every worn item.
 **Verified:** slim S/L, heavyweight S/XL alone; tee + jeans from front, back and side (both tees); 24 tests pass.
 **Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Renamed to "Fitting Room"; cute, warm wardrobe decorations
+**By:** Claude (Opus 5.5)
+**What:** The new pages are now called **Fitting Room** (logo "Fitting *Room*" with "Room" in the action orange; page titles "… · Fitting Room"). The team's original app (`app.html`, `js/`, `css/`) and README are not renamed. The wardrobe on the try-on page gets decorations: a potted plant and a sleeping ginger cat (tail swishes, little "z"s) on top, warm fairy lights that twinkle along the crown, a heart tag swaying on the left door handle (it swings open with the door), and a round woven rug in terracotta and cream underneath. All decorative only (hidden from screen readers, not clickable) and still when the system asks for reduced motion; dark-mode rug.
+**Verified:** try-on page at 390 and 1280px, doors closed and open (decorations don't block the doors or the rail), no sideways scrolling, no page errors; tests pass.
+**Files:** `public/shop.html`, `public/index.html`, `public/result.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Door ornaments (挂饰) on the wardrobe
+**By:** Claude (Opus 5.5)
+**What:** Hanging ornaments on the wardrobe doors: a dried-flower wreath (sage leaves, cream / pink / mustard flowers, red berries) with a ribbon bow, hung from the top of the right door; a felt strand on the left door (star, moon, two wooden beads, heart); a terracotta tassel with a brass bead on the right handle, pairing with the heart tag on the left handle. They sit on the door fronts, so they swing open with the doors; each sways gently at its own pace (still with reduced motion); decorative only, not clickable; slightly smaller on phones.
+**Verified:** try-on page at 390 and 1280px, doors closed and open; close-up check of each ornament; no page errors.
+**Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Warm decorations on the pages
+**By:** Claude (Opus 5.5)
+**What:** New `public/decor.js` (loaded by the measure and try-on pages) adds, matching the wardrobe: fairy lights draped under the top bar on both pages; small hand-drawn hearts, sparkles, stars and flowers floating in the side margins (wide screens only, ≥1180px); on the measure page, a tailor's tape measure hanging over the mannequin card and a tomato pin cushion with coloured pins (≥760px); on the try-on page, a wooden "Fitting Room ♡" sign swinging in the corner of the model's stage and a small potted plant on the stage floor. All decorative (hidden from screen readers, ignore the pointer, so dragging / rotating the model is unaffected), still with reduced motion. Page top padding nudged so the lights clear the headings.
+**Verified:** both pages at 390 and 1280px: no sideways scrolling, nothing overlaps buttons, the drop hint or inputs; tests pass.
+**Files:** `public/decor.js` (new), `public/index.html`, `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — The wardrobe drawer (抽屉): pieces taken off the rail are folded in, not deleted
+**By:** Claude (Opus 5.5)
+**What:** The drawer under the doors now opens: tap it and the front slides out toward you with a gingham-lined tray. The × on a hanger folds the piece into the drawer instead of deleting it (a closed drawer gives a little bump, and an orange badge on its front counts what's inside). Tap a folded piece ("Hang back") to put it back on the rail; the wardrobe opens and the hangers swing. The drawer keeps the last 8 pieces. Empty, it holds a lavender sachet and a note saying what goes in there. Pieces are drawn folded, seen from above, with their name underneath: tops with the sleeves tucked behind, the hem folded up and their neckline, collar, hood or zip on top; jeans and trousers folded over with the waistband, belt loops, button and pockets (jeans with orange topstitching); all show their stacked layers along the front edge. The page makes room below the wardrobe while the drawer is open.
+**Clear wording:** the × on a hanger is now a ↓ arrow (orange outline, filled on hover); after using it, a note above the drawer says "Folded into the drawer below." with a **Show me** button that opens it (hides after 5 s); the drawer front has an orange ↓ arrow (points up when open); inside, a plain sentence "Clothes you took off the rail. **Tap one to hang it back up.**"; empty, it says "**Nothing in here yet.** Tap **↓** on a piece in the wardrobe and it's folded in here, so you can hang it back later."
+**Verified:** headless Chrome at 390 and 1280px: empty drawer, badge after removing pieces, open drawer with folded pieces, hang back (drawer and rail counts correct); no page errors; 24 tests pass.
+**Files:** `public/app.js`, `public/shop.html`, `public/styles.css`, `CHANGELOG.md`

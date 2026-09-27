@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Try On · FitCheck</title>
+  <title>Try On · Fitting Room</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
 <body>
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="logo" href="measure.html"><span class="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#2b2170"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M11 9.5l3-1.5c.6 1.3 1.1 2 2 2s1.4-.7 2-2l3 1.5 3 4-2.4 1.6-1.1-1.4V23h-9v-9.3l-1.1 1.4L8 13.5z" fill="#fff" opacity=".95"/><path d="M12.5 19.5h7" stroke="#d9b36a" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 1.6"/></svg></span><span class="logo-word">Fit<em>Check</em></span></a>
+    <a class="logo" href="index.html"><span class="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#2b2170"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M11 9.5l3-1.5c.6 1.3 1.1 2 2 2s1.4-.7 2-2l3 1.5 3 4-2.4 1.6-1.1-1.4V23h-9v-9.3l-1.1 1.4L8 13.5z" fill="#fff" opacity=".95"/><path d="M12.5 19.5h7" stroke="#d9b36a" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 1.6"/></svg></span><span class="logo-word">Fitting <em>Room</em></span></a>
     <ol class="steps" aria-label="Step 2 of 2"><li class="done"><span class="dot">1</span><span class="lbl">Measure</span></li><li class="current" aria-current="step"><span class="dot">2</span><span class="lbl">Try on</span></li></ol>
   </div>
 </header>
@@ -81,7 +81,12 @@
 
     <div class="wardrobe-scene">
       <div class="wardrobe" id="wardrobe" data-open="false">
-        <div class="wd-crown"><span class="wd-plaque"><span id="plaqueCount">0</span> <span id="plaqueUnit">pieces</span></span></div>
+        <div class="wd-decor" aria-hidden="true">
+          <svg class="wd-plant" viewBox="0 0 54 64"><path d="M27 40C20 30 10 28 6 16c10 2 18 10 21 22z" fill="#8fae7c"/><path d="M27 40c3-14 13-18 21-28 0 14-10 22-20 28z" fill="#7a9a68"/><path d="M27 40c-3-14-1-28 3-38 6 12 2 28-2 38z" fill="#a3bf8f"/><path d="M27 40c-9-4-19-2-25-8 8-4 18 0 25 7z" fill="#6f8f5e"/><path d="M13 40h28l-4 22H17z" fill="#c8693f"/><rect x="11" y="37" width="32" height="7" rx="2" fill="#d97d52"/><path d="M27 57c-3-2-5-3.5-5-5.5a2.2 2.2 0 0 1 5-1 2.2 2.2 0 0 1 5 1c0 2-2 3.5-5 5.5z" fill="#f6d9b8"/></svg>
+          <svg class="wd-cat" viewBox="0 0 96 54"><path class="cat-tail" d="M76 46c14 0 17-13 9-19" stroke="#e39a5b" stroke-width="6" fill="none" stroke-linecap="round"/><ellipse cx="54" cy="40" rx="30" ry="14" fill="#e39a5b"/><path d="M50 27q3 5 0 9M60 27q3 5 0 9M70 29q3 5 0 8" stroke="#c97b40" stroke-width="2.5" fill="none" stroke-linecap="round"/><path d="M14 26l1-14 10 9z" fill="#e39a5b"/><path d="M30 20l8-10 1 15z" fill="#e39a5b"/><path d="M16.5 23l.5-7.5 5.5 5z" fill="#f2a9a0"/><path d="M32 20.5l4.5-6.5.5 9z" fill="#f2a9a0"/><circle cx="26" cy="34" r="14" fill="#e39a5b"/><ellipse cx="25" cy="39.5" rx="7" ry="5" fill="#f6d9b8"/><path d="M17 33q3 2.5 6 0M28 33q3 2.5 6 0" stroke="#5a3a22" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M25 37.5l-1.8-1.5h3.6z" fill="#e0787a"/><circle cx="15.5" cy="39" r="2.3" fill="#f2a9a0" opacity=".7"/><circle cx="35" cy="39" r="2.3" fill="#f2a9a0" opacity=".7"/><ellipse cx="37" cy="51" rx="6" ry="3" fill="#f6d9b8"/><text class="cat-z" x="40" y="14">z</text><text class="cat-z cat-z2" x="48" y="8">z</text></svg>
+        </div>
+        <div class="wd-crown"><span class="wd-plaque"><span id="plaqueCount">0</span> <span id="plaqueUnit">pieces</span></span>
+          <span class="wd-lights" aria-hidden="true"><svg viewBox="0 0 100 16" preserveAspectRatio="none"><path d="M0 1Q25 29 50 1Q75 29 100 1" fill="none" stroke="#8c6a2e" stroke-width="1.2" vector-effect="non-scaling-stroke"/></svg><i style="left:5%;top:6px"></i><i style="left:15%;top:13px"></i><i style="left:25%;top:15px"></i><i style="left:35%;top:13px"></i><i style="left:45%;top:6px"></i><i style="left:55%;top:6px"></i><i style="left:65%;top:13px"></i><i style="left:75%;top:15px"></i><i style="left:85%;top:13px"></i><i style="left:95%;top:6px"></i></span></div>
         <div class="wd-cabinet">
           <div class="wd-interior">
             <span class="wd-wall wd-wall-l"></span><span class="wd-wall wd-wall-r"></span>
@@ -103,18 +108,29 @@
             </div>
           </div>
           <button type="button" class="wd-door wd-door-l" aria-label="Open wardrobe">
-            <span class="face front"><span class="panel"></span><span class="knob"></span></span>
+            <span class="face front"><span class="panel"></span><span class="door-strand" aria-hidden="true"><svg viewBox="0 0 24 112"><path d="M12 0v98" stroke="#b8914c" stroke-width="1"/><path d="M12 22l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="#e6b54a" stroke="#c9962e" stroke-width=".6"/><path d="M16 50a9 9 0 1 1-7.5-10.2A7 7 0 0 0 16 50z" fill="#f3e3cf" stroke="#d9c3a3" stroke-width=".8"/><path d="M12 98c-5-3.4-8.5-6.2-8.5-10a4.3 4.3 0 0 1 8.5-1.6A4.3 4.3 0 0 1 20.5 88c0 3.8-3.5 6.6-8.5 10z" fill="#e8918a"/><circle cx="12" cy="62" r="1.8" fill="#c8a07a"/><circle cx="12" cy="70" r="1.8" fill="#c8a07a"/></svg></span><span class="knob"></span><span class="charm" aria-hidden="true"><svg viewBox="0 0 20 34"><path d="M10 0v14" stroke="#b8914c" stroke-width="1.2"/><path d="M10 32c-5-3.4-8.5-6.2-8.5-10a4.3 4.3 0 0 1 8.5-1.6A4.3 4.3 0 0 1 18.5 22c0 3.8-3.5 6.6-8.5 10z" fill="#d9694a"/><circle cx="7" cy="21" r="1.4" fill="#fff" opacity=".6"/></svg></span></span>
             <span class="face back"><span class="mirror"></span></span>
           </button>
           <button type="button" class="wd-door wd-door-r" aria-label="Open wardrobe">
-            <span class="face front"><span class="panel"></span><span class="knob"></span></span>
+            <span class="face front"><span class="panel"></span><span class="door-wreath" aria-hidden="true"><svg viewBox="0 0 70 92"><path d="M35 0v36" stroke="#d9694a" stroke-width="2"/><circle cx="35" cy="62" r="24" fill="none" stroke="#6f8f5e" stroke-width="5"/><ellipse cx="59.0" cy="62.0" rx="3.2" ry="7" fill="#8fae7c" transform="rotate(70 59.0 62.0)"/><ellipse cx="57.6" cy="70.2" rx="3.2" ry="7" fill="#7a9a68" transform="rotate(130 57.6 70.2)"/><ellipse cx="53.4" cy="77.4" rx="3.2" ry="7" fill="#a3bf8f" transform="rotate(110 53.4 77.4)"/><ellipse cx="47.0" cy="82.8" rx="3.2" ry="7" fill="#8fae7c" transform="rotate(170 47.0 82.8)"/><ellipse cx="39.2" cy="85.6" rx="3.2" ry="7" fill="#7a9a68" transform="rotate(150 39.2 85.6)"/><ellipse cx="30.8" cy="85.6" rx="3.2" ry="7" fill="#a3bf8f" transform="rotate(210 30.8 85.6)"/><ellipse cx="23.0" cy="82.8" rx="3.2" ry="7" fill="#8fae7c" transform="rotate(190 23.0 82.8)"/><ellipse cx="16.6" cy="77.4" rx="3.2" ry="7" fill="#7a9a68" transform="rotate(250 16.6 77.4)"/><ellipse cx="12.4" cy="70.2" rx="3.2" ry="7" fill="#a3bf8f" transform="rotate(230 12.4 70.2)"/><ellipse cx="11.0" cy="62.0" rx="3.2" ry="7" fill="#8fae7c" transform="rotate(290 11.0 62.0)"/><ellipse cx="12.4" cy="53.8" rx="3.2" ry="7" fill="#7a9a68" transform="rotate(270 12.4 53.8)"/><ellipse cx="16.6" cy="46.6" rx="3.2" ry="7" fill="#a3bf8f" transform="rotate(330 16.6 46.6)"/><ellipse cx="23.0" cy="41.2" rx="3.2" ry="7" fill="#8fae7c" transform="rotate(310 23.0 41.2)"/><ellipse cx="30.8" cy="38.4" rx="3.2" ry="7" fill="#7a9a68" transform="rotate(370 30.8 38.4)"/><ellipse cx="39.2" cy="38.4" rx="3.2" ry="7" fill="#a3bf8f" transform="rotate(350 39.2 38.4)"/><ellipse cx="47.0" cy="41.2" rx="3.2" ry="7" fill="#8fae7c" transform="rotate(410 47.0 41.2)"/><ellipse cx="53.4" cy="46.6" rx="3.2" ry="7" fill="#7a9a68" transform="rotate(390 53.4 46.6)"/><ellipse cx="57.6" cy="53.8" rx="3.2" ry="7" fill="#a3bf8f" transform="rotate(450 57.6 53.8)"/><circle cx="12.4" cy="53.8" r="3.6" fill="#f3e3cf"/><circle cx="12.4" cy="53.8" r="1.3" fill="#c97b40"/><circle cx="26.8" cy="39.4" r="3.6" fill="#e8918a"/><circle cx="26.8" cy="39.4" r="1.3" fill="#c97b40"/><circle cx="53.4" cy="46.6" r="3.6" fill="#f3e3cf"/><circle cx="53.4" cy="46.6" r="1.3" fill="#c97b40"/><circle cx="57.6" cy="70.2" r="3.6" fill="#e6b54a"/><circle cx="57.6" cy="70.2" r="1.3" fill="#c97b40"/><circle cx="43.2" cy="84.6" r="3.6" fill="#e8918a"/><circle cx="43.2" cy="84.6" r="1.3" fill="#c97b40"/><circle cx="24.9" cy="83.8" r="3.6" fill="#f3e3cf"/><circle cx="24.9" cy="83.8" r="1.3" fill="#c97b40"/><circle cx="12.4" cy="70.2" r="3.6" fill="#e6b54a"/><circle cx="12.4" cy="70.2" r="1.3" fill="#c97b40"/><circle cx="52.7" cy="79.7" r="2" fill="#c8481a"/><circle cx="17.3" cy="79.7" r="2" fill="#c8481a"/><circle cx="43.6" cy="38.5" r="2" fill="#c8481a"/><path d="M35 38c-6-6-14-6-13 0s8 4 13 0zM35 38c6-6 14-6 13 0s-8 4-13 0z" fill="#d9694a"/><path d="M33 39l-5 12M37 39l5 12" stroke="#d9694a" stroke-width="3" stroke-linecap="round"/><circle cx="35" cy="38.5" r="3" fill="#c25a3c"/></svg></span><span class="knob"></span><span class="tassel" aria-hidden="true"><svg viewBox="0 0 16 46"><path d="M8 0v10" stroke="#b8914c" stroke-width="1.2"/><circle cx="8" cy="13" r="3.4" fill="#d9b36a"/><circle cx="7" cy="12" r="1" fill="#fff" opacity=".6"/><path d="M4.5 17h7l1 3h-9z" fill="#b33c10"/><path d="M3.5 20h9l1.5 22c-2 2-10 2-12 0z" fill="#d9694a"/><path d="M5 22l-.6 19M7 22v20M9 22v20M11 22l.6 19" stroke="#b8532f" stroke-width=".7" opacity=".7"/></svg></span></span>
             <span class="face back"><span class="mirror"></span></span>
           </button>
         </div>
-        <div class="wd-base"><span class="wd-drawer"><span class="pull"></span></span></div>
+        <div class="wd-base">
+          <div class="wd-tray" id="wdTray" role="region" aria-label="Drawer" inert>
+            <div class="wd-tray-box">
+              <span class="wd-tray-label">Clothes you took off the rail. <b>Tap one to hang it back up.</b></span>
+              <div class="wd-folded" id="folded"></div>
+              <div class="wd-tray-empty" id="trayEmpty"><svg viewBox="0 0 40 34" aria-hidden="true"><path d="M20 9c-3-6-9-7-9-3s6 4 9 3zM20 9c3-6 9-7 9-3s-6 4-9 3z" fill="#d9694a"/><path d="M8 12h24l3 18c0 2-2 3-4 3H9c-2 0-4-1-4-3z" fill="#c9b6dc"/><path d="M8 12h24l-.6 4H8.6z" fill="#b39cc9"/><circle cx="20" cy="9" r="2" fill="#c25a3c"/><path d="M14 20l2 2M22 24l2 2M17 27l2 2M26 19l2 2" stroke="#9a80b5" stroke-width="1.4" stroke-linecap="round"/></svg><span><b>Nothing in here yet.</b> Tap <b>↓</b> on a piece in the wardrobe and it’s folded in here, so you can hang it back later.</span></div>
+            </div>
+          </div>
+          <button type="button" class="wd-drawer" id="wdDrawer" aria-expanded="false" aria-controls="wdTray" aria-label="Open the drawer"><svg class="drawer-hint" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="pull"></span><span class="drawer-count" id="drawerCount" hidden></span></button>
+          <p class="wd-toast" id="wdToast" role="status" hidden><span id="wdToastText"></span> <button type="button" id="wdToastShow">Show me</button></p>
+        </div>
         <div class="wd-feet"><i></i><i></i></div>
       </div>
       <div class="wd-shadow"></div>
+      <div class="wd-rug" aria-hidden="true"></div>
     </div>
 
     <div class="wardrobe-actions">
@@ -151,6 +167,7 @@
   </div>
 </main>
 <script src="app.js"></script>
+<script src="decor.js" defer></script>
 <script type="module">
   import { importLink } from './fit-main.js';
   import { mountFit3D } from './fit3d.js';
@@ -160,7 +177,7 @@
   document.getElementById('chip').innerHTML =
     (saved ? '' : '<span>Demo body</span>') +
     Fit.FIELDS.map(f => `<span>${short[f.key]} <b>${Math.round(body[f.key])}</b></span>`).join('') +
-    '<a href="measure.html">Edit</a>';
+    '<a href="index.html">Edit</a>';
 
   const esc = Fit.esc;
   const $ = id => document.getElementById(id);
@@ -202,7 +219,7 @@
           <span class="cloth">${Fit.garmentArt(g)}</span>
           <span class="tag"><span class="worn-badge">On model</span><span class="tag-brand"><span class="size-chip lv-${worst}">${report.recommended}</span>${esc(g.brand)}</span><span class="tag-name">${esc(g.name)}</span></span>
         </a>
-        <button type="button" class="unhang" data-id="${esc(g.id)}" aria-label="Remove ${esc(g.name)} from wardrobe">×</button>
+        <button type="button" class="unhang" data-id="${esc(g.id)}" aria-label="Put ${esc(g.name)} in the drawer" title="Put in the drawer">↓</button>
       </div>`;
   }
 
@@ -284,7 +301,11 @@
     b.closest('.hanger').classList.add('leaving');
     setTimeout(() => {
       if (worn && worn.id === b.dataset.id) takeOff();
+      const g = Fit.getGarment(b.dataset.id);
+      if (g) Fit.foldIntoDrawer(g);
       Fit.removeCustom(b.dataset.id); renderWardrobe(); setOpen(true);
+      renderDrawer(true);
+      if (g && !drawerOpen()) toast('Folded into the drawer below.');
     }, 280);
   });
   hangers.addEventListener('mouseover', e => { const h = e.target.closest('.hanger'); if (view3d) view3d.hover(h ? +h.dataset.i : null); });
@@ -306,6 +327,56 @@
     setOpen(true);
     swing();
   });
+  // ---- The drawer: pieces taken off the rail are folded in here; tap one to hang it back ----
+  const drawerBtn = $('wdDrawer'), tray = $('wdTray'), folded = $('folded');
+  const drawerOpen = () => wardrobe.dataset.drawer === 'true';
+  function setDrawer(open) {
+    wardrobe.dataset.drawer = String(open);
+    drawerBtn.setAttribute('aria-expanded', String(open));
+    drawerBtn.setAttribute('aria-label', open ? 'Close the drawer' : 'Open the drawer');
+    tray.inert = !open;
+    if (open) hideToast();
+  }
+  // A short note after a piece is folded away, pointing at the drawer.
+  const toastEl = $('wdToast');
+  let toastTimer = 0;
+  function toast(text) {
+    $('wdToastText').textContent = text;
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+  function hideToast() { clearTimeout(toastTimer); toastEl.hidden = true; }
+  $('wdToastShow').addEventListener('click', () => setDrawer(true));
+  function renderDrawer(bump) {
+    const list = Fit.loadDrawer();
+    folded.innerHTML = list.map((g, i) => `
+      <button type="button" class="folded" data-id="${esc(g.id)}" style="--r:${(i % 3 - 1) * 2}deg" aria-label="Hang ${esc(g.brand)} ${esc(g.name)} back on the rail" title="${esc(g.brand)} · ${esc(g.name)}">
+        ${Fit.foldedArt(g)}<span class="folded-name" aria-hidden="true">${esc(g.name)}</span><span class="folded-tip">Hang back</span>
+      </button>`).join('');
+    $('trayEmpty').hidden = list.length > 0;
+    const count = $('drawerCount');
+    count.hidden = !list.length;
+    count.textContent = list.length;
+    if (bump && !drawerOpen()) { drawerBtn.classList.remove('bump'); void drawerBtn.offsetWidth; drawerBtn.classList.add('bump'); }
+  }
+  drawerBtn.addEventListener('click', () => setDrawer(!drawerOpen()));
+  folded.addEventListener('click', e => {
+    const b = e.target.closest('.folded');
+    if (!b) return;
+    const g = Fit.loadDrawer().find(x => x.id === b.dataset.id);
+    if (!g) return;
+    b.classList.add('rising');
+    setTimeout(() => {
+      Fit.saveCustom(g); // also takes it out of the drawer
+      page = 0;
+      renderWardrobe(); renderDrawer();
+      setOpen(true); swing();
+    }, 320);
+  });
+  setDrawer(false);
+  renderDrawer();
+
   function swing() { wardrobe.classList.remove('swing'); void wardrobe.offsetWidth; wardrobe.classList.add('swing'); }
 
   // Keep the first visible piece in view when the number per rail changes.
@@ -442,7 +513,7 @@
     $('dropHint').hidden = true;
     $('takeOff').hidden = false;
     tabF.disabled = false;
-    document.title = `${g.name} · Try on · FitCheck`;
+    document.title = `${g.name} · Try on · Fitting Room`;
     if (view) view.wear(g, size);
     colourFigure();
     selectSize(size, { instant: true });
@@ -460,7 +531,7 @@
     hangers.querySelectorAll('.hanger').forEach(h => h.classList.remove('worn'));
     if (view) view.takeOff();
     figure.querySelectorAll('.region').forEach(g => g.classList.remove('lv-good', 'lv-warn', 'lv-bad'));
-    document.title = 'Try On · FitCheck';
+    document.title = 'Try On · Fitting Room';
     try { history.replaceState(null, '', 'shop.html'); } catch (e) { /* ignore */ }
   }
   $('takeOff').addEventListener('click', takeOff);

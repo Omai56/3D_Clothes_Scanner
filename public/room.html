@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#111111" />
+  <title>Fitting Room</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M9 10l4-2 3 3 3-3 4 2 3 5-3 2v9H9v-9l-3-2z' fill='%23ffffff'/%3E%3C/svg%3E" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <button id="back" class="icon-btn" hidden aria-label="Back">‹</button>
+    <div class="brand">Fitting Room</div>
+    <div class="topbar-right" id="topbar-right"></div>
+  </header>
+
+  <main id="app">
+    <!-- Step 1: body -->
+    <section id="screen-body" class="screen">
+      <h1>Your body</h1>
+      <p class="lead">Scan yourself once. Every item is then tried on your real 3D body.</p>
+
+      <button id="btn-scan" class="card action">
+        <span class="card-title">Scan me with the camera</span>
+        <span class="card-sub">Two photos, about a minute.</span>
+      </button>
+      <div id="scan-wait" class="notice" hidden>
+        <div class="spinner"></div>
+        <div>
+          <strong>Waiting for your scan…</strong><br />
+          <span id="scan-wait-text">Finish the scan, then come back here.</span>
+        </div>
+      </div>
+
+      <h2>Or use a saved body</h2>
+      <div id="saved-scans" class="list"></div>
+    </section>
+
+    <!-- Step 2: the room -->
+    <section id="screen-room" class="screen room" hidden>
+      <form id="import-form" class="bar">
+        <input id="import-url" type="url" inputmode="url" placeholder="Paste a product link…" />
+        <button type="submit" class="primary small" id="import-btn">Get</button>
+        <button type="button" class="closet-btn" id="closet-btn" aria-label="My closet">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3a2 2 0 0 0-2 2c0 .9.6 1.6 1.4 1.9V8L3 13.5V15h18v-1.5L12.6 8V6.9A2 2 0 0 0 12 3zm0 6.2 6.2 4.3H5.8L12 9.2zM4 17h16v1H4z" fill="currentColor"/></svg>
+          <span>My closet</span>
+        </button>
+      </form>
+      <p id="import-status" class="status toast" hidden></p>
+
+      <div class="stage" id="stage">
+        <div id="viewer"></div>
+        <div id="meshy-status" class="viewer-notice" hidden></div>
+        <div class="hint" id="hint">Drag to rotate · pinch to zoom</div>
+        <div id="drop-hint" class="drop-hint" hidden>Drop here to put it on</div>
+
+        <!-- side panel -->
+        <aside id="panel" class="panel-side closed" aria-label="Item">
+          <button id="panel-tab" class="panel-tab" aria-label="Toggle item panel"><span>‹</span></button>
+          <div class="panel-inner">
+            <div id="panel-empty" class="panel-empty">
+              <p><b>Nothing on yet.</b></p>
+              <p class="muted small">Paste a link above, or open <b>My closet</b> and press and hold an item to drag it onto you.</p>
+            </div>
+            <div id="panel-item" hidden>
+              <div id="worn-tabs" class="worn-tabs" hidden></div>
+              <div class="fit-head">
+                <img id="fit-img" alt="" draggable="false" />
+                <div>
+                  <div id="fit-brand" class="muted small"></div>
+                  <div id="fit-name" class="item-name"></div>
+                  <div id="fit-fabric" class="muted small"></div>
+                </div>
+              </div>
+              <div class="wearing-row">
+                <div class="wearing-chip" id="wearing-chip" title="Press and hold to drag back to the closet"><img id="wearing-img" alt="" draggable="false" /><span>Wearing</span></div>
+                <button id="btn-takeoff" class="ghost small-btn" type="button">Take off</button>
+              </div>
+              <div class="sizes" id="sizes"></div>
+              <p id="fit-summary" class="summary small"></p>
+              <div id="waist-control" class="waist-control" hidden>
+                <label for="waist-slider">Waistband <span id="waist-label">default</span></label>
+                <input id="waist-slider" type="range" min="-10" max="4" step="1" value="0" />
+              </div>
+              <div id="add-model" class="add-model" hidden>
+                <div><b>No 3D look for this item yet.</b> Make one in about a minute: open <span class="mono">tripo3d.ai</span>, upload the product photo, export as <b>.glb</b>, then add it here.</div>
+                <label class="file-btn">Add .glb model<input id="model-file" type="file" accept=".glb,model/gltf-binary" hidden /></label>
+                <span id="add-model-status" class="status"></span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- closet sheet -->
+        <div id="closet" class="closet" hidden>
+          <div class="closet-head">
+            <b>My closet</b>
+            <span class="muted small">Tap to wear · press and hold to drag</span>
+            <button id="closet-close" class="icon-btn small" aria-label="Close">×</button>
+          </div>
+          <div id="garments" class="grid closet-grid"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- in-app scanner -->
+  <div id="scan-overlay" class="scan-overlay" hidden>
+    <div class="scan-overlay-bar">
+      <span>Body scan</span>
+      <a id="scan-newtab" href="#" target="_blank" rel="noopener">Open in a new tab</a>
+      <button id="scan-close" class="icon-btn small" aria-label="Close">×</button>
+    </div>
+    <iframe id="scan-frame" title="Body scanner" allow="camera; microphone; accelerometer; gyroscope; fullscreen"></iframe>
+  </div>
+
+  <div id="drag-ghost" class="drag-ghost" hidden><img alt="" /></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

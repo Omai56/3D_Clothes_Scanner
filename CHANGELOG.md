@@ -564,3 +564,27 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What (`public/js/viewer.js` `_dressBottoms`):** each leg tube is now built around one fixed front-to-back axis (the thigh's) and, for a leg that is not tight (from 2.5 cm of thigh ease), every direction gets the largest radius the leg needs anywhere along it — a straight cylinder that the calf, sitting further back than the thigh, hangs inside instead of being wrapped by. Under 1 cm of ease the cloth still follows the leg; in between it blends. Rest circumference per row = the perimeter of that ring.
 **Verified:** jeans 29 back + side (straight down the back of the calf), 29/34 front (sizes still differ), 29 from below (crotch closed); 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Renamed to "Fitting Room"; cute, warm wardrobe decorations
+**By:** Claude (Opus 5.5)
+**What:** The new pages are now called **Fitting Room** (logo "Fitting *Room*" with "Room" in the action orange; page titles "… · Fitting Room"). The team's original app (`app.html`, `js/`, `css/`) and README are not renamed. The wardrobe on the try-on page gets decorations: a potted plant and a sleeping ginger cat (tail swishes, little "z"s) on top, warm fairy lights that twinkle along the crown, a heart tag swaying on the left door handle (it swings open with the door), and a round woven rug in terracotta and cream underneath. All decorative only (hidden from screen readers, not clickable) and still when the system asks for reduced motion; dark-mode rug.
+**Verified:** try-on page at 390 and 1280px, doors closed and open (decorations don't block the doors or the rail), no sideways scrolling, no page errors; tests pass.
+**Files:** `public/shop.html`, `public/index.html`, `public/result.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Door ornaments (挂饰) on the wardrobe
+**By:** Claude (Opus 5.5)
+**What:** Hanging ornaments on the wardrobe doors: a dried-flower wreath (sage leaves, cream / pink / mustard flowers, red berries) with a ribbon bow, hung from the top of the right door; a felt strand on the left door (star, moon, two wooden beads, heart); a terracotta tassel with a brass bead on the right handle, pairing with the heart tag on the left handle. They sit on the door fronts, so they swing open with the doors; each sways gently at its own pace (still with reduced motion); decorative only, not clickable; slightly smaller on phones.
+**Verified:** try-on page at 390 and 1280px, doors closed and open; close-up check of each ornament; no page errors.
+**Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Warm decorations on the pages
+**By:** Claude (Opus 5.5)
+**What:** New `public/decor.js` (loaded by the measure and try-on pages) adds, matching the wardrobe: fairy lights draped under the top bar on both pages; small hand-drawn hearts, sparkles, stars and flowers floating in the side margins (wide screens only, ≥1180px); on the measure page, a tailor's tape measure hanging over the mannequin card and a tomato pin cushion with coloured pins (≥760px); on the try-on page, a wooden "Fitting Room ♡" sign swinging in the corner of the model's stage and a small potted plant on the stage floor. All decorative (hidden from screen readers, ignore the pointer, so dragging / rotating the model is unaffected), still with reduced motion. Page top padding nudged so the lights clear the headings.
+**Verified:** both pages at 390 and 1280px: no sideways scrolling, nothing overlaps buttons, the drop hint or inputs; tests pass.
+**Files:** `public/decor.js` (new), `public/index.html`, `public/shop.html`, `public/styles.css`, `CHANGELOG.md`

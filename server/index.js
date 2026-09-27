@@ -87,6 +87,29 @@ app.get('/api/scans/:name', async (req, res) => {
   res.json(s);
 });
 
+// Delete a saved body (its JSON + OBJ). A copy goes to data/backup-demo/scans first. The demo body stays.
+app.delete('/api/scans/:name', async (req, res) => {
+  const name = req.params.name;
+  if (!safeName(name)) return res.status(400).json({ error: 'bad name' });
+  if (name === 'demo') return res.status(400).json({ error: 'the demo body cannot be deleted' });
+  const s = await readScan(name);
+  if (!s) return res.status(404).json({ error: 'scan not found' });
+  try {
+    const bak = path.join(ROOT, 'data', 'backup-demo', 'scans');
+    await fs.mkdir(bak, { recursive: true });
+    const obj = path.basename(s.objUrl);
+    // only this scan's own files: never a mesh another record happens to point at
+    const files = [`${name}.json`, ...(obj.startsWith(`${name}.`) ? [obj] : [])];
+    for (const f of files) {
+      try { await fs.copyFile(path.join(SCANS_DIR, f), path.join(bak, f)); } catch { /* no copy, still delete */ }
+      try { await fs.unlink(path.join(SCANS_DIR, f)); } catch { /* already gone */ }
+    }
+    res.json({ removed: name });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
 // Start a phone scan: returns the Bodygram scanner URL to open on the phone.
 const sessions = new Map(); // sessionId -> { createdAt }
 app.post('/api/scan-session', async (req, res) => {

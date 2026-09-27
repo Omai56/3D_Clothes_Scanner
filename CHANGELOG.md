@@ -813,3 +813,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** the scan from the phone was saved (`data/scans/scan-53cd9e00`) but the Saved 3D bodies list was built once at page load, so it never showed. `public/measure-bodies.js` now re-reads the list every 5 s: a scan that just finished appears, is selected and remembered for the try-on page, with a note to continue. Fresh scans are named "Your scan · 13:11" on both pages (`public/fit3d.js` picker too).
 **Verified:** the real scan lists and fills 178 / 87.9 / 73.2 / 93.6 / 80.4 / 45.2; a simulated new scan file shows up and is selected within 7 s.
 **Files:** `public/measure-bodies.js`, `public/fit3d.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Delete saved scans
+**By:** Claude (Fable 5.1)
+**What:** `DELETE /api/scans/:name` (`server/index.js`) removes a saved body's JSON and OBJ after copying them to `data/backup-demo/scans/`; the demo body is refused; a scan can only remove its own files. `public/measure-bodies.js`: a small × on each saved body; first tap arms it ("Delete?"), a second tap within 3 s deletes and the list refreshes. Needs a server restart.
+**Verified:** throwaway scan deleted through the page; demo → 400; backup copy present; 24 tests pass.
+**Files:** `server/index.js`, `public/measure-bodies.js`, `CHANGELOG.md`

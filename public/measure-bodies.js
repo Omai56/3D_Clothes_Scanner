@@ -18,6 +18,9 @@
     .saved-body[aria-pressed="true"] b::before { content: "✓ "; }
     .saved-bodies .note { margin: 8px 0 0; font-size: 12.5px; color: var(--muted, #857d74); }
     .saved-bodies .note.ok { color: var(--ink, #1a1816); }
+    .saved-body-wrap { position: relative; display: inline-flex; }
+    .saved-body-x { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid #000; background: #fff; color: #000; font: 700 14px/1 inherit; cursor: pointer; padding: 0; display: grid; place-items: center; }
+    .saved-body-x[data-arm="1"] { background: #b3261e; border-color: #b3261e; color: #fff; width: auto; padding: 0 8px; border-radius: 999px; font-size: 11px; }
     /* the step indicator never lets the label sit on the dot */
     .steps li { gap: 8px; }
     .steps .dot { flex: none; }
@@ -50,6 +53,31 @@
         b.setAttribute('aria-pressed', String(s.name === current));
         const meta = [s.input?.heightCm ? `${s.input.heightCm} cm` : null, s.input?.photos ? 'phone scan' : 'sample'].filter(Boolean).join(' · ');
         b.innerHTML = `<b>${Fit.esc(niceLabel(s))}</b><span>${Fit.esc(meta)}</span>`;
+        const wrap = document.createElement('span');
+        wrap.className = 'saved-body-wrap';
+        wrap.appendChild(b);
+        if (s.name !== 'demo') {
+          // × deletes the scan: first tap arms it ("Delete?"), second tap within 3 s deletes
+          const x = document.createElement('button');
+          x.type = 'button'; x.className = 'saved-body-x'; x.textContent = '×'; x.title = 'Delete this scan';
+          x.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (x.dataset.arm !== '1') {
+              x.dataset.arm = '1'; x.textContent = 'Delete?';
+              setTimeout(() => { x.dataset.arm = '0'; x.textContent = '×'; }, 3000);
+              return;
+            }
+            x.disabled = true;
+            try {
+              const r = await fetch(`/api/scans/${encodeURIComponent(s.name)}`, { method: 'DELETE' });
+              if (!r.ok) throw new Error((await r.json()).error || 'could not delete');
+              if (current === s.name) { current = null; try { sessionStorage.removeItem('fit3dScan'); } catch (err) { /* ignore */ } }
+              known = '';
+              refresh();
+            } catch (err) { x.disabled = false; note.textContent = err.message; }
+          });
+          wrap.appendChild(x);
+        }
         b.addEventListener('click', () => {
           row.querySelectorAll('.saved-body').forEach((x) => x.setAttribute('aria-pressed', 'false'));
           b.setAttribute('aria-pressed', 'true');
@@ -74,7 +102,7 @@
             })
             .catch(() => { note.textContent = 'Could not read that scan. Try again.'; });
         });
-        row.appendChild(b);
+        row.appendChild(wrap);
       }
   }
   async function refresh() {

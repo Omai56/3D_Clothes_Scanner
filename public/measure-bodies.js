@@ -35,11 +35,13 @@
 
   let current = null;
   try { current = sessionStorage.getItem('fit3dScan'); } catch (e) { /* ignore */ }
+  const niceLabel = (s) => (/^scan-/.test(s.name) && s.createdAt ? `Your scan · ${new Date(s.createdAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : s.label);
 
-  fetch('/api/scans')
-    .then((r) => r.json())
-    .then((scans) => {
+  let known = '';
+  function renderList(scans) {
       if (!scans.length) { box.hidden = true; demo.hidden = false; return; }
+      box.hidden = false;
+      row.innerHTML = '';
       for (const s of scans) {
         const b = document.createElement('button');
         b.type = 'button';
@@ -47,7 +49,7 @@
         b.dataset.name = s.name;
         b.setAttribute('aria-pressed', String(s.name === current));
         const meta = [s.input?.heightCm ? `${s.input.heightCm} cm` : null, s.input?.photos ? 'phone scan' : 'sample'].filter(Boolean).join(' · ');
-        b.innerHTML = `<b>${Fit.esc(s.label)}</b><span>${Fit.esc(meta)}</span>`;
+        b.innerHTML = `<b>${Fit.esc(niceLabel(s))}</b><span>${Fit.esc(meta)}</span>`;
         b.addEventListener('click', () => {
           row.querySelectorAll('.saved-body').forEach((x) => x.setAttribute('aria-pressed', 'false'));
           b.setAttribute('aria-pressed', 'true');
@@ -66,7 +68,7 @@
                 input.dispatchEvent(new Event('input', { bubbles: true })); // the page validates + updates progress
               }
               try { sessionStorage.setItem('fit3dScan', s.name); } catch (e) { /* ignore */ } // the try-on page shows this body
-              note.textContent = `Using ${s.label}. Press “Continue to try on”.`;
+              note.textContent = `Using ${niceLabel(s)}. Press “Continue to try on”.`;
               note.classList.add('ok');
               actions.querySelector('button[type="submit"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             })
@@ -74,6 +76,29 @@
         });
         row.appendChild(b);
       }
-    })
-    .catch(() => { box.hidden = true; demo.hidden = false; });
+  }
+  async function refresh() {
+    try {
+      const scans = await (await fetch('/api/scans')).json();
+      const sig = scans.map((s) => s.name).join(',');
+      if (sig === known) return;
+      const prev = known.split(',').filter(Boolean);
+      const isNew = known !== '' && scans.some((s) => !prev.includes(s.name));
+      known = sig;
+      // a scan that just finished is selected and used straight away
+      if (isNew) {
+        const fresh = scans.find((s) => !prev.includes(s.name)) ?? scans[0];
+        current = fresh.name;
+        try { sessionStorage.setItem('fit3dScan', fresh.name); } catch (e) { /* ignore */ }
+      }
+      renderList(scans);
+      if (isNew) {
+        note.textContent = `Your new scan is in. Press “Continue to try on”.`;
+        note.classList.add('ok');
+        box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (e) { if (!known) { box.hidden = true; demo.hidden = false; } }
+  }
+  refresh();
+  setInterval(refresh, 5000); // picks up a scan finished on the phone without reloading
 })();

@@ -805,3 +805,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `public/styles.css` — restored in full: the × edit had cut the sheet at an earlier `.remove-link` rule from the skin (pages briefly rendered unstyled).
 **Verified:** chocolate tee hangs brown with the × showing; stylesheet 932 rules; no page errors.
 **Files:** `public/shop.html`, `public/styles.css`, `public/fit-main.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — New scans appear on the measure page without a reload; readable scan names
+**By:** Claude (Fable 5.1)
+**What:** the scan from the phone was saved (`data/scans/scan-53cd9e00`) but the Saved 3D bodies list was built once at page load, so it never showed. `public/measure-bodies.js` now re-reads the list every 5 s: a scan that just finished appears, is selected and remembered for the try-on page, with a note to continue. Fresh scans are named "Your scan · 13:11" on both pages (`public/fit3d.js` picker too).
+**Verified:** the real scan lists and fills 178 / 87.9 / 73.2 / 93.6 / 80.4 / 45.2; a simulated new scan file shows up and is selected within 7 s.
+**Files:** `public/measure-bodies.js`, `public/fit3d.js`, `CHANGELOG.md`

@@ -1,0 +1,347 @@
+{
+  "bodyComposition": {
+    "bodyFatPercentage": 14.178,
+    "skeletalMuscleMass": 31012
+  },
+  "createdAt": 1790539910,
+  "customScanId": "scan-53cd9e00",
+  "id": "scan_4XYKldlUApXJkUklmFg1IY",
+  "input": {
+    "heightCm": 178,
+    "weightKg": 63,
+    "age": 20,
+    "gender": "male",
+    "photos": true
+  },
+  "measurements": [
+    {
+      "name": "acrossBackShoulderWidth",
+      "unit": "mm",
+      "value": 452
+    },
+    {
+      "name": "backNeckHeight",
+      "unit": "mm",
+      "value": 1493
+    },
+    {
+      "name": "backNeckPointToGroundContoured",
+      "unit": "mm",
+      "value": 1533
+    },
+    {
+      "name": "backNeckPointToWaist",
+      "unit": "mm",
+      "value": 433
+    },
+    {
+      "name": "backNeckPointToWristLengthR",
+      "unit": "mm",
+      "value": 788
+    },
+    {
+      "name": "bellyWaistDepth",
+      "unit": "mm",
+      "value": 196
+    },
+    {
+      "name": "bellyWaistGirth",
+      "unit": "mm",
+      "value": 754
+    },
+    {
+      "name": "bellyWaistHeight",
+      "unit": "mm",
+      "value": 1039
+    },
+    {
+      "name": "bellyWaistWidth",
+      "unit": "mm",
+      "value": 287
+    },
+    {
+      "name": "bustGirth",
+      "unit": "mm",
+      "value": 879
+    },
+    {
+      "name": "bustHeight",
+      "unit": "mm",
+      "value": 1268
+    },
+    {
+      "name": "calfGirthR",
+      "unit": "mm",
+      "value": 368
+    },
+    {
+      "name": "forearmGirthR",
+      "unit": "mm",
+      "value": 259
+    },
+    {
+      "name": "hipGirth",
+      "unit": "mm",
+      "value": 936
+    },
+    {
+      "name": "hipHeight",
+      "unit": "mm",
+      "value": 874
+    },
+    {
+      "name": "insideLegHeight",
+      "unit": "mm",
+      "value": 804
+    },
+    {
+      "name": "insideLegLengthR",
+      "unit": "mm",
+      "value": 741
+    },
+    {
+      "name": "kneeGirthR",
+      "unit": "mm",
+      "value": 389
+    },
+    {
+      "name": "kneeHeightR",
+      "unit": "mm",
+      "value": 490
+    },
+    {
+      "name": "midThighGirthR",
+      "unit": "mm",
+      "value": 487
+    },
+    {
+      "name": "neckBaseGirth",
+      "unit": "mm",
+      "value": 385
+    },
+    {
+      "name": "neckGirth",
+      "unit": "mm",
+      "value": 345
+    },
+    {
+      "name": "outerAnkleHeightR",
+      "unit": "mm",
+      "value": 65
+    },
+    {
+      "name": "outerArmLengthR",
+      "unit": "mm",
+      "value": 581
+    },
+    {
+      "name": "outseamR",
+      "unit": "mm",
+      "value": 1031
+    },
+    {
+      "name": "outsideLegLengthR",
+      "unit": "mm",
+      "value": 1098
+    },
+    {
+      "name": "shoulderToElbowR",
+      "unit": "mm",
+      "value": 312
+    },
+    {
+      "name": "thighGirthR",
+      "unit": "mm",
+      "value": 559
+    },
+    {
+      "name": "topHipGirth",
+      "unit": "mm",
+      "value": 839
+    },
+    {
+      "name": "topHipHeight",
+      "unit": "mm",
+      "value": 973
+    },
+    {
+      "name": "underBustGirth",
+      "unit": "mm",
+      "value": 802
+    },
+    {
+      "name": "upperArmGirthR",
+      "unit": "mm",
+      "value": 281
+    },
+    {
+      "name": "waistGirth",
+      "unit": "mm",
+      "value": 732
+    },
+    {
+      "name": "waistHeight",
+      "unit": "mm",
+      "value": 1072
+    },
+    {
+      "name": "wristGirthR",
+      "unit": "mm",
+      "value": 173
+    }
+  ],
+  "memberId": "key_2KMxvjbDHwntP30N74lRcD",
+  "posture": {
+    "front": {
+      "angles": [
+        {
+          "name": "ear",
+          "unit": "degrees",
+          "value": 1.5274812
+        },
+        {
+          "name": "foot",
+          "unit": "degrees",
+          "value": 0.21757153
+        },
+        {
+          "name": "shoulder",
+          "unit": "degrees",
+          "value": 2.2228594
+        },
+        {
+          "name": "topHip",
+          "unit": "degrees",
+          "value": -0.2637277
+        }
+      ],
+      "lines": [
+        {
+          "name": "topHip",
+          "points": [
+            {
+              "x": 639.8854,
+              "y": 1121.6615
+            },
+            {
+              "x": 397.5096,
+              "y": 1120.5459
+            }
+          ]
+        },
+        {
+          "name": "ear",
+          "points": [
+            {
+              "x": 583,
+              "y": 555
+            },
+            {
+              "x": 451,
+              "y": 559
+            }
+          ]
+        },
+        {
+          "name": "foot",
+          "points": [
+            {
+              "x": 676.1489,
+              "y": 1822.5533
+            },
+            {
+              "x": 354.0529,
+              "y": 1823.7764
+            }
+          ]
+        },
+        {
+          "name": "shoulder",
+          "points": [
+            {
+              "x": 661.31476,
+              "y": 700.136
+            },
+            {
+              "x": 378.70956,
+              "y": 711.10547
+            }
+          ]
+        }
+      ]
+    },
+    "right": {
+      "angles": [
+        {
+          "angles": [
+            19.854372,
+            9.850671,
+            0.76247776
+          ],
+          "name": "backWaistLine",
+          "unit": "degrees"
+        },
+        {
+          "angles": [
+            6.948654,
+            1.1864294,
+            -4.8440003,
+            5.3051095
+          ],
+          "name": "bodyLine",
+          "unit": "degrees"
+        }
+      ],
+      "lines": [
+        {
+          "name": "backWaistLine",
+          "points": [
+            {
+              "x": 372.27597,
+              "y": 1060.889
+            },
+            {
+              "x": 387.62357,
+              "y": 1018.38617
+            },
+            {
+              "x": 392.4093,
+              "y": 990.82495
+            },
+            {
+              "x": 393.5015,
+              "y": 908.7584
+            }
+          ]
+        },
+        {
+          "name": "bodyLine",
+          "points": [
+            {
+              "x": 395,
+              "y": 1802
+            },
+            {
+              "x": 434,
+              "y": 1482
+            },
+            {
+              "x": 441,
+              "y": 1144
+            },
+            {
+              "x": 406,
+              "y": 731
+            },
+            {
+              "x": 419,
+              "y": 591
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "status": "success",
+  "avatarFile": "scan-53cd9e00.obj"
+}

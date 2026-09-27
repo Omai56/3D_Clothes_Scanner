@@ -57,7 +57,8 @@ export async function mountFit3D({ stage, picker, legend, preferScan = null }) {
     current = scans.find((s) => s.input?.photos)?.name ?? (scans.some((s) => s.name === preferScan) ? preferScan : scans[0].name);
   }
 
-  picker.innerHTML = `<label>3D body <select>${scans.map((s) => `<option value="${s.name}">${s.label}</option>`).join('')}</select></label>`;
+  const niceLabel = (s) => (/^scan-/.test(s.name) && s.createdAt ? `Your scan · ${new Date(s.createdAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : s.label);
+  picker.innerHTML = `<label>3D body <select>${scans.map((s) => `<option value="${s.name}">${niceLabel(s)}</option>`).join('')}</select></label>`;
   const select = picker.querySelector('select');
   select.value = current;
   select.addEventListener('change', () => loadScan(select.value));

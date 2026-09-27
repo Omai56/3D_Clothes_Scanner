@@ -564,3 +564,13 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What (`public/js/viewer.js` `_dressBottoms`):** each leg tube is now built around one fixed front-to-back axis (the thigh's) and, for a leg that is not tight (from 2.5 cm of thigh ease), every direction gets the largest radius the leg needs anywhere along it — a straight cylinder that the calf, sitting further back than the thigh, hangs inside instead of being wrapped by. Under 1 cm of ease the cloth still follows the leg; in between it blends. Rest circumference per row = the perimeter of that ring.
 **Verified:** jeans 29 back + side (straight down the back of the calf), 29/34 front (sizes still differ), 29 from below (crotch closed); 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 11:45 — Shoulders from the scan: torso clipped about its own centre, shoulder tips per side
+**By:** Claude (Fable 5.1)
+**What:**
+- `shared/bodyslices.js` — above the armpit the fused-arm outline is clipped about the torso's own centre line (this scan's is 2.6 cm right of x = 0), not about x = 0. Before, the left torso rings kept 4 cm of arm root and the right lost 1 cm of chest, which pushed the tee's left shoulder up and let the right sink in. `buildRings` returns `torsoCx`.
+- `public/js/viewer.js` — shoulder tips per side from the scan silhouette (`shoulderTipsFromScan`: outermost 1 cm column whose top is within 9.5 cm of the neck base). On Daniel they are at 1.42 m / 1.41 m, 8–9 cm below the neck base (the code assumed 5 cm), 23.5 cm right / 18.5 cm left of x = 0. The arm capsules start at these tips; the tee is centred between them, its seam-to-seam width is tip to tip (+ dropped-seam allowance), and the yoke slopes down to each side's own tip height. Shoulder height map covers 3–12.5 cm below the neck base.
+**Verified:** heavyweight S front (both shoulders level, no bump, no punched-in side) and back; slim L front (seam on the shoulder) and back; 24 tests pass.
+**Files:** `shared/bodyslices.js`, `public/js/viewer.js`, `CHANGELOG.md`

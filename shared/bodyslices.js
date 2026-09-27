@@ -30,6 +30,7 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
   const classified = new Map();
   let armpitIy = -1;
   let torsoHalfAtArmpit = shoulderHalfWidth * 0.75;
+  let torsoCx = 0; // the torso's own centre line (bodies are not centred on x = 0)
   for (const [iy, loops] of loopsBySlice) {
     const y = iy * SLICE_STEP;
     if (!loops.length || y < crotchY) continue;
@@ -48,7 +49,8 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
   for (let d = 3; d <= 6; d++) {
     const c = classified.get(armpitIy - d);
     if (c) {
-      torsoHalfAtArmpit = Math.max(Math.abs(c.main.minX), Math.abs(c.main.maxX));
+      torsoHalfAtArmpit = (c.main.maxX - c.main.minX) / 2;
+      torsoCx = (c.main.maxX + c.main.minX) / 2;
       break;
     }
   }
@@ -90,7 +92,7 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
     if (!c) continue;
     const { main, arms } = c;
     const bound = torsoBound(y);
-    const loop = Number.isFinite(bound) ? clipLoopX(main, bound) : main;
+    const loop = Number.isFinite(bound) ? clipLoopX(main, bound, torsoCx) : main;
     torso.set(iy, ringFromLoop(loop, y));
     for (const lp of arms) (lp.cx > 0 ? armR : armL).push({ x: lp.cx, y, z: lp.cz, area: lp.area });
   }
@@ -103,13 +105,13 @@ export function buildRings(positions, faces, { crotchY, shoulderHalfWidth = 0.23
   smoothAcrossSlices(left);
   armR.sort((a, b) => a.y - b.y);
   armL.sort((a, b) => a.y - b.y);
-  return { torso, right, left, armR, armL, armpitY, torsoHalfAtArmpit, crotchSplitY, legTopY };
+  return { torso, right, left, armR, armL, armpitY, torsoHalfAtArmpit, torsoCx, crotchSplitY, legTopY };
 }
 
 /** Clamp a loop's x to ±bound (flattens fused arms into vertical torso sides). */
-function clipLoopX(loop, bound) {
+function clipLoopX(loop, bound, cx = 0) {
   const pts = Float64Array.from(loop.pts);
-  for (let i = 0; i < pts.length; i += 2) pts[i] = Math.max(-bound, Math.min(bound, pts[i]));
+  for (let i = 0; i < pts.length; i += 2) pts[i] = Math.max(cx - bound, Math.min(cx + bound, pts[i]));
   return loopStats(Array.from(pts));
 }
 

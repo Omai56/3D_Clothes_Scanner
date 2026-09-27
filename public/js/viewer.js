@@ -100,13 +100,14 @@ export class FitViewer {
       shoulderHalfWidth: bodyCm.acrossBackShoulderWidth / 200,
       neckY: bodyCm.backNeckHeight / 100,
     });
-    // Arm loops exist only below the armpit; the shoulder point itself comes from the scan.
-    const shoulderY = bodyCm.backNeckHeight / 100 - 0.05;
-    const shoulderX = bodyCm.acrossBackShoulderWidth / 200 - 0.01;
+    // Shoulder tips (where the top of the shoulder turns down into the arm), per side, from the
+    // scan's silhouette — Bodygram's across-back width is a contoured tape measure and the tips
+    // are lower than the neck base by 8–10 cm, not 5.
+    this.shoulderTips = shoulderTipsFromScan(positions, bodyCm.backNeckHeight / 100, this.rings.armpitY, this.rings.torsoCx ?? 0, bodyCm.acrossBackShoulderWidth / 200);
     // Height map of the shoulders (top of the body between armpit and neck base) for draping.
     // Only the top ~5 cm of the shoulders (near-horizontal surface); the sloping sides are handled
     // by the ring colliders. Neck and head excluded.
-    this.shoulderMap = buildTopMap(positions, bodyCm.backNeckHeight / 100 - 0.1, bodyCm.backNeckHeight / 100 - 0.045);
+    this.shoulderMap = buildTopMap(positions, bodyCm.backNeckHeight / 100 - 0.125, bodyCm.backNeckHeight / 100 - 0.03);
     // Top of the feet: trousers that are too long rest on the shoe instead of passing through it.
     this.ankleTopY = (bodyCm.outerAnkleHeightR ?? 7) / 100 + 0.03;
     this.footMap = buildTopMap(positions, 0, this.ankleTopY);
@@ -114,7 +115,8 @@ export class FitViewer {
     for (const [side, sign] of [['R', 1], ['L', -1]]) {
       const line = armLine(this.rings['arm' + side]);
       if (!line) continue;
-      this.arms[side] = { shoulder: { x: sign * shoulderX, y: shoulderY, z: line.shoulder.z }, hand: line.hand };
+      const tip = this.shoulderTips[side];
+      this.arms[side] = { shoulder: { x: tip.x - sign * 0.01, y: tip.y, z: line.shoulder.z }, hand: line.hand };
     }
   }
 
@@ -238,15 +240,16 @@ export class FitViewer {
     const zBack = Math.min(ext.zmin, extUp?.zmin ?? ext.zmin);
     const bodyW = ext.xmax - ext.xmin;
     const bodyD = ext.zmax - zBack;
-    const bodyCx = (ext.xmin + ext.xmax) / 2;
+    const tips = this.shoulderTips ?? { R: { x: 0.21, y: neckY - 0.09 }, L: { x: -0.21, y: neckY - 0.09 } };
+    const bodyCx = (tips.R.x + tips.L.x) / 2; // the tee hangs centred between the shoulder tips
     const bodyCz = (zBack + ext.zmax) / 2;
-    const shoulderW = (b.acrossBackShoulderWidth ?? 44) / 100;
+    const shoulderW = tips.R.x - tips.L.x; // tip to tip, straight line
     const armRef = this.arms?.R ?? this.arms?.L;
     const armAng = armRef ? Math.atan2(Math.abs(armRef.hand.x - armRef.shoulder.x), Math.max(0.05, armRef.shoulder.y - armRef.hand.y)) : 0.3;
     const chestFlat = chart.chest ?? chart.hem ?? null;
     const shoulderRatio = chart.shoulder && chestFlat ? clamp(chart.shoulder / chestFlat, 0.75, 1.05) : 0.95;
     const drop = chart.shoulder ? Math.max(0, chart.shoulder / 100 - shoulderW) / 2 : 0; // dropped seam: this far down the arm
-    const Ws = shoulderW - 0.01 + 2 * drop * Math.sin(armAng); // worn seam-to-seam width (seams on the shoulder tips)
+    const Ws = shoulderW + 2 * drop * Math.sin(armAng); // worn seam-to-seam width (seams on the shoulder tips)
 
     // --- body of the tee: chart circumference as an ellipse ---
     const bodyC = TWO_PI * Math.sqrt(((bodyW / 2 + gap) ** 2 + (bodyD / 2 + gap) ** 2) / 2);
@@ -301,12 +304,12 @@ export class FitViewer {
     // the neck base to the shoulder tip. The yoke follows that slope so the seam lands on the
     // tip instead of floating above it; a dropped seam continues down the arm from there.
     const neckHW = (b.neckBaseGirth ?? 39) / 100 / TWO_PI + 0.01;
-    const shoulderTipY = neckY - 0.05;
     const seamWorldY = hemY + vTop * H;
-    const slopeDrop = Math.max(0, seamWorldY - (shoulderTipY + 0.012));
+    const slopeDropS = { R: Math.max(0, seamWorldY - (tips.R.y + 0.012)), L: Math.max(0, seamWorldY - (tips.L.y + 0.012)) };
     const yokeDrop = (X, v) => {
       const ax = Math.abs(X - bodyCx);
       const vv = smoothstep(vArm - 0.1, vTop, v);
+      const slopeDrop = slopeDropS[X >= bodyCx ? 'R' : 'L'];
       return (slopeDrop * smoothstep(neckHW, xs, ax) + dropY * smoothstep(xs, Math.max(xs + 0.01, Ws / 2), ax)) * vv;
     };
     for (const o of meshes) {
@@ -2031,6 +2034,35 @@ function buildAdjacency(geo) {
 function armAxis(arm, armR) {
   const s = Math.sign(arm.shoulder.x) || 1;
   return { x: arm.shoulder.x - s * armR * 0.7, y: arm.shoulder.y - armR * 0.9, z: arm.shoulder.z };
+}
+
+/**
+ * Shoulder tips from the scan silhouette: per side, the outermost 1 cm column (from the torso
+ * centre outward) whose top surface is still within 9.5 cm of the neck base; beyond it the
+ * surface drops steeply into the arm. Falls back to the across-back width if the scan is odd.
+ */
+function shoulderTipsFromScan(positions, neckY, armpitY, cx0, fallbackHalf) {
+  const top = new Map();
+  for (let i = 0; i < positions.length; i += 3) {
+    const y = positions[i + 1];
+    if (y < armpitY - 0.02 || y > neckY + 0.02) continue;
+    const k = Math.round(positions[i] * 100);
+    if (!top.has(k) || y > top.get(k)) top.set(k, y);
+  }
+  const thr = neckY - 0.095;
+  const out = {};
+  for (const [side, sgn] of [['R', 1], ['L', -1]]) {
+    let k = Math.round(cx0 * 100);
+    let last = null;
+    for (let n = 0; n < 40; n++, k += sgn) {
+      const t = top.get(k);
+      if (t == null || t < thr) break;
+      last = { k, t };
+    }
+    const ok = last && Math.abs(last.k / 100 - cx0) > 0.1;
+    out[side] = ok ? { x: last.k / 100 + sgn * 0.005, y: Math.min(last.t, neckY - 0.05) } : { x: cx0 + sgn * fallbackHalf, y: neckY - 0.07 };
+  }
+  return out;
 }
 
 /** Top-of-body height map (max y per 1 cm x/z cell) for vertices with yMin <= y <= yMax. */

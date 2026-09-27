@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
   <meta name="theme-color" content="#111111" />
-  <title>FitCheck</title>
+  <title>Fitting Room</title>
   <link rel="stylesheet" href="/css/style.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M9 10l4-2 3 3 3-3 4 2 3 5-3 2v9H9v-9l-3-2z' fill='%2330a46c'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23141414'/%3E%3Cpath d='M9 10l4-2 3 3 3-3 4 2 3 5-3 2v9H9v-9l-3-2z' fill='%23ffffff'/%3E%3C/svg%3E" />
   <script type="importmap">
     {
       "imports": {
@@ -19,105 +19,110 @@
 <body>
   <header class="topbar">
     <button id="back" class="icon-btn" hidden aria-label="Back">‹</button>
-    <div class="brand">FitCheck</div>
-    <ol class="steps" id="steps">
-      <li data-step="body">Body</li>
-      <li data-step="item">Item</li>
-      <li data-step="fit">Fit</li>
-    </ol>
+    <div class="brand">Fitting Room</div>
+    <div class="topbar-right" id="topbar-right"></div>
   </header>
 
   <main id="app">
     <!-- Step 1: body -->
     <section id="screen-body" class="screen">
       <h1>Your body</h1>
-      <p class="lead">Scan yourself once. We use your real measurements and 3D body for every item.</p>
+      <p class="lead">Scan yourself once. Every item is then tried on your real 3D body.</p>
 
       <button id="btn-scan" class="card action">
         <span class="card-title">Scan me with the camera</span>
-        <span class="card-sub">Opens the Bodygram scanner. Two photos, about a minute.</span>
+        <span class="card-sub">Two photos, about a minute.</span>
       </button>
       <div id="scan-wait" class="notice" hidden>
         <div class="spinner"></div>
         <div>
           <strong>Waiting for your scan…</strong><br />
-          <span id="scan-wait-text">Finish the scan in the other tab, then come back here.</span>
+          <span id="scan-wait-text">Finish the scan, then come back here.</span>
         </div>
       </div>
 
       <h2>Or use a saved body</h2>
       <div id="saved-scans" class="list"></div>
-
-      <div id="body-summary" class="panel" hidden>
-        <div class="panel-title">Measurements</div>
-        <div id="body-measurements" class="measure-grid"></div>
-        <button id="btn-body-next" class="primary">Continue</button>
-      </div>
     </section>
 
-    <!-- Step 2: item -->
-    <section id="screen-item" class="screen" hidden>
-      <h1>Pick an item</h1>
-      <form id="import-form" class="import">
-        <input id="import-url" type="url" inputmode="url" placeholder="Paste a product link (e.g. Zara)…" />
-        <button type="submit" class="primary small">Get</button>
+    <!-- Step 2: the room -->
+    <section id="screen-room" class="screen room" hidden>
+      <form id="import-form" class="bar">
+        <input id="import-url" type="url" inputmode="url" placeholder="Paste a product link…" />
+        <button type="submit" class="primary small" id="import-btn">Get</button>
+        <button type="button" class="closet-btn" id="closet-btn" aria-label="My closet">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3a2 2 0 0 0-2 2c0 .9.6 1.6 1.4 1.9V8L3 13.5V15h18v-1.5L12.6 8V6.9A2 2 0 0 0 12 3zm0 6.2 6.2 4.3H5.8L12 9.2zM4 17h16v1H4z" fill="currentColor"/></svg>
+          <span>My closet</span>
+        </button>
       </form>
-      <p id="import-status" class="status" hidden></p>
+      <p id="import-status" class="status toast" hidden></p>
 
-      <h2>Saved items</h2>
-      <div id="garments" class="grid"></div>
-    </section>
-
-    <!-- Step 3: fit -->
-    <section id="screen-fit" class="screen" hidden>
-      <div class="fit-head">
-        <img id="fit-img" alt="" />
-        <div>
-          <div id="fit-brand" class="muted"></div>
-          <h1 id="fit-name"></h1>
-          <div id="fit-fabric" class="muted small"></div>
-        </div>
-      </div>
-
-      <div class="sizes" id="sizes"></div>
-      <div id="waist-control" class="waist-control" hidden>
-        <label for="waist-slider">Waistband <span id="waist-label">at the natural waist</span></label>
-        <input id="waist-slider" type="range" min="-10" max="4" step="1" value="0" />
-      </div>
-
-      <div class="viewer-wrap">
+      <div class="stage" id="stage">
         <div id="viewer"></div>
         <div id="meshy-status" class="viewer-notice" hidden></div>
-        <div id="view-mode" class="segmented" hidden role="group" aria-label="View">
-          <button data-mode="look" class="active">Look</button>
-          <button data-mode="fit">Fit</button>
-        </div>
-        <div class="legend">
-          <span><i style="background:#e5484d"></i>Tight</span>
-          <span><i style="background:#f5b301"></i>Snug</span>
-          <span><i style="background:#30a46c"></i>Good</span>
-          <span><i style="background:#3e8fe0"></i>Relaxed</span>
-        </div>
-        <div class="hint">Drag to rotate · pinch to zoom</div>
-        <div id="look-flags" class="look-flags" hidden></div>
-      </div>
-      <p class="viewer-help"><b>Look</b> is the real garment draped on your scan at this size. <b>Fit</b> colours the same garment by where it is tight or loose.</p>
-      <div id="add-model" class="add-model" hidden>
-        <div><b>No 3D look for this item yet.</b> Make one in about a minute: open <span class="mono">tripo3d.ai</span>, upload the product photo, export as <b>.glb</b>, then add it here.</div>
-        <label class="file-btn">Add .glb model<input id="model-file" type="file" accept=".glb,model/gltf-binary" hidden /></label>
-        <span id="add-model-status" class="status"></span>
-      </div>
+        <div class="hint" id="hint">Drag to rotate · pinch to zoom</div>
+        <div id="drop-hint" class="drop-hint" hidden>Drop here to put it on</div>
 
-      <div class="panel">
-        <div id="fit-verdict" class="verdict"></div>
-        <p id="fit-summary" class="summary"></p>
-        <ul id="fit-regions" class="regions"></ul>
-        <ul id="fit-notes" class="notes"></ul>
-      </div>
+        <!-- side panel -->
+        <aside id="panel" class="panel-side closed" aria-label="Item">
+          <button id="panel-tab" class="panel-tab" aria-label="Toggle item panel"><span>‹</span></button>
+          <div class="panel-inner">
+            <div id="panel-empty" class="panel-empty">
+              <p><b>Nothing on yet.</b></p>
+              <p class="muted small">Paste a link above, or open <b>My closet</b> and press and hold an item to drag it onto you.</p>
+            </div>
+            <div id="panel-item" hidden>
+              <div class="fit-head">
+                <img id="fit-img" alt="" draggable="false" />
+                <div>
+                  <div id="fit-brand" class="muted small"></div>
+                  <div id="fit-name" class="item-name"></div>
+                  <div id="fit-fabric" class="muted small"></div>
+                </div>
+              </div>
+              <div class="wearing-row">
+                <div class="wearing-chip" id="wearing-chip" title="Press and hold to drag back to the closet"><img id="wearing-img" alt="" draggable="false" /><span>Wearing</span></div>
+                <button id="btn-takeoff" class="ghost small-btn" type="button">Take off</button>
+              </div>
+              <div class="sizes" id="sizes"></div>
+              <p id="fit-summary" class="summary small"></p>
+              <div id="waist-control" class="waist-control" hidden>
+                <label for="waist-slider">Waistband <span id="waist-label">default</span></label>
+                <input id="waist-slider" type="range" min="-10" max="4" step="1" value="0" />
+              </div>
+              <div id="add-model" class="add-model" hidden>
+                <div><b>No 3D look for this item yet.</b> Make one in about a minute: open <span class="mono">tripo3d.ai</span>, upload the product photo, export as <b>.glb</b>, then add it here.</div>
+                <label class="file-btn">Add .glb model<input id="model-file" type="file" accept=".glb,model/gltf-binary" hidden /></label>
+                <span id="add-model-status" class="status"></span>
+              </div>
+            </div>
+          </div>
+        </aside>
 
-      <button id="btn-another" class="secondary">Try another item</button>
+        <!-- closet sheet -->
+        <div id="closet" class="closet" hidden>
+          <div class="closet-head">
+            <b>My closet</b>
+            <span class="muted small">Tap to wear · press and hold to drag</span>
+            <button id="closet-close" class="icon-btn small" aria-label="Close">×</button>
+          </div>
+          <div id="garments" class="grid closet-grid"></div>
+        </div>
+      </div>
     </section>
   </main>
+
+  <!-- in-app scanner -->
+  <div id="scan-overlay" class="scan-overlay" hidden>
+    <div class="scan-overlay-bar">
+      <span>Body scan</span>
+      <a id="scan-newtab" href="#" target="_blank" rel="noopener">Open in a new tab</a>
+      <button id="scan-close" class="icon-btn small" aria-label="Close">×</button>
+    </div>
+    <iframe id="scan-frame" title="Body scanner" allow="camera; microphone; accelerometer; gyroscope; fullscreen"></iframe>
+  </div>
+
+  <div id="drag-ghost" class="drag-ghost" hidden><img alt="" /></div>
 
   <script type="module" src="/js/app.js"></script>
 </body>

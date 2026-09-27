@@ -631,3 +631,21 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Tried and reverted: a cap-less tube from the seam (tore the seam into fringe), an underarm drop (fins), pulling loose tees' shoulder caps in (tore the seam).
 **Verified:** heavyweight S front/back, XXL back; slim L front/back, S back; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Fitting Room UI: body opens straight into the room, closet + drag to dress, side panel, boxers, in-app scanner
+**By:** Claude (Fable 5.1), per Daniel's brief
+**What:**
+- Renamed to **Fitting Room** (`public/index.html`, `README.md`; `public/app.html` now redirects to `/`).
+- `public/index.html`, `public/css/style.css`, `public/js/app.js` — rewritten as a two-screen phone app:
+  - **Body**: scan or tap a saved body → opens straight into the room with the 3D body (no Continue / measurements step).
+  - **Room**: link bar at the top (paste a product link → Get) with a **My closet** button beside it; the 3D body fills the rest of the screen.
+  - **My closet** is a bottom sheet with the saved items. **Tap** an item to wear it, or **press and hold** (~0.45 s) to pick it up and **drag it onto the body** to put it on (ghost image follows the finger, "Drop here to put it on"). The **Wearing** chip in the side panel drags back to the closet button to take the item off; a Take off button does the same.
+  - **Side panel** on the right with an arrow tab; it slides in and the body slides left with it (camera view offset). Holds the item, sizes (BEST badge), one-line fit summary, waistband slider, and the Add .glb card.
+  - The **colour Fit view is gone** (legend, Look/Fit toggle, per-region colours, tight/loose chips); Look only.
+  - **Scanner in the app**: the Bodygram scanner opens in a full-screen frame with camera permission delegated (`allow="camera; microphone"`) and an "Open in a new tab" fallback; the app polls and drops into the room when the scan is saved. Whether Bodygram allows framing could not be verified headlessly — the fallback link covers it.
+- `public/js/viewer.js` — **boxers drawn on the body** in the fragment shader (top of hips to mid-thigh, lighter waistband, hands excluded); `viewShift` (camera view offset, eased) and `frameBody()`.
+- Samuel's pages stay at `/measure.html` and `/shop.html`.
+**Verified (headless phone walkthrough):** body tap → room; closet → tap tee → panel with sizes; size change re-drapes; press-and-hold jeans → drag onto body → worn; slim S; no console errors; 24 tests pass.
+**Files:** `public/index.html`, `public/css/style.css`, `public/js/app.js`, `public/js/viewer.js`, `public/app.html`, `public/result.html`, `README.md`, `CHANGELOG.md`

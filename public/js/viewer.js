@@ -56,10 +56,32 @@ export class FitViewer {
     this.resize();
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
+    this.viewShift = 0; // px: the body slides left while the side panel is open
+    this._shiftNow = 0;
     this.renderer.setAnimationLoop(() => {
       this.controls.update();
+      if (Math.abs(this._shiftNow - this.viewShift) > 0.5) {
+        this._shiftNow += (this.viewShift - this._shiftNow) * 0.18;
+        this._applyShift();
+      } else if (this._shiftNow !== this.viewShift) {
+        this._shiftNow = this.viewShift;
+        this._applyShift();
+      }
       this.renderer.render(this.scene, this.camera);
     });
+  }
+
+  _applyShift() {
+    const w = this.el.clientWidth || 320;
+    const h = this.el.clientHeight || 480;
+    if (this._shiftNow === 0) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(w, h, this._shiftNow, 0, w, h);
+  }
+
+  /** Frame the whole body (used when a body is loaded with nothing on it). */
+  frameBody() {
+    this.controls.target.set(0, 0.95, 0);
+    this.camera.position.set(0, 1.0, 2.7);
   }
 
   resize() {
@@ -68,6 +90,7 @@ export class FitViewer {
     this.renderer.setSize(w, h); // also sets the canvas CSS size so it fits the container
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    if (this._shiftNow) this._applyShift();
   }
 
   /** Load the body OBJ and precompute slice rings. bodyCm = Bodygram measurements in cm. */
@@ -80,7 +103,33 @@ export class FitViewer {
 
     const text = await (await fetch(objUrl)).text();
     const group = new OBJLoader().parse(text);
+    // Boxers drawn onto the body in the fragment shader (crisp edges whatever the mesh density):
+    // from just below the top of the hips to mid-thigh, a lighter waistband, hands excluded.
+    const topHip = (bodyCm.topHipHeight ?? bodyCm.hipHeight + 8) / 100 - 0.005;
+    const legEnd = bodyCm.insideLegHeight / 100 - 0.11;
+    const hipHalf = ((bodyCm.hipGirth ?? 95) / 100 / Math.PI) * 0.62 + 0.02;
     const mat = new THREE.MeshStandardMaterial({ color: 0xd8d2ca, roughness: 0.9, metalness: 0 });
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTopHip = { value: topHip };
+      sh.uniforms.uLegEnd = { value: legEnd };
+      sh.uniforms.uHipHalf = { value: hipHalf };
+      sh.uniforms.uCx = { value: 0.02 };
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+varying vec3 vBodyPos;`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+vBodyPos = position;`);
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+varying vec3 vBodyPos;
+uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float onBody = step(abs(vBodyPos.x - uCx), uHipHalf);
+          float inY = step(uLegEnd, vBodyPos.y) * step(vBodyPos.y, uTopHip);
+          float band = step(uTopHip - 0.028, vBodyPos.y);
+          vec3 cloth = mix(vec3(0.028, 0.031, 0.040), vec3(0.075, 0.082, 0.100), band);
+          diffuseColor.rgb = mix(diffuseColor.rgb, cloth, onBody * inY);`);
+    };
     group.traverse((o) => {
       if (!o.isMesh) return;
       let g = o.geometry;

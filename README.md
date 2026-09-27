@@ -1,4 +1,4 @@
-# 3D Clothes Scanner — FitCheck
+# Fitting Room
 
 Scan your body, paste a clothing link, and see **which size actually fits and where**, on your own 3D body, from any angle.
 
@@ -36,8 +36,8 @@ Alternatives: `ngrok http 3000` (needs a free ngrok account) or `cloudflared tun
 | Body | Bodygram hosted scanner (2 photos) → 35 measurements + 3D body (OBJ). Saved bodies live in `data/scans/`. | `server/bodygram.js`, `scripts/run-stats-scan.js` |
 | Item | **Paste a Zara link → live import** of name, photos, composition, per-size stock and the full size chart (cm). Zara's page is read by the installed Chrome headlessly (their bot protection blocks plain requests, but a real browser on a home IP is fine); the chart + composition endpoints answer plain requests. Imported items are saved to `data/garments/` and appear under Saved items. Other stores: best-effort name/photo only. | `server/zara.js`, `server/zara-map.js`, `server/importer.js`, `data/garments/*.json` |
 | Fit | Garment vs body per region → ease in cm → tight / snug / good / relaxed → best size + explanation. | `shared/fit.js` |
-| 3D · Fit view | Body sliced into 1 cm outlines; a garment shell is built from the size chart (offset by ease, cut at real length) and coloured by fit. | `shared/bodyslices.js`, `public/js/viewer.js` |
-| 3D · Look view | An AI mesh of the garment (Tripo, from the flat product photo, `public/models/`) is **cloth-simulated onto the scan**: tube proxies sized from the size chart (chest/hem/arm, waist/hip, lengths) hang under gravity against the body (position-based dynamics), then the mesh is glued to them. S and XL really differ. Waistband slider for bottoms. | `public/js/cloth.js`, `public/js/viewer.js` (`_dressTop`, `_dressBottoms`) |
+| 3D body | Body sliced into 1 cm outlines (rings), shoulder tips and arm lines from the scan; boxers drawn on in the shader. | `shared/bodyslices.js`, `public/js/viewer.js` |
+| 3D · Look | An AI mesh of the garment (Tripo, from the flat product photo, `public/models/`) is **cloth-simulated onto the scan**: tube proxies sized from the size chart (chest/hem/arm, waist/hip, lengths) hang under gravity against the body (position-based dynamics), then the mesh is glued to them. S and XL really differ. Waistband slider for bottoms. | `public/js/cloth.js`, `public/js/viewer.js` (`_dressTop`, `_dressBottoms`) |
 
 **Only 5 free Bodygram scans.** Every scan is saved to `data/scans/` and reused. Don't re-scan to test — use the saved `demo` body.
 

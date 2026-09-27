@@ -618,6 +618,13 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 
 ## 2026-09-27 — The fitting room: curtains, a lamp, and backdrops you change with the sign
 **By:** Claude (Opus 5.5)
-**What:** The model's stage on the try-on page is decorated as a fitting room: velvet curtains on both sides, tied back with brass tassels and hung from a brass rail across the top, and a small pendant lamp with a warm glow (the plant stays). The wooden "Fitting Room ♡" sign is now a button (orange swap badge): each press gives it a little spin, shows the backdrop's name, and moves to the next backdrop: **Studio** (the original, always the one you start with), **Blush wallpaper** (pink polka dots, panelled wall), **Garden trellis** (sage trellis, wooden floor), **Terracotta arch** (a cream arch in a clay wall, tiled floor), **Starry night** (moon and stars), **Maldives beach** (turquoise lagoon, white sand, overwater bungalows, a palm; no lamp, linen curtains), then back to Studio. The curtains change colour to match (soft grey on Studio). The choice isn't remembered, so each visit starts on Studio. Decorations ignore the pointer, so dragging pieces onto the model and turning it work as before; the sign has a screen-reader label naming the current backdrop.
+**What:** The model's stage on the try-on page is decorated as a fitting room: velvet curtains on both sides, tied back with brass tassels and hung from a brass rail across the top, and a small pendant lamp with a warm glow (the plant stays). The wooden "Fitting Room ♡" sign is now a button (orange swap badge): each press gives it a little spin, shows the backdrop's name, and moves to the next backdrop: **Studio** (the original, always the one you start with), **Blush wallpaper** (pink polka dots, panelled wall), **Garden trellis** (sage trellis, wooden floor), **Maldives beach** (turquoise lagoon, white sand, overwater bungalows, a palm; no lamp, linen curtains), then back to Studio. The curtains change colour to match (soft grey on Studio). The choice isn't remembered, so each visit starts on Studio. Decorations ignore the pointer, so dragging pieces onto the model and turning it work as before; the sign has a screen-reader label naming the current backdrop.
 **Verified:** headless Chrome at 1280 and 390px, every backdrop in turn and back to Studio; no page errors; 24 tests pass.
+**Files:** `public/decor.js`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Removed the Terracotta arch and Starry night backdrops
+**By:** Claude (Opus 5.5)
+**What:** The fitting room sign now cycles four backdrops: Studio (default), Blush wallpaper, Garden trellis, Maldives beach.
 **Files:** `public/decor.js`, `public/styles.css`, `CHANGELOG.md`

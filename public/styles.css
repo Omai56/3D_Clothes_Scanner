@@ -1527,8 +1527,6 @@ main.page { position: relative; }
 .model-drop { --cw: clamp(20px, 7%, 34px); --curtain: #8f8a84; }
 .model-drop[data-room="blush"] { --curtain: #d98ba0; }
 .model-drop[data-room="garden"] { --curtain: #6f8f5e; }
-.model-drop[data-room="arch"] { --curtain: #7f3f27; }
-.model-drop[data-room="night"] { --curtain: #5b4a8a; }
 .model-drop[data-room="seaside"] { --curtain: #d6ccbb; }
 .deco-curtain, .deco-tie, .deco-rail, .deco-lamp { position: absolute; z-index: 1; pointer-events: none; }
 .deco-curtain { top: 8px; bottom: 0; width: var(--cw); color: var(--curtain); transition: color .4s; filter: drop-shadow(2px 0 4px rgba(40, 25, 15, .25)); }
@@ -1580,27 +1578,6 @@ main.page { position: relative; }
     repeating-linear-gradient(45deg, rgba(255, 255, 255, .22) 0 1.2px, transparent 1.2px 18.4px),
     repeating-linear-gradient(-45deg, rgba(255, 255, 255, .22) 0 1.2px, transparent 1.2px 18.4px),
     linear-gradient(180deg, #cfdcc3, #b7caa9);
-}
-.model-drop[data-room="arch"] .stage {
-  background:
-    radial-gradient(60% 34% at 50% 30%, rgba(255, 250, 240, .55), transparent 72%),
-    linear-gradient(180deg, transparent 86%, #c98566 86%, #c98566 86.6%, transparent 86.6%),
-    repeating-linear-gradient(90deg, transparent 0 38px, rgba(120, 60, 35, .18) 38px 39px) 0 100% / 100% 14% no-repeat,
-    linear-gradient(180deg, #d99a7c, #cf8a6c) 0 100% / 100% 14% no-repeat,
-    radial-gradient(ellipse 33% 19% at 50% 31%, #f5e6d4 99%, transparent 100%),
-    linear-gradient(#f5e6d4, #efdcc6) 50% 100% / 66% 70% no-repeat,
-    radial-gradient(ellipse 36% 21% at 50% 31%, #c47a5c 99%, transparent 100%),
-    linear-gradient(#c47a5c, #c47a5c) 50% 100% / 72% 70% no-repeat,
-    linear-gradient(180deg, #e3a98c, #d99a7c);
-}
-.model-drop[data-room="night"] .stage {
-  background:
-    radial-gradient(circle at 76.5% 15%, #2b2d5c 0 5.2%, transparent 5.5%),
-    radial-gradient(circle at 79% 16.5%, #fff3cf 0 6%, rgba(255, 243, 207, .25) 6.5%, transparent 12%),
-    radial-gradient(circle, #fff 0 1px, transparent 1.6px) 0 0 / 37px 43px,
-    radial-gradient(circle, rgba(255, 255, 255, .6) 0 .8px, transparent 1.4px) 17px 21px / 53px 47px,
-    radial-gradient(60% 18% at 50% 100%, rgba(150, 130, 220, .35), transparent 70%),
-    linear-gradient(180deg, #1c2046 0%, #2c2a5a 55%, #463a6e 100%);
 }
 .model-drop[data-room="seaside"] .stage {
   background:

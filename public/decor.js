@@ -67,8 +67,6 @@
       { id: '', name: 'Studio' },
       { id: 'blush', name: 'Blush wallpaper' },
       { id: 'garden', name: 'Garden trellis' },
-      { id: 'arch', name: 'Terracotta arch' },
-      { id: 'night', name: 'Starry night' },
       { id: 'seaside', name: 'Maldives beach' },
     ];
     let room = 0;

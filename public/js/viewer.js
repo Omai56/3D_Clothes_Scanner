@@ -303,14 +303,24 @@ export class FitViewer {
     // The flat-lay mesh has a nearly level shoulder line; the body's shoulder slopes down from
     // the neck base to the shoulder tip. The yoke follows that slope so the seam lands on the
     // tip instead of floating above it; a dropped seam continues down the arm from there.
-    const neckHW = (b.neckBaseGirth ?? 39) / 100 / TWO_PI + 0.01;
     const seamWorldY = hemY + vTop * H;
-    const slopeDropS = { R: Math.max(0, seamWorldY - (tips.R.y + 0.012)), L: Math.max(0, seamWorldY - (tips.L.y + 0.012)) };
+    // The mesh's shoulder line is level; the body's slopes from the neck base down to the
+    // shoulder tips. Along the seam line the yoke is lowered onto the scan's own top profile
+    // (never lifted), fading out towards the chest; beyond the tips a dropped seam continues
+    // down the arm.
+    const profile = tips.profile ?? null;
+    const restOn = (X) => {
+      const side = X >= bodyCx ? 'R' : 'L';
+      const tip = tips[side];
+      const inside = side === 'R' ? X <= tip.x : X >= tip.x;
+      const top = inside && profile ? profile(X) : null;
+      return (top ?? tip.y) + gap + 0.006;
+    };
     const yokeDrop = (X, v) => {
       const ax = Math.abs(X - bodyCx);
       const vv = smoothstep(vArm - 0.1, vTop, v);
-      const slopeDrop = slopeDropS[X >= bodyCx ? 'R' : 'L'];
-      return (slopeDrop * smoothstep(neckHW, xs, ax) + dropY * smoothstep(xs, Math.max(xs + 0.01, Ws / 2), ax)) * vv;
+      const slopeDrop = Math.max(0, seamWorldY - restOn(X));
+      return (slopeDrop + dropY * smoothstep(xs, Math.max(xs + 0.01, Ws / 2), ax)) * vv;
     };
     for (const o of meshes) {
       const orig = o.userData.origPos;
@@ -332,121 +342,150 @@ export class FitViewer {
       o.userData.wgt = wgt;
     }
 
-    // pass 2: sleeves hinge at the shoulder joint and hang along the arm
-    const tilt = 0.14 + 0.2 * clamp(drop / 0.05, 0, 1); // boxy tees stand off the arm more
-    const alpha = Math.min(1.3, armAng + tilt); // sleeve axis, angle from vertical
-    const armDiam = (b.upperArmGirthR ?? 30) / 100 / Math.PI;
-    // visible width of a sleeve worn on the arm: the flat width is half the tube's circumference,
-    // so the hanging tube shows about three quarters of it
-    const dTarget = chart.arm_width ? Math.max(armDiam + 0.045, (chart.arm_width / 100) * 0.75) : null;
-    const armholeY = box.min.y + vArm * h;
-    const farThr = 0.5 * Math.max(0.01, P.maxAx - P.torsoHW);
+    // pass 2: each sleeve is a straight tube hanging from the top of the arm. Its axis runs
+    // parallel to the arm, offset downward so the sleeve's top rests on the arm and the slack
+    // hangs underneath (gravity); its radius comes from the chart's sleeve width (never tighter
+    // than the arm), its length from the chart's sleeve length measured from the seam. A dropped
+    // seam starts the tube further down the arm. The flat-lay sleeve maps onto it by distance
+    // from the side seam (along) and position between its top and underarm edges (around).
+    const S2 = (this._gltfSlices ??= sliceTopMesh(model, box, 64, meshCx));
+    const armR = (b.upperArmGirthR ?? 30) / 100 / TWO_PI;
+    const rsChart = chart.arm_width ? (2 * chart.arm_width) / 100 / TWO_PI : null;
+    const rs = Math.max(armR + gap + 0.012, rsChart ?? armR + 0.03);
+    const Lsleeve = chart.sleeve ? chart.sleeve / 100 : Math.max(0.1, (P.maxAx - P.torsoHW) * sxSh);
+    this.lastTopFit.sleeves = { rs, armR, Lsleeve };
     for (const [side, sgn] of [['R', 1], ['L', -1]]) {
-      // joint at the centre of the armhole; the sleeve swings down about it towards the arm
-      const dA = Math.max(0.05 * h, seamTopY[side] - armholeY);
-      const yJ = seamTopY[side] - 0.45 * dA;
-      const vJ = clamp((yJ - box.min.y) / h, 0, 1);
-      const Jx = warpX(meshCx + sgn * meshShoulderHW, vJ);
-      const J = [Jx, warpY(vJ) - yokeDrop(Jx, vJ), warpZ(meshCz)];
-      // the sleeve is centred on the arm inside it (arms hang a little in front of the torso's
-      // centre line), otherwise the arm collider inflates the sleeve's front face
-      const armZ = this.arms?.[side]?.shoulder.z ?? J[2];
-      const zShift = clamp(armZ - J[2], -0.06, 0.06);
-      // current sleeve axis: joint -> far part of the sleeve
-      let cx = 0;
-      let cy = 0;
-      let cnt = 0;
-      for (const o of meshes) {
-        const { origPos: orig, W, wgt } = o.userData;
-        for (let i = 0; i < wgt.length; i++) {
-          if (wgt[i] < 0.5 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
-          const v = clamp((orig[i * 3 + 1] - box.min.y) / h, 0, 1);
-          if (Math.abs(orig[i * 3] - meshCx) - torsoHWAt(v) < farThr) continue;
-          cx += W[i * 3];
-          cy += W[i * 3 + 1];
-          cnt++;
-        }
-      }
-      if (cnt < 10) continue; // no sleeve on this side
-      let ux = cx / cnt - J[0];
-      let uy = cy / cnt - J[1];
-      const un = Math.hypot(ux, uy);
-      if (un < 1e-3) continue;
+      const arm = this.arms?.[side];
+      if (!arm) continue;
+      const A0 = armAxis(arm, armR);
+      let ux = arm.hand.x - A0.x;
+      let uy = arm.hand.y - A0.y;
+      let uz = arm.hand.z - A0.z;
+      const un = Math.hypot(ux, uy, uz) || 1;
       ux /= un;
       uy /= un;
-      const px = -uy;
-      const py = ux;
-      let L = 0;
-      for (const o of meshes) {
-        const { origPos: orig, W, wgt } = o.userData;
-        for (let i = 0; i < wgt.length; i++) {
-          if (wgt[i] < 0.5 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
-          const a = (W[i * 3] - J[0]) * ux + (W[i * 3 + 1] - J[1]) * uy;
-          if (a > L) L = a;
-        }
+      uz /= un;
+      // "up" across the arm (world up with the along-arm part removed), "front" = along x up
+      let vx = -ux * uy;
+      let vy = 1 - uy * uy;
+      let vz = -uz * uy;
+      const vn = Math.hypot(vx, vy, vz) || 1;
+      vx /= vn;
+      vy /= vn;
+      vz /= vn;
+      let fx = uy * vz - uz * vy;
+      let fy = uz * vx - ux * vz;
+      let fz = ux * vy - uy * vx;
+      if (fz < 0) {
+        fx = -fx;
+        fy = -fy;
+        fz = -fz;
       }
-      // sleeve width = the far half of the sleeve (the armhole end is deeper than the cuff)
-      let bMin = Infinity;
-      let bMax = -Infinity;
-      let zMin = Infinity;
-      let zMax = -Infinity;
+      const off = rs - armR - gap; // tube axis below the arm axis: the sleeve hangs from its top
+      const back = 0.03; // the cap starts a little above the arm's top point, up at the yoke edge
+      const along0 = drop - back;
+      const C0 = [A0.x + ux * along0 - vx * off, A0.y + uy * along0 - vy * off, A0.z + uz * along0 - vz * off];
       for (const o of meshes) {
-        const { origPos: orig, W, wgt } = o.userData;
-        for (let i = 0; i < wgt.length; i++) {
-          if (wgt[i] < 0.5 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
-          const rx = W[i * 3] - J[0];
-          const ry = W[i * 3 + 1] - J[1];
-          const a = rx * ux + ry * uy;
-          if (a < 0.5 * L) continue;
-          const bb = rx * px + ry * py;
-          if (bb < bMin) bMin = bb;
-          if (bb > bMax) bMax = bb;
-          const z = W[i * 3 + 2];
-          if (z < zMin) zMin = z;
-          if (z > zMax) zMax = z;
-        }
-      }
-      // The sleeve keeps the proportions the mesh came with (they already scale with the size
-      // through the shoulder width); rescaling it to the chart's sleeve numbers ballooned it.
-      const d = Math.max(0.02, bMax - bMin);
-      const dz = Math.max(0.02, zMax - zMin);
-      const kL = 1;
-      // never fatter than the chart's sleeve width (some generated meshes come with balloon
-      // sleeves), never made bigger
-      const kW = window.__sleeveSwing !== false && dTarget ? clamp(dTarget / d, 0.7, 1) : 1;
-      // ...except front-to-back: a flat-lay sleeve is a thin pillow; it must be at least as
-      // thick as the arm inside it or the arm collider inflates it into a puff
-      const kZ = window.__sleeveSwing !== false ? clamp((armDiam + 0.03) / dz, 1, 1.6) : 1;
-      const tx = sgn * Math.sin(alpha);
-      const ty = -Math.cos(alpha);
-      // how far the sleeve may swing: a long sleeve follows the arm, a short wide cap sleeve
-      // stays close to how it was cut (swinging it far just balloons it at the armhole)
-      // window.__sleeveSwing = false keeps the sleeves at the angle they were generated with
-      const phiMax = window.__sleeveSwing === false ? 0 : 0.75 * clamp(L / (0.6 * d), 0.6, 1) * (1 - 0.7 * clamp(drop / 0.05, 0, 1));
-      const phi = clamp(Math.atan2(ux * ty - uy * tx, ux * tx + uy * ty), -phiMax, phiMax);
-      this.lastTopFit.sleeves[side] = { J, u: [ux, uy], phi, kL, kW, kZ, L, d, dz, cnt, seamTop: seamTopY[side], armholeY, vArm, vTop, dA };
-      // rigid swing of the whole sleeve about the joint (a progressive bend left the cap
-      // pointing sideways and read as a puff sleeve)
-      const cph = Math.cos(phi);
-      const sph = Math.sin(phi);
-      for (const o of meshes) {
-        const { origPos: orig, W, wgt } = o.userData;
+        const { origPos: orig, origFront: fr, origDepthS: df, W, wgt } = o.userData;
+        const DS = (o.userData.DS ??= new Float32Array(W.length)); // sleeve displacement, smoothed below
         for (let i = 0; i < wgt.length; i++) {
           const w = wgt[i];
           if (w <= 0 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
-          const rx = W[i * 3] - J[0];
-          const ry = W[i * 3 + 1] - J[1];
-          const a = rx * ux + ry * uy;
-          const bb = kW * (rx * px + ry * py);
-          const vx = a * ux + bb * px;
-          const vy = a * uy + bb * py;
-          const qx = J[0] + vx * cph - vy * sph;
-          const qy = J[1] + vx * sph + vy * cph;
-          const qz = J[2] + zShift + kZ * (W[i * 3 + 2] - J[2]);
-          W[i * 3] += w * (qx - W[i * 3]);
-          W[i * 3 + 1] += w * (qy - W[i * 3 + 1]);
-          W[i * 3 + 2] += w * (qz - W[i * 3 + 2]);
+          const sv = S2.sleeveOf(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2]);
+          if (!sv) continue;
+          const a = sv.s * Lsleeve;
+          const wt = w * smoothstep(0, 0.3, sv.s); // the cap stays with the armhole, the tube takes over beyond it
+          const ph = Math.acos(clamp(sv.u, -1, 1));
+          // which half of the tube: by depth across the flat-lay pillow (a vertex on the top or
+          // underarm edge sits at the seam either way, so a wrong guess there costs nothing)
+          const front = df ? df[i] >= 0.5 : fr ? fr[i] === 1 : sv.front;
+          const cu = rs * Math.cos(ph);
+          const cf = rs * Math.sin(ph) * (front ? 1 : -1);
+          const qx = C0[0] + ux * a + vx * cu + fx * cf;
+          const qy = C0[1] + uy * a + vy * cu + fy * cf;
+          const qz = C0[2] + uz * a + vz * cu + fz * cf;
+          DS[i * 3] = wt * (qx - W[i * 3]);
+          DS[i * 3 + 1] = wt * (qy - W[i * 3 + 1]);
+          DS[i * 3 + 2] = wt * (qz - W[i * 3 + 2]);
         }
+      }
+    }
+    // The sleeve displacement is smoothed over the mesh's neighbours before it is applied, so
+    // the armhole eases into the tube instead of pleating where the two mappings meet.
+    for (const o of meshes) {
+      const DS = o.userData.DS;
+      if (!DS) continue;
+      const W = o.userData.W;
+      const n = W.length / 3;
+      const { canon, offsets, list } = (o.userData.adj ??= buildAdjacency(o.geometry));
+      let cur = DS;
+      let nxt = new Float32Array(W.length);
+      for (let it = 0; it < 8; it++) {
+        for (let i = 0; i < n; i++) {
+          const c = canon[i];
+          const s0 = offsets[c];
+          const e = offsets[c + 1];
+          if (e === s0) {
+            nxt[i * 3] = cur[i * 3];
+            nxt[i * 3 + 1] = cur[i * 3 + 1];
+            nxt[i * 3 + 2] = cur[i * 3 + 2];
+            continue;
+          }
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+          for (let j = s0; j < e; j++) {
+            const q = list[j] * 3;
+            ax += cur[q];
+            ay += cur[q + 1];
+            az += cur[q + 2];
+          }
+          const inv = 0.5 / (e - s0);
+          nxt[i * 3] = 0.5 * cur[i * 3] + ax * inv;
+          nxt[i * 3 + 1] = 0.5 * cur[i * 3 + 1] + ay * inv;
+          nxt[i * 3 + 2] = 0.5 * cur[i * 3 + 2] + az * inv;
+        }
+        const t = cur;
+        cur = nxt;
+        nxt = t;
+      }
+      for (let k = 0; k < W.length; k++) W[k] += cur[k];
+      delete o.userData.DS;
+      // The generated sleeves carry baked-in creases (visible on the raw mesh); on a straight
+      // tube they read as ridges, so the sleeve surface itself is relaxed a little.
+      const wgtA = o.userData.wgt;
+      for (let it = 0; it < 6; it++) {
+        for (let i = 0; i < n; i++) {
+          if (wgtA[i] < 0.6) {
+            nxt[i * 3] = W[i * 3];
+            nxt[i * 3 + 1] = W[i * 3 + 1];
+            nxt[i * 3 + 2] = W[i * 3 + 2];
+            continue;
+          }
+          const c = canon[i];
+          const s0 = offsets[c];
+          const e = offsets[c + 1];
+          if (e === s0) {
+            nxt[i * 3] = W[i * 3];
+            nxt[i * 3 + 1] = W[i * 3 + 1];
+            nxt[i * 3 + 2] = W[i * 3 + 2];
+            continue;
+          }
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+          for (let j = s0; j < e; j++) {
+            const q = list[j] * 3;
+            ax += W[q];
+            ay += W[q + 1];
+            az += W[q + 2];
+          }
+          const inv = 0.5 / (e - s0);
+          nxt[i * 3] = 0.5 * W[i * 3] + ax * inv;
+          nxt[i * 3 + 1] = 0.5 * W[i * 3 + 1] + ay * inv;
+          nxt[i * 3 + 2] = 0.5 * W[i * 3 + 2] + az * inv;
+        }
+        W.set(nxt);
       }
     }
 
@@ -1942,6 +1981,26 @@ function bakeToWorld(scene) {
       depthF[i] = thick > 1e-4 ? clamp((arr[i * 3 + 2] - minZ[k]) / thick, 0, 1) : front[i];
     }
     o.userData.origDepth = depthF;
+    // the same, smoothed over the mesh (a bumpy back layer must not flip individual vertices)
+    {
+      let cur = Float32Array.from(depthF);
+      let nxt = new Float32Array(depthF.length);
+      for (let it = 0; it < 10; it++) {
+        for (let i = 0; i < nrm.count; i++) {
+          const c = adj.canon[i];
+          const s0 = adj.offsets[c];
+          const e = adj.offsets[c + 1];
+          if (e === s0) { nxt[i] = cur[i]; continue; }
+          let sum = 0;
+          for (let j = s0; j < e; j++) sum += cur[adj.list[j]];
+          nxt[i] = 0.5 * cur[i] + (0.5 * sum) / (e - s0);
+        }
+        const t = cur;
+        cur = nxt;
+        nxt = t;
+      }
+      o.userData.origDepthS = cur;
+    }
     o.geometry.computeBoundingBox();
     o.geometry.computeBoundingSphere();
   }
@@ -2171,6 +2230,18 @@ function shoulderTipsFromScan(positions, neckY, armpitY, cx0, fallbackHalf) {
   }
   const thr = neckY - 0.095;
   const out = {};
+  // top-of-body height along x (1 cm columns), for the yoke to follow
+  out.profile = (x) => {
+    const f = x * 100;
+    const k0 = Math.floor(f);
+    const t = f - k0;
+    const a = top.get(k0);
+    const b = top.get(k0 + 1);
+    if (a == null && b == null) return null;
+    if (a == null) return b;
+    if (b == null) return a;
+    return a + (b - a) * t;
+  };
   for (const [side, sgn] of [['R', 1], ['L', -1]]) {
     let k = Math.round(cx0 * 100);
     let last = null;

@@ -598,3 +598,13 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What (`public/js/viewer.js` `_dressBottoms`):** seat and legs are built round fixed vertical axes (hip centre; each thigh's centre) with the body outline sampled densely (720 rays) and empty directions interpolated (jagged rings were crumpling the lower legs). Per row: where the garment's circumference is smaller than the body's (+1 cm) the cloth hugs the body and the running maximum restarts there; otherwise the ring is the running maximum of everything above (the legs also inherit the seat's outer/front/back extents), shrunk uniformly so its perimeter never exceeds the fabric's circumference and never inside the body. Result: size 29 hugs Daniel's upper thigh (garment 51 cm round vs thigh 60) then falls straight; 34 falls straight from the seat. Rest circumference per row = that ring's perimeter.
 **Verified:** jeans 29 side/back/front/below, 34 front/side — straight down the back of the calf, no crumple, crotch closed; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Tee sleeves are straight tubes hanging from the arm; yoke rests on the scan's shoulder line
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js` `_placeTop`, `shoulderTipsFromScan`):**
+- **Sleeves**: each sleeve is mapped onto a straight tube parallel to the arm, offset so its top rests on the arm and the slack hangs underneath; radius from the chart's `arm_width` (never tighter than the arm + 1.2 cm), length from the chart's `sleeve`, a dropped seam starts it further down the arm. The flat-lay sleeve maps by distance from the side seam (along) and by position between its top and underarm edges (round); front/back half from the smoothed pillow-depth of the vertex. The armhole cap stays with the torso and eases into the tube over the first 30 %; the sleeve displacement is smoothed over the mesh neighbours (8 passes) and the sleeve surface relaxed (6 passes) because the generated sleeves carry baked-in creases. Replaces the rigid swing.
+- **Yoke**: along the seam line the cloth is lowered onto the scan's own top-of-body profile per 1 cm column (between the collar and the shoulder tips), so the tee touches the shoulders instead of floating; beyond the tips a dropped seam continues down the arm.
+**Verified:** heavyweight S front (level shoulders, sleeves down along the arm, collar seated) and both back sides (no skin at the armpits; faint ridges remain on the sleeves from the mesh's own creases); slim L front (seam on the shoulder, collar seated) and back (holes are the mesh's); 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

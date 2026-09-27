@@ -345,3 +345,13 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - **Diagnosis**: the slim tee's skin patches at the back collar, back armpits and hem are holes in the generated GLB itself (rendered the raw mesh alone: same holes). No placement change affects them; the item needs a regenerated mesh (tripo3d.ai → "Add .glb model" card).
 **Verified:** jeans 29 back (straight), heavyweight S front/back, slim L front/back; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 10:20 — Seat hangs straight (no side bulge); tees 1 cm lower; black tee sleeves as Daniel preferred
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`):**
+- **Bottoms**: the seat tube hangs straight down from its widest point per column (running maximum from the waistband down), so the cloth no longer balloons out again around the hips in a side view.
+- **Tops**: neck line 1 cm lower (the top read as floating above the shoulders); the sleeve swing is back to the rigid, small-for-boxy-tees version and the shoulder-joint sphere collider is removed — Daniel judged the previous round better for the black tee (the bend-along-the-sleeve version gave an asymmetric shoulder and back-armpit gaps).
+**Verified:** heavyweight S front/back, slim L front, jeans 29 side; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

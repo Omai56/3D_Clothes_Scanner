@@ -224,7 +224,7 @@ export class FitViewer {
     const gap = 0.005;
 
     // --- heights: garment length from the chart ---
-    const topY = b.backNeckHeight / 100 + 0.005;
+    const topY = b.backNeckHeight / 100 - 0.005;
     const hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
     const H = Math.max(0.3, topY - hemY);
 
@@ -419,7 +419,7 @@ export class FitViewer {
       // how far the sleeve may swing: a long sleeve follows the arm, a short wide cap sleeve
       // stays close to how it was cut (swinging it far just balloons it at the armhole)
       // window.__sleeveSwing = false keeps the sleeves at the angle they were generated with
-      const phiMax = window.__sleeveSwing === false ? 0 : 0.75 * clamp(L / (0.6 * d), 0.6, 1);
+      const phiMax = window.__sleeveSwing === false ? 0 : 0.75 * clamp(L / (0.6 * d), 0.6, 1) * (1 - 0.7 * clamp(drop / 0.05, 0, 1));
       const phi = clamp(Math.atan2(ux * ty - uy * tx, ux * tx + uy * ty), -phiMax, phiMax);
       this.lastTopFit.sleeves[side] = { J, u: [ux, uy], phi, kL, kW, kZ, L, d, dz, cnt, seamTop: seamTopY[side], armholeY, vArm, vTop, dA };
       // rigid swing of the whole sleeve about the joint (a progressive bend left the cap
@@ -440,10 +440,8 @@ export class FitViewer {
           const qx = J[0] + vx * cph - vy * sph;
           const qy = J[1] + vx * sph + vy * cph;
           const qz = J[2] + zShift + kZ * (W[i * 3 + 2] - J[2]);
-          // the swing builds up along the sleeve: none at the armhole cap, full from 60 % out
-          const wa = w * smoothstep(0.2 * L, 0.6 * L, a);
-          W[i * 3] += wa * (qx - W[i * 3]);
-          W[i * 3 + 1] += wa * (qy - W[i * 3 + 1]);
+          W[i * 3] += w * (qx - W[i * 3]);
+          W[i * 3 + 1] += w * (qy - W[i * 3 + 1]);
           W[i * 3 + 2] += w * (qz - W[i * 3 + 2]);
         }
       }
@@ -559,25 +557,6 @@ export class FitViewer {
       const s0 = armAxis(a, rUp - gap);
       // the deltoid at the top of the arm is fatter than the upper-arm girth
       arms.push(capsuleCollider(s0.x, s0.y, s0.z, a.hand.x, a.hand.y, a.hand.z, (t) => rUp + (rWr - rUp) * t + rUp * 0.12 * Math.max(0, 1 - t / 0.15)));
-      // shoulder joint / armpit wedge: the torso rings are clipped here and the arm capsule
-      // starts lower, so without this cloth pushed into the armpit stays inside the body
-      const sg = Math.sign(a.shoulder.x) || 1;
-      const jx = a.shoulder.x - sg * rUp * 0.45;
-      const jy = a.shoulder.y - rUp * 1.15;
-      const jz = a.shoulder.z;
-      const jr = rUp * 1.35;
-      arms.push((pos, i) => {
-        const k = i * 3;
-        const ox = pos[k] - jx;
-        const oy = pos[k + 1] - jy;
-        const oz = pos[k + 2] - jz;
-        const d = Math.hypot(ox, oy, oz);
-        if (d >= jr || d < 1e-6) return;
-        const sc = jr / d;
-        pos[k] = jx + ox * sc;
-        pos[k + 1] = jy + oy * sc;
-        pos[k + 2] = jz + oz * sc;
-      });
     }
     const floor = (pos, i) => {
       if (pos[i * 3 + 1] < 0.01) pos[i * 3 + 1] = 0.01;
@@ -989,6 +968,7 @@ export class FitViewer {
     const cols = 48;
     const srows = Math.max(3, Math.ceil((topY - legTop) / dy) + 1);
     const seat = new Tube(srows, cols);
+    const seatColMax = new Float32Array(cols);
     const seatRowY = (r) => Math.max(legTop, topY - r * dy);
     for (let r = 0; r < srows; r++) {
       const Y = seatRowY(r);
@@ -999,7 +979,11 @@ export class FitViewer {
       for (let c = 0; c < cols; c++) {
         const th = (c / cols) * TWO_PI - Math.PI;
         const smp = sampleRing(this.rings.torso, Yc, th) ?? { r: 0.15, cx: 0, cz: 0 };
-        const rr = Math.max(smp.r + gap, smp.r * s);
+        // cloth hangs straight down from the widest point above (hip bones / seat), it does not
+        // balloon out again around every bulge of the body
+        const rr0 = Math.max(smp.r + gap, smp.r * s);
+        if (rr0 > seatColMax[c]) seatColMax[c] = rr0;
+        const rr = seatColMax[c];
         seat.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
       }
     }

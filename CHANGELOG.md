@@ -619,3 +619,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Verified:** jeans 29 side/back/front/below and 34 front match the reference photos' straight fall; slider at −8 cm: waistband, crotch and hem all lower. 24 tests pass.
 **Known:** a small fold/notch remains at the crotch seam from below (the mesh's fly slot).
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Tees: sleeves snapped onto the arm tube, collar on the shoulder line, tight sizes worn against the skin
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js` `_placeTop`):**
+- Sleeve vertices beyond the cap are put back exactly on the arm tube (place along/around kept) before the relax pass, so the deltoid dents and back ridges from the mesh's baked creases are flattened at every size; the underarm gusset maps onto the tube's underside.
+- Yoke: every vertex along the shoulder line rests on the scan's top profile, the collar column at the trapezius height beside the neck (not on the neck); front neckline 2 cm lower.
+- A tee cut smaller than the body (slim S/M) is worn against the skin: the whole torso is clamped to within 1.4 cm of the body surface with a 1.2 cm clearance, so the body mesh never shows through.
+- Tried and reverted: a cap-less tube from the seam (tore the seam into fringe), an underarm drop (fins), pulling loose tees' shoulder caps in (tore the seam).
+**Verified:** heavyweight S front/back, XXL back; slim L front/back, S back; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

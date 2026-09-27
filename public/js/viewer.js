@@ -223,7 +223,7 @@ export class FitViewer {
     const meshCz = (box.min.z + box.max.z) / 2;
     if (!this._gltfTop) this._gltfTop = topProfile(model, box, meshCx, bands);
     const P = this._gltfTop;
-    const gap = 0.005;
+    let gap = 0.005;
 
     // --- heights: garment length from the chart ---
     const topY = b.backNeckHeight / 100 - 0.005;
@@ -254,6 +254,10 @@ export class FitViewer {
     // --- body of the tee: chart circumference as an ellipse ---
     const bodyC = TWO_PI * Math.sqrt(((bodyW / 2 + gap) ** 2 + (bodyD / 2 + gap) ** 2) / 2);
     const C = Math.max(chestFlat ? (2 * chestFlat) / 100 : bodyC, bodyC);
+    // a tee cut smaller than the body (stretch, slim fit) is worn against the skin: it hugs the
+    // body's surface with a bit more clearance so the body mesh never shows through it
+    const tight = chestFlat != null && (2 * chestFlat) / 100 < bodyC + 0.03;
+    if (tight) gap = 0.012;
     const q2 = 2 * (C / TWO_PI) ** 2;
     let Wb = Ws;
     let Db = 2 * Math.sqrt(Math.max(0, q2 - (Wb / 2) ** 2));
@@ -297,7 +301,7 @@ export class FitViewer {
     // shoulder seam sits down the arm, so the yoke beyond the body's shoulder point slopes down
     // to it (and the sleeve hangs from there).
     const rampStart = 0.02 * P.torsoHW;
-    const rampLen = 0.4 * P.torsoHW;
+    const rampLen = 0.15 * P.torsoHW;
     const xs = shoulderW / 2;
     const dropY = drop * Math.cos(armAng);
     // The flat-lay mesh has a nearly level shoulder line; the body's shoulder slopes down from
@@ -309,19 +313,28 @@ export class FitViewer {
     // (never lifted), fading out towards the chest; beyond the tips a dropped seam continues
     // down the arm.
     const profile = tips.profile ?? null;
-    const restOn = (X) => {
+    const neckHW = (b.neckBaseGirth ?? 39) / 100 / TWO_PI + 0.012;
+    const restOn = (X0) => {
+      // the collar column rests at the trapezius height beside the neck, not on the neck itself
+      const X = Math.abs(X0 - bodyCx) < neckHW ? bodyCx + Math.sign(X0 - bodyCx || 1) * neckHW : X0;
       const side = X >= bodyCx ? 'R' : 'L';
       const tip = tips[side];
       const inside = side === 'R' ? X <= tip.x : X >= tip.x;
       const top = inside && profile ? profile(X) : null;
       return (top ?? tip.y) + gap + 0.006;
     };
-    const yokeDrop = (X, v) => {
+    // The shoulder line of the mesh (its top ~8 % below the collar) is lowered so it rests on
+    // the body's top profile; below that the drop fades out towards the chest. The collar
+    // itself keeps its standing height above the shoulder line.
+    const yokeDrop = (X, v, yWarp) => {
       const ax = Math.abs(X - bodyCx);
       const vv = smoothstep(vArm - 0.1, vTop, v);
-      const slopeDrop = Math.max(0, seamWorldY - restOn(X));
+      const yLine = Math.min(yWarp, seamWorldY);
+      const slopeDrop = Math.max(0, yLine - restOn(X));
       return (slopeDrop + dropY * smoothstep(xs, Math.max(xs + 0.01, Ws / 2), ax)) * vv;
     };
+    // front neckline sits a little lower than the generated collar (flat-lay collars ride high)
+    const neckLower = 0.02;
     for (const o of meshes) {
       const orig = o.userData.origPos;
       const n = orig.length / 3;
@@ -333,8 +346,13 @@ export class FitViewer {
         const z = orig[i * 3 + 2];
         const v = clamp((y - box.min.y) / h, 0, 1);
         const X = warpX(x, v);
+        const yW = warpY(v);
+        let Y = yW - yokeDrop(X, v, yW);
+        if (warpZ(z) > bodyCz + 0.02 && Math.abs(X - bodyCx) < neckHW * 1.6 && v > vTop - 0.15) {
+          Y -= neckLower * smoothstep(vTop - 0.15, vTop - 0.02, v) * (1 - smoothstep(neckHW * 0.9, neckHW * 1.6, Math.abs(X - bodyCx)));
+        }
         W[i * 3] = X;
-        W[i * 3 + 1] = warpY(v) - yokeDrop(X, v);
+        W[i * 3 + 1] = Y;
         W[i * 3 + 2] = warpZ(z);
         wgt[i] = smoothstep(rampStart, rampStart + rampLen, Math.abs(x - meshCx) - torsoHWAt(v));
       }
@@ -385,24 +403,27 @@ export class FitViewer {
       const back = 0.03; // the cap starts a little above the arm's top point, up at the yoke edge
       const along0 = drop - back;
       const C0 = [A0.x + ux * along0 - vx * off, A0.y + uy * along0 - vy * off, A0.z + uz * along0 - vz * off];
+      const underDrop = 0;
+      (this._sleeveTubes ??= {})[side] = { C0, u: [ux, uy, uz], v: [vx, vy, vz], f: [fx, fy, fz], rs, sgn, underDrop };
       for (const o of meshes) {
         const { origPos: orig, origFront: fr, origDepthS: df, W, wgt } = o.userData;
         const DS = (o.userData.DS ??= new Float32Array(W.length)); // sleeve displacement, smoothed below
         for (let i = 0; i < wgt.length; i++) {
           const w = wgt[i];
           if (w <= 0 || (orig[i * 3] >= meshCx ? 1 : -1) !== sgn) continue;
-          const sv = S2.sleeveOf(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2]);
+          const sv = S2.sleeveOf(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2], true);
           if (!sv) continue;
           const a = sv.s * Lsleeve;
-          const wt = w * smoothstep(0, 0.3, sv.s); // the cap stays with the armhole, the tube takes over beyond it
+          const wt = w * smoothstep(0, 0.08, sv.s); // the cap stays with the armhole, the tube takes over just beyond it
           const ph = Math.acos(clamp(sv.u, -1, 1));
           // which half of the tube: by depth across the flat-lay pillow (a vertex on the top or
           // underarm edge sits at the seam either way, so a wrong guess there costs nothing)
           const front = df ? df[i] >= 0.5 : fr ? fr[i] === 1 : sv.front;
+          const under = clamp(-sv.u, 0, 1) * (1 - smoothstep(0, 0.6, sv.s)) * underDrop;
           const cu = rs * Math.cos(ph);
           const cf = rs * Math.sin(ph) * (front ? 1 : -1);
           const qx = C0[0] + ux * a + vx * cu + fx * cf;
-          const qy = C0[1] + uy * a + vy * cu + fy * cf;
+          const qy = C0[1] + uy * a + vy * cu + fy * cf - under;
           const qz = C0[2] + uz * a + vz * cu + fz * cf;
           DS[i * 3] = wt * (qx - W[i * 3]);
           DS[i * 3 + 1] = wt * (qy - W[i * 3 + 1]);
@@ -451,9 +472,30 @@ export class FitViewer {
       }
       for (let k = 0; k < W.length; k++) W[k] += cur[k];
       delete o.userData.DS;
-      // The generated sleeves carry baked-in creases (visible on the raw mesh); on a straight
-      // tube they read as ridges, so the sleeve surface itself is relaxed a little.
+      // The generated sleeves carry baked-in creases (visible on the raw mesh). Beyond the cap
+      // the sleeve is a plain tube, so every sleeve vertex is put back exactly on the tube's
+      // surface (keeping its place along and around it), then the surface is relaxed a little.
       const wgtA = o.userData.wgt;
+      const origA = o.userData.origPos;
+      for (let i = 0; i < n; i++) {
+        if (wgtA[i] < 0.9) continue;
+        const sv = S2.sleeveOf(origA[i * 3], origA[i * 3 + 1], origA[i * 3 + 2], true);
+        if (!sv || sv.s < 0.08) continue;
+        const T = this._sleeveTubes?.[sv.side];
+        if (!T) continue;
+        const rx = W[i * 3] - T.C0[0];
+        const ry = W[i * 3 + 1] - T.C0[1];
+        const rz = W[i * 3 + 2] - T.C0[2];
+        const a = rx * T.u[0] + ry * T.u[1] + rz * T.u[2];
+        let px = rx - a * T.u[0];
+        let py = ry - a * T.u[1];
+        let pz = rz - a * T.u[2];
+        const d = Math.hypot(px, py, pz) || 1e-6;
+        const k = (T.rs / d - 1) * smoothstep(0.08, 0.2, sv.s) * wgtA[i] * smoothstep(-0.7, -0.2, sv.u);
+        W[i * 3] += px * k;
+        W[i * 3 + 1] += py * k;
+        W[i * 3 + 2] += pz * k;
+      }
       for (let it = 0; it < 6; it++) {
         for (let i = 0; i < n; i++) {
           if (wgtA[i] < 0.6) {
@@ -498,9 +540,34 @@ export class FitViewer {
       const adj = (o.userData.adj ??= buildAdjacency(o.geometry));
       const D = new Float32Array(W.length);
       const T = new Float32Array(W.length);
+      const wgtC = o.userData.wgt;
+      const maxOffBody = tight ? 0.014 : Infinity;
+      const pullIn = (P0, i) => {
+        if (wgtC[i] > 0.5) return; // sleeves hang from the arm
+        const k = i * 3;
+        const Y = P0[k + 1];
+        // a tee cut smaller than the body lies on the skin everywhere (pulling the loose tee's
+        // shoulder caps in tore the sleeve seam, so loose tees are left to hang)
+        const maxOff = maxOffBody;
+        if (!Number.isFinite(maxOff)) return;
+        const c = sampleRing(this.rings.torso, Math.min(Y, neckY - 0.02), 0);
+        if (!c) return;
+        const dx = P0[k] - c.cx;
+        const dz = P0[k + 2] - c.cz;
+        const smp = sampleRing(this.rings.torso, Math.min(Y, neckY - 0.02), Math.atan2(dz, dx));
+        if (!smp) return;
+        const d = Math.hypot(dx, dz);
+        const lim = smp.r + gap + maxOff;
+        if (d > lim) {
+          const f = lim / d;
+          P0[k] = c.cx + dx * f;
+          P0[k + 2] = c.cz + dz * f;
+        }
+      };
       const collide = () => {
         for (let i = 0; i < n; i++) {
           if (T[i * 3 + 1] < hemY - 0.01) continue;
+          pullIn(T, i);
           for (let pass = 0; pass < 2; pass++) for (const col of Cs.all) col(T, i);
         }
       };
@@ -2607,7 +2674,7 @@ function sliceTopMesh(scene, box, NB, meshCx) {
   // s = fraction along the sleeve (side seam -> cuff), u = across it (-1 underarm, +1 top),
   // front = which layer. Everything beside the torso is sleeve unless it lies clearly below
   // the sleeve's underarm edge (then it is an underarm gusset).
-  out.sleeveOf = (x, y, z) => {
+  out.sleeveOf = (x, y, z, lenient = false) => {
     const ax = Math.abs(x - meshCx);
     if (ax <= torsoHalf * 0.98 || sleeveLen <= 0.01) return null;
     const side = x >= meshCx ? 'R' : 'L';
@@ -2620,7 +2687,7 @@ function sliceTopMesh(scene, box, NB, meshCx) {
     const zc = lerpCol(E.zc, f) ?? 0;
     if (top == null || bot == null) return null;
     const span = Math.max(1e-3, top - bot);
-    if (y < bot - span * 0.15) return null; // below the sleeve: gusset
+    if (y < bot - span * 0.15) return lenient ? { side, s, u: -1, front: z >= zc } : null; // below the sleeve: gusset
     return { side, s, u: Math.max(-1, Math.min(1, (2 * (y - bot)) / span - 1)), front: z >= zc };
   };
   // Torso band statistics over everything that is NOT sleeve (the widening upper torso beside

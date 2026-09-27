@@ -628,3 +628,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **By:** Claude (Opus 5.5)
 **What:** The fitting room sign now cycles four backdrops: Studio (default), Blush wallpaper, Garden trellis, Maldives beach.
 **Files:** `public/decor.js`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Two more fitting room backdrops: Canadian autumn and Swiss snow
+**By:** Claude (Opus 5.5)
+**What:** The sign now cycles six backdrops: Studio (default), Blush wallpaper, Garden trellis, Maldives beach, **Canadian autumn** (maple trees in red, orange and gold, layered autumn hills, maple leaves falling and scattered on golden grass; maple-red curtains) and **Swiss snow** (Alps with a Matterhorn-style peak and snow caps, snowy pines, a wooden chalet with lit windows, falling snow, snowfield; Swiss-red curtains). Both are outdoors, so the ceiling lamp is hidden, as on the beach. All drawn into the stage background, behind the model.
+**Verified:** headless Chrome at 1280 and 390px, full cycle back to Studio; no page errors; 24 tests pass.
+**Files:** `public/decor.js`, `public/styles.css`, `CHANGELOG.md`

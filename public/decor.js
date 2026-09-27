@@ -68,6 +68,8 @@
       { id: 'blush', name: 'Blush wallpaper' },
       { id: 'garden', name: 'Garden trellis' },
       { id: 'seaside', name: 'Maldives beach' },
+      { id: 'maple', name: 'Canadian autumn' },
+      { id: 'alps', name: 'Swiss snow' },
     ];
     let room = 0;
     const sign = document.createElement('button');

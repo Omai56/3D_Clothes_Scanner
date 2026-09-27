@@ -582,3 +582,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What (`public/js/viewer.js` `_bodyColliders`):** a sphere at the back of each shoulder joint (posterior deltoid) fills the wedge of body that neither the clipped torso rings nor the arm capsule cover; with the arm capsules now placed on the scan's real shoulder tips it no longer distorts the cap. `window.__jointSphere = false` disables it.
 **Verified:** heavyweight S back (both sides: no skin at the armpit seam), front unchanged; slim L front/back unchanged (its back holes are in the mesh); 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Daniel's app back at the root; Samuel's measurement page moved to /measure.html
+**By:** Claude (Fable 5.1), at Daniel's request
+**What:** the 3-step scan → item → fit app (Look/Fit views, saved bodies) is `public/index.html` again (a copy of `public/app.html`, which stays for existing links). Samuel's measurements form is now `public/measure.html`; his try-on page `shop.html` and its "Edit" link point to it. Nothing of the new UI is removed — it lives at `/measure.html` → `/shop.html`.
+**Why:** after the merge the root URL showed the measurements form, with no way to pick the saved "Daniel" body or reach the Look view.
+**Files:** `public/index.html`, `public/measure.html`, `public/shop.html`, `CHANGELOG.md`

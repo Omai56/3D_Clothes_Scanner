@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Your Measurements · FitCheck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="measure.html"><span class="logo-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a5cff"/><stop offset="1" stop-color="#2b2170"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M11 9.5l3-1.5c.6 1.3 1.1 2 2 2s1.4-.7 2-2l3 1.5 3 4-2.4 1.6-1.1-1.4V23h-9v-9.3l-1.1 1.4L8 13.5z" fill="#fff" opacity=".95"/><path d="M12.5 19.5h7" stroke="#d9b36a" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="1 1.6"/></svg></span><span class="logo-word">Fit<em>Check</em></span></a>
+    <ol class="steps" aria-label="Step 1 of 2"><li class="current" aria-current="step"><span class="dot">1</span><span class="lbl">Measure</span></li><li class=""><span class="dot">2</span><span class="lbl">Try on</span></li></ol>
+  </div>
+</header>
+<main class="page">
+  <p class="eyebrow">Step 1 of 2 · Your body</p>
+  <h1>Your <em>measurements</em></h1>
+  <p class="lede">We compare these to each size chart to find the size that fits you, and show where.</p>
+
+  <div class="measure-layout">
+    <aside class="card figure-panel">
+      <div class="figure-wrap alive stage" id="figure"></div>
+      <div class="figure-caption" id="caption"></div>
+    </aside>
+
+    <form class="card form-panel" id="form" novalidate>
+      <div class="scan-card" id="scanCard">
+        <span class="scan-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="8.5" r="1.8"/><path d="M9 17v-3.5a3 3 0 0 1 6 0V17"/></svg></span>
+        <span class="scan-text">
+          <b>Scan your body</b>
+          <span id="scanStatus">Opens the Bodygram scanner. Two photos, about a minute, then we fill these in for you.</span>
+        </span>
+        <button class="btn scan-btn" type="button" id="scanBtn">Scan my body</button>
+      </div>
+      <p class="scan-or"><span>or type them in</span></p>
+      <div class="form-head">
+        <div class="progress" id="progress" aria-live="polite"></div>
+        <div class="unit-toggle" role="group" aria-label="Units">
+          <button type="button" data-unit="cm" aria-pressed="true">cm</button>
+          <button type="button" data-unit="in" aria-pressed="false">in</button>
+        </div>
+      </div>
+      <div class="progress-bar"><i id="progressBar"></i></div>
+      <div class="fields" id="fields"></div>
+      <div class="form-actions">
+        <button class="btn primary" type="submit">Continue to try on</button>
+        <button class="btn ghost" type="button" id="demo">Fill with demo scan</button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script src="app.js"></script>
+<script>
+  const figure = document.getElementById('figure');
+  const caption = document.getElementById('caption');
+  const fieldsEl = document.getElementById('fields');
+  const form = document.getElementById('form');
+  let unit = 'cm';
+  const k = () => (unit === 'in' ? Fit.CM_PER_IN : 1);
+  const fmt = v => String(Math.round(v * 10) / 10);
+
+  figure.innerHTML = Fit.bodyFigure('Body outline, highlights the part you are measuring');
+
+  fieldsEl.innerHTML = Fit.FIELDS.map((f, i) => `
+    <label class="field" data-region="${f.key}">
+      <span class="label"><span class="num">${i + 1}</span>${f.label}</span>
+      <span class="hint">${f.hint}</span>
+      <span class="input-wrap">
+        <input name="${f.key}" type="number" inputmode="decimal" step="0.1" placeholder=" "
+          enterkeyhint="${i === Fit.FIELDS.length - 1 ? 'done' : 'next'}" aria-describedby="err-${f.key}">
+        <span class="unit">cm</span>
+      </span>
+      <span class="field-error" id="err-${f.key}"></span>
+    </label>`).join('');
+
+  // Values are kept in cm; inputs show the chosen unit.
+  const inputFor = key => form.elements[key];
+  function readCm(key) { const v = parseFloat(inputFor(key).value); return Number.isFinite(v) ? v * k() : null; }
+  function writeCm(key, cm) { inputFor(key).value = cm == null ? '' : fmt(cm / k()); }
+
+  function checkField(f, show) {
+    const cm = readCm(f.key);
+    const label = inputFor(f.key).closest('.field');
+    let msg = '';
+    if (cm == null) msg = show ? 'Required' : '';
+    else if (cm < f.min || cm > f.max) msg = `Enter ${fmt(f.min / k())} to ${fmt(f.max / k())} ${unit}`;
+    label.classList.toggle('invalid', !!msg);
+    label.querySelector('.field-error').textContent = msg;
+    return cm != null && !msg;
+  }
+
+  let wasComplete = null;
+  function updateProgress() {
+    const done = Fit.FIELDS.filter(f => { const v = readCm(f.key); return v != null && v >= f.min && v <= f.max; }).length;
+    const complete = done === Fit.FIELDS.length;
+    // Wave hello when the last measurement goes in (not on page load).
+    if (complete && wasComplete === false) {
+      figure.classList.remove('cheer'); void figure.offsetWidth; figure.classList.add('cheer');
+      setTimeout(() => figure.classList.remove('cheer'), 1700);
+    }
+    wasComplete = complete;
+    for (const f of Fit.FIELDS) { const v = readCm(f.key); Fit.setFigureValue(figure, f.key, v ? `${fmt(v / k())} ${unit}` : ''); }
+    document.getElementById('progress').textContent = done === Fit.FIELDS.length ? 'All set' : `${done} of ${Fit.FIELDS.length} filled`;
+    document.getElementById('progressBar').style.width = (done / Fit.FIELDS.length * 100) + '%';
+  }
+
+  let active = null;
+  function setActive(key) {
+    active = key;
+    const f = Fit.FIELDS.find(x => x.key === key);
+    if (!f) {
+      figure.removeAttribute('data-active');
+      caption.innerHTML = '<b>Tap a field</b>to see where to measure';
+    } else {
+      figure.dataset.active = key;
+      const cm = readCm(key);
+      caption.innerHTML = `<b>${f.label}${cm ? ` · ${fmt(cm / k())} ${unit}` : ''}</b>${f.hint}`;
+    }
+    figure.querySelectorAll('[data-region]').forEach(el => el.classList.toggle('active', el.dataset.region === key));
+    fieldsEl.querySelectorAll('.field').forEach(el => el.classList.toggle('active', el.dataset.region === key));
+  }
+  setActive(null);
+
+  // Tap the body to jump to that measurement.
+  figure.addEventListener('click', e => {
+    const g = e.target.closest('.region');
+    if (g) inputFor(g.dataset.region).focus();
+  });
+
+  fieldsEl.addEventListener('focusin', e => { const l = e.target.closest('.field'); if (l) setActive(l.dataset.region); });
+  fieldsEl.addEventListener('mouseover', e => {
+    const l = e.target.closest('.field');
+    if (l && !fieldsEl.contains(document.activeElement)) setActive(l.dataset.region);
+  });
+  fieldsEl.addEventListener('focusout', e => {
+    const l = e.target.closest('.field');
+    if (l) checkField(Fit.FIELDS.find(f => f.key === l.dataset.region), false);
+    setTimeout(() => { if (!fieldsEl.contains(document.activeElement)) setActive(null); }, 0);
+  });
+  fieldsEl.addEventListener('mouseleave', () => { if (!fieldsEl.contains(document.activeElement)) setActive(null); });
+  fieldsEl.addEventListener('input', e => {
+    const l = e.target.closest('.field');
+    if (l && l.classList.contains('invalid')) checkField(Fit.FIELDS.find(f => f.key === l.dataset.region), false);
+    updateProgress();
+    if (active) setActive(active);
+  });
+  // Enter moves to the next field; on the last one it submits.
+  fieldsEl.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const i = Fit.FIELDS.findIndex(f => f.key === e.target.name);
+    if (i < 0 || i === Fit.FIELDS.length - 1) return;
+    e.preventDefault();
+    inputFor(Fit.FIELDS[i + 1].key).focus();
+  });
+
+  document.querySelector('.unit-toggle').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || b.dataset.unit === unit) return;
+    const cms = Object.fromEntries(Fit.FIELDS.map(f => [f.key, readCm(f.key)]));
+    unit = b.dataset.unit;
+    document.querySelectorAll('.unit-toggle button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    document.querySelectorAll('.input-wrap .unit').forEach(u => { u.textContent = unit; });
+    for (const f of Fit.FIELDS) writeCm(f.key, cms[f.key]);
+    updateProgress();
+    Fit.FIELDS.forEach(f => { if (inputFor(f.key).closest('.field').classList.contains('invalid')) checkField(f, true); });
+    if (active) setActive(active);
+  });
+
+  function fill(body) { for (const f of Fit.FIELDS) writeCm(f.key, body[f.key]); Fit.FIELDS.forEach(f => checkField(f, false)); updateProgress(); }
+  const saved = Fit.loadBody();
+  if (saved) fill(saved); else updateProgress();
+
+  document.getElementById('demo').addEventListener('click', () => fill(Fit.DEMO_BODY));
+
+  // ---------- Body scan: same flow as the original app (public/app.html) ----------
+  // Opens the Bodygram scanner in a new tab (clean camera permission) and waits here; when the scan
+  // finishes, the fields fill in. If the browser blocks the new tab, this tab goes to the scanner
+  // instead and the wait resumes when the user comes back.
+  const scanCard = document.getElementById('scanCard');
+  const scanBtn = document.getElementById('scanBtn');
+  const scanStatus = document.getElementById('scanStatus');
+  const SCAN_KEY = 'pendingScan';
+  const store = {
+    get() { try { return sessionStorage.getItem(SCAN_KEY); } catch (e) { return null; } },
+    set(v) { try { v ? sessionStorage.setItem(SCAN_KEY, v) : sessionStorage.removeItem(SCAN_KEY); } catch (e) { /* ignore */ } },
+  };
+  function scanState(state, text) {
+    scanCard.dataset.state = state;
+    scanStatus.textContent = text;
+    scanBtn.disabled = state === 'busy';
+  }
+
+  scanBtn.addEventListener('click', async () => {
+    scanState('busy', 'Opening the scanner…');
+    // Open the tab now, while we still have the click; Safari blocks window.open after an await.
+    const tab = window.open('', '_blank');
+    const height = readCm('height');
+    try {
+      const res = await fetch('/api/scan-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefill: height ? { height: Math.round(height) } : {} }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || 'no scanner link');
+      store.set(data.sessionId);
+      if (tab) { tab.location.href = data.url; waitForScan(); }
+      else location.href = data.url; // new tab blocked: go there in this tab
+    } catch (e) {
+      console.warn('scan-session', e);
+      if (tab) tab.close();
+      scanState('error', "Couldn't open the scanner right now. Try again, or type your measurements below.");
+      scanBtn.textContent = 'Try again';
+    }
+  });
+
+  // Bodygram names -> our fields (height comes from what the user entered in the scanner).
+  const SCAN_FIELDS = { chest: 'bustGirth', waist: 'waistGirth', hip: 'hipGirth', inseam: 'insideLegHeight', shoulder: 'acrossBackShoulderWidth' };
+  async function applyScan(name) {
+    const s = await (await fetch(`/api/scans/${encodeURIComponent(name)}`)).json();
+    const m = s.measurements_cm || {};
+    const body = { height: s.input?.heightCm ?? readCm('height') };
+    for (const [key, bg] of Object.entries(SCAN_FIELDS)) body[key] = m[bg] ?? readCm(key);
+    fill(body);
+    try { sessionStorage.setItem('fit3dScan', name); } catch (e) { /* ignore */ } // try-on page shows this 3D body
+  }
+
+  // Poll every 4 s for up to 8 minutes, like the original app.
+  let polling = false;
+  async function waitForScan() {
+    const id = store.get();
+    if (!id || polling) return;
+    polling = true;
+    scanState('busy', 'Waiting for your scan… Finish it in the scanner tab, then come back here.');
+    const started = Date.now();
+    let failure = null;
+    while (Date.now() - started < 8 * 60 * 1000) {
+      try {
+        const r = await (await fetch(`/api/scan-session/${encodeURIComponent(id)}`)).json();
+        if (r.ready) {
+          await applyScan(r.name);
+          store.set(null);
+          polling = false;
+          scanState('done', 'Scan done: your measurements are filled in below. Check them, then continue.');
+          scanBtn.textContent = 'Scan again';
+          return;
+        }
+        if (r.failed) { failure = r.error?.code ?? 'unknown'; break; }
+      } catch (e) { console.warn('scan poll', e); }
+      await new Promise(res => setTimeout(res, 4000));
+    }
+    store.set(null);
+    polling = false;
+    scanState('error', failure
+      ? `The scan failed (${failure}). Try again with better lighting.`
+      : "We didn't get a finished scan. Scan again, or type your measurements below.");
+    scanBtn.textContent = 'Scan again';
+  }
+  waitForScan(); // resumes after the same-tab fallback
+  // Coming back with the browser's Back button can restore the page from cache without re-running scripts.
+  window.addEventListener('pageshow', e => { if (e.persisted) waitForScan(); });
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const bad = Fit.FIELDS.filter(f => !checkField(f, true));
+    if (bad.length) { inputFor(bad[0].key).focus(); return; }
+    const body = Object.fromEntries(Fit.FIELDS.map(f => [f.key, Math.round(readCm(f.key) * 10) / 10]));
+    Fit.saveBody(body);
+    location.href = 'shop.html';
+  });
+</script>
+</body>
+</html>

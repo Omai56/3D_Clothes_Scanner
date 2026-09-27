@@ -1011,35 +1011,66 @@ export class FitViewer {
       // Baggy legs hang straight down from the widest part of the leg (thigh); only a leg cut
       // close to the body follows the knee and calf. 8 cm of ease at the thigh = fully straight.
       const thighY = legTop - 0.04;
-      const straight = clamp((circLeg(side, thighY) - bodyCAt(legMap, legYc(thighY))) / 0.05, 0, 1);
-      const thighC = sampleRing(legMap, legYc(thighY), 0);
-      const colMax = new Float32Array(lcols);
-      const restHang = new Float32Array(lrows);
-      let hangC = 0;
+      // A leg that is not tight hangs straight: one vertical tube whose radius in every
+      // direction is the largest the leg needs anywhere along it (measured from one fixed
+      // front-to-back axis, so the calf sitting further back than the thigh is inside the
+      // cloth, not wrapped by it). Under ~1 cm of thigh ease the cloth follows the leg; from
+      // 2.5 cm it is fully straight.
+      const straight = clamp((circLeg(side, thighY) - bodyCAt(legMap, legYc(thighY)) - 0.01) / 0.015, 0, 1);
+      const thighC = sampleRing(legMap, legYc(thighY), 0) ?? { cx: sgn * 0.09, cz: -0.06, r: 0.09 };
+      const NSMP = 96;
+      const distRow = new Float32Array(lrows * lcols); // scaled body distance from the axis per row/column
+      const axisX = new Float32Array(lrows);
+      const colAll = new Float32Array(lcols);
       for (let r = 0; r < lrows; r++) {
         const Y = legRowY(r);
         const Yc = legYc(Y);
         const C = circLeg(side, Y);
         const base = ringAt(legMap, Yc);
         const s = base ? C / ringCircumference(base) : 1;
-        hangC = Math.max(hangC, C, bodyCAt(legMap, Yc));
-        restHang[r] = hangC;
-        for (let c = 0; c < lcols; c++) {
-          const th = (c / lcols) * TWO_PI - Math.PI;
-          const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: sgn * 0.09, cz: -0.08 };
+        const cc = sampleRing(legMap, Yc, 0) ?? thighC;
+        axisX[r] = cc.cx;
+        const ax = cc.cx;
+        const az = thighC.cz;
+        const acc = new Float32Array(lcols).fill(-1);
+        for (let j = 0; j < NSMP; j++) {
+          const th = (j / NSMP) * TWO_PI - Math.PI;
+          const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: cc.cx, cz: cc.cz };
           const rr0 = Math.max(smp.r + gap, smp.r * s);
-          if (rr0 > colMax[c]) colMax[c] = rr0;
-          const rr = rr0 + straight * (colMax[c] - rr0);
-          // a straight leg hangs on one front-to-back axis (the thigh's); the calf's backward
-          // bulge below must not pull the cloth with it
-          const cz = thighC ? smp.cz + straight * (thighC.cz - smp.cz) : smp.cz;
-          tube.set(r, c, smp.cx + rr * Math.cos(th), Y, cz + rr * Math.sin(th));
+          const px = smp.cx + rr0 * Math.cos(th) - ax;
+          const pz = smp.cz + rr0 * Math.sin(th) - az;
+          const a2 = Math.atan2(pz, px);
+          const bin = ((Math.round(((a2 + Math.PI) / TWO_PI) * lcols) % lcols) + lcols) % lcols;
+          const d = Math.hypot(px, pz);
+          if (d > acc[bin]) acc[bin] = d;
+        }
+        for (let c = 0; c < lcols; c++) {
+          if (acc[c] < 0) acc[c] = Math.max(acc[(c + 1) % lcols], acc[(c + lcols - 1) % lcols], 0.05);
+          distRow[r * lcols + c] = acc[c];
+          if (acc[c] > colAll[c]) colAll[c] = acc[c];
         }
       }
-      tube.setRest((r) => {
-        const base = Math.max(circLeg(side, legRowY(r)), bodyCAt(legMap, legYc(legRowY(r))));
-        return base + straight * (restHang[r] - base);
-      }, (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
+      const restRow = new Float32Array(lrows);
+      for (let r = 0; r < lrows; r++) {
+        const Y = legRowY(r);
+        let per = 0;
+        let px0 = 0;
+        let pz0 = 0;
+        for (let c = 0; c <= lcols; c++) {
+          const cc = c % lcols;
+          const th = (cc / lcols) * TWO_PI - Math.PI;
+          const d0 = distRow[r * lcols + cc];
+          const d = d0 + straight * (colAll[cc] - d0);
+          const px = axisX[r] + d * Math.cos(th);
+          const pz = thighC.cz + d * Math.sin(th);
+          if (c < lcols) tube.set(r, cc, px, Y, pz);
+          if (c > 0) per += Math.hypot(px - px0, pz - pz0);
+          px0 = px;
+          pz0 = pz;
+        }
+        restRow[r] = Math.max(per, circLeg(side, Y), bodyCAt(legMap, legYc(Y)));
+      }
+      tube.setRest((r) => restRow[r], (r) => Math.max(0.002, legRowY(r) - legRowY(r + 1)));
       for (let c = 0; c < lcols; c++) tube.pin(0, c);
       // the two legs never cross the line between the thighs. That line is the real midline of
       // this scan (bodies are not symmetric about x = 0), per row.

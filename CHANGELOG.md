@@ -556,3 +556,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - **Tops**: neck line 1 cm lower (the top read as floating above the shoulders); the sleeve swing is back to the rigid, small-for-boxy-tees version and the shoulder-joint sphere collider is removed — Daniel judged the previous round better for the black tee (the bend-along-the-sleeve version gave an asymmetric shoulder and back-armpit gaps).
 **Verified:** heavyweight S front/back, slim L front, jeans 29 side; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 11:00 — Trouser legs are straight cylinders unless tight (no clinging to the calves)
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js` `_dressBottoms`):** each leg tube is now built around one fixed front-to-back axis (the thigh's) and, for a leg that is not tight (from 2.5 cm of thigh ease), every direction gets the largest radius the leg needs anywhere along it — a straight cylinder that the calf, sitting further back than the thigh, hangs inside instead of being wrapped by. Under 1 cm of ease the cloth still follows the leg; in between it blends. Rest circumference per row = the perimeter of that ring.
+**Verified:** jeans 29 back + side (straight down the back of the calf), 29/34 front (sizes still differ), 29 from below (crotch closed); 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

@@ -301,3 +301,15 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - `_bodyColliders` gained `legLo`, `footTop`, `torsoLo` options and a `seat` collider list; `buildAdjacency`, `smoothstep`, `topProfile` helpers.
 **Verified (headless renders on Daniel's scan):** heavyweight tee S/XL front + back, slim tee S/L front, jeans 29/34 front, side and from below (crotch closed, hem on the shoes); no console errors; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 07:20 — Tee yoke follows the shoulder slope; jeans hem breaks on the shoe
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js`), from Daniel's review against Zara's model photos:**
+- **Tops**: the yoke now slopes down from the neck base to the shoulder tip like the body does (the flat-lay mesh has a level shoulder line, so the seam floated above the shoulder); the sleeve seam sits on the shoulder tip for a fitted tee (was 1–2 cm outside it) and a dropped seam continues down the arm; the sleeve/torso junction blends over a wider band (fewer holes at the back armpit); the sleeve's front-to-back thickness floor is just the arm's diameter.
+- **Bottoms**: the hem stops 3 cm above the floor and is pushed round the shoe by the real foot outline (reads as the hem breaking on the shoe, as in the reference photo) instead of being lifted point by point onto the foot, which had left a tattered hem; pooling roll reduced, radial bump nearly removed.
+- Layer classification: edge vertices (side seams, hems) go by the mid-surface again; only backward-facing vertices are tested against the back surface.
+**Known limits:** the slim tee's generated mesh has oversized sleeves/armholes so its sleeves still read full; a thin sliver can show at the back armpit of the heavyweight tee at some angles; the jeans mesh's side edge looks jagged in a pure side view.
+**Verified:** slim L, heavyweight S front/back, jeans 29/34 front, side and from below; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

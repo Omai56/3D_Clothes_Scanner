@@ -246,7 +246,7 @@ export class FitViewer {
     const chestFlat = chart.chest ?? chart.hem ?? null;
     const shoulderRatio = chart.shoulder && chestFlat ? clamp(chart.shoulder / chestFlat, 0.75, 1.05) : 0.95;
     const drop = chart.shoulder ? Math.max(0, chart.shoulder / 100 - shoulderW) / 2 : 0; // dropped seam: this far down the arm
-    const Ws = shoulderW + 2 * drop * Math.sin(armAng) + 0.012; // worn seam-to-seam width
+    const Ws = shoulderW - 0.01 + 2 * drop * Math.sin(armAng); // worn seam-to-seam width (seams on the shoulder tips)
 
     // --- body of the tee: chart circumference as an ellipse ---
     const bodyC = TWO_PI * Math.sqrt(((bodyW / 2 + gap) ** 2 + (bodyD / 2 + gap) ** 2) / 2);
@@ -294,10 +294,21 @@ export class FitViewer {
     // shoulder seam sits down the arm, so the yoke beyond the body's shoulder point slopes down
     // to it (and the sleeve hangs from there).
     const rampStart = 0.02 * P.torsoHW;
-    const rampLen = 0.12 * P.torsoHW;
+    const rampLen = 0.22 * P.torsoHW;
     const xs = shoulderW / 2;
     const dropY = drop * Math.cos(armAng);
-    const yokeDrop = (X, v) => (dropY > 0 ? dropY * smoothstep(xs, Ws / 2, Math.abs(X - bodyCx)) * smoothstep(vArm - 0.1, vTop, v) : 0);
+    // The flat-lay mesh has a nearly level shoulder line; the body's shoulder slopes down from
+    // the neck base to the shoulder tip. The yoke follows that slope so the seam lands on the
+    // tip instead of floating above it; a dropped seam continues down the arm from there.
+    const neckHW = (b.neckBaseGirth ?? 39) / 100 / TWO_PI + 0.01;
+    const shoulderTipY = neckY - 0.05;
+    const seamWorldY = hemY + vTop * H;
+    const slopeDrop = Math.max(0, seamWorldY - (shoulderTipY + 0.012));
+    const yokeDrop = (X, v) => {
+      const ax = Math.abs(X - bodyCx);
+      const vv = smoothstep(vArm - 0.1, vTop, v);
+      return (slopeDrop * smoothstep(neckHW, xs, ax) + dropY * smoothstep(xs, Math.max(xs + 0.01, Ws / 2), ax)) * vv;
+    };
     for (const o of meshes) {
       const orig = o.userData.origPos;
       const n = orig.length / 3;
@@ -402,7 +413,7 @@ export class FitViewer {
       const kW = dTarget ? clamp(dTarget / d, 0.7, 1) : 1;
       // ...except front-to-back: a flat-lay sleeve is a thin pillow; it must be at least as
       // thick as the arm inside it or the arm collider inflates it into a puff
-      const kZ = clamp((armDiam + 0.03) / dz, 1, 1.7);
+      const kZ = clamp((armDiam + 0.012) / dz, 1, 1.5);
       const tx = sgn * Math.sin(alpha);
       const ty = -Math.cos(alpha);
       // how far the sleeve may swing: a long sleeve follows the arm, a short wide cap sleeve
@@ -577,7 +588,19 @@ export class FitViewer {
       const Y = pos[k + 1];
       if (Y > legLo + 0.02 || !this.footMap) return;
       const top = this.footMap.lookup(pos[k], pos[k + 2]);
-      if (top != null && Y < top + gap && Y > top - 0.2) pos[k + 1] = top + gap;
+      if (top == null || Y >= top + gap || Y <= top - 0.2) return;
+      // only over the foot itself (inside its outline at this height), never beside it
+      const legs = [rings.right, rings.left];
+      let over = false;
+      for (const map of legs) {
+        const c = sampleRing(map, Math.max(0.02, Y), 0);
+        if (!c) continue;
+        const dx = pos[k] - c.cx;
+        const dz = pos[k + 2] - c.cz;
+        const smp = sampleRing(map, Math.max(0.02, Y), Math.atan2(dz, dx));
+        if (smp && Math.hypot(dx, dz) < smp.r) over = true;
+      }
+      if (over) pos[k + 1] = top + gap;
     };
     const bodyList = footTop ? [foot, body, floor] : [body, floor];
     // shoulder lift runs before the radial ring push: cloth over the shoulder rests on it
@@ -917,11 +940,11 @@ export class FitViewer {
     const splitY = this.rings.crotchSplitY ?? crotchY;
     const ankleTop = this.ankleTopY ?? (b.outerAnkleHeightR ?? 7) / 100 + 0.03;
     const legYc = (Y) => clamp(Y, ankleTop, legTopBody - 0.005); // leg ring used for a height
-    const hemFloor = 0.012; // the hem may reach the floor; excess length pools on the shoe
+    const hemFloor = 0.03; // the hem breaks on the shoe just above the floor; excess length pools there
     const hemWanted = chart.total_length != null ? topY - chart.total_length / 100 : crotchY - (effectiveInseam(chart) ?? b.insideLegHeight) / 100;
     const hemY = Math.max(hemFloor, hemWanted);
     const excess = Math.max(0, hemY - hemWanted);
-    const POOL = 0.09;
+    const POOL = 0.06;
     const gap = 0.008;
 
     const vCrotch = (S.crotchBand + 1) / NB;
@@ -1015,7 +1038,9 @@ export class FitViewer {
       tubes.push(tube);
     }
 
-    const Cs = this._bodyColliders({ gap, legTop: legTopBody, neckY, armpitY, legLo: ankleTop, footTop: true, torsoLo: splitY });
+    // the leg colliders use the real outline at every height (the hem is pushed round the shoe,
+    // which reads as the hem breaking on it); the tube's rest sizes come from the ankle ring
+    const Cs = this._bodyColliders({ gap, legTop: legTopBody, neckY, armpitY, torsoLo: splitY });
     for (const t of tubes) t.colliders = t === seat ? Cs.seat : Cs.body;
     const t0 = performance.now();
     simulate(tubes, Cs.body);
@@ -1050,7 +1075,7 @@ export class FitViewer {
           if (excess > 0 && Yl < hemY + POOL) {
             const t = clamp((Yl - hemWanted) / (hemY + POOL - hemWanted), 0, 1);
             Y = hemY + t * POOL;
-            bump = Math.min(0.02, excess * 0.2) * Math.sin(Math.PI * t);
+            bump = Math.min(0.008, excess * 0.1) * Math.sin(Math.PI * t);
           }
           let p = tube.sample((legTop - Y) / dy, ((th + Math.PI) / TWO_PI) * lcols);
           if (bump) {
@@ -1692,7 +1717,9 @@ function bakeToWorld(scene) {
       const nz = nrm.getZ(i);
       // back = near the back surface AND facing backwards; a recessed front detail (the fly
       // slot runs as deep as the back layer at the crotch) faces forwards or sideways
-      front[i] = (thick > 1e-4 && arr[i * 3 + 2] - minZ[k] > 0.3 * thick) || nz > -0.3 ? 1 : 0;
+      if (nz > 0.3) front[i] = 1;
+      else if (nz < -0.3) front[i] = thick > 1e-4 && arr[i * 3 + 2] - minZ[k] > 0.3 * thick ? 1 : 0;
+      else front[i] = arr[i * 3 + 2] >= sumZ[k] / Math.max(1, cnt[k]) ? 1 : 0; // edges: by the mid-surface
     }
     // majority vote over the neighbours: no isolated flips (they would stretch a triangle
     // from the front of the body to the back)

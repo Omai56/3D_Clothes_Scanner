@@ -1368,6 +1368,7 @@ main.page { position: relative; }
 }
 
 .deco-sign { position: absolute; left: 14px; top: 0; z-index: 2; pointer-events: none; padding-top: 16px; transform-origin: 50% 0; animation: wd-charm 6s ease-in-out infinite; }
+.model-drop .deco-sign { left: calc(var(--cw) + 6px); top: 6px; padding: 12px 0 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; pointer-events: auto; z-index: 4; }
 .deco-sign::before, .deco-sign::after { content: ""; position: absolute; top: 0; width: 1px; height: 20px; background: #b8914c; }
 .deco-sign::before { left: 22%; transform: rotate(12deg); transform-origin: 0 0; }
 .deco-sign::after { right: 22%; transform: rotate(-12deg); transform-origin: 0 0; }
@@ -1496,3 +1497,125 @@ main.page { position: relative; }
 
 .folded-name { display: block; margin-top: 3px; font: 600 9px/1.1 var(--font-ui); color: #6f655a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-color-scheme: dark) { .folded-name { color: var(--muted); } }
+
+/* Drag a piece from the rail onto the drawer to fold it away (as well as the ↓ button).
+   While a piece is held, the drawer is outlined in orange and its arrow bobs; over it, the drawer opens a crack. */
+.is-dragging .wd-drawer { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta) 45%, transparent), inset 0 0 0 1px rgba(0, 0, 0, .08); }
+.is-dragging .drawer-hint { animation: drawer-arrow-bob .8s ease-in-out infinite; }
+.wardrobe.drawer-over .wd-drawer { transform: translateY(8px); background: color-mix(in srgb, var(--cta) 10%, var(--lacquer-1)); box-shadow: var(--ring), 0 0 0 2px var(--cta), 0 10px 16px -8px rgba(60, 40, 20, .35); }
+.wardrobe[data-drawer="true"].drawer-over .wd-drawer { transform: translateY(calc(var(--tray-h) + 6px)) scale(1.05); }
+.wardrobe.drawer-over .drawer-count:not([hidden]) { transform: translateY(-50%) scale(1.15); }
+.drag-ghost.into-drawer { opacity: 0; transform: translate(-50%, -20%) scale(.35, .25); transition: transform .25s ease-in, opacity .25s ease-in; }
+@keyframes drawer-arrow-bob { 0%, 100% { transform: translateY(-50%); } 50% { transform: translateY(calc(-50% + 3px)); } }
+@media (prefers-reduced-motion: reduce) { .is-dragging .drawer-hint { animation: none; } }
+
+/* Drag a folded piece out of the open drawer and drop it on the wardrobe to hang it back (as well as tapping it).
+   While it's held, the wardrobe is outlined in orange; over it, the outline gets stronger. */
+.folded.lifting { opacity: .3; }
+.drag-ghost.folded-ghost { width: 84px; transform: translate(-50%, -50%) rotate(-4deg) scale(1.05); }
+.drag-ghost.onto-rail { opacity: 0; transform: translate(-50%, -90%) scale(.7); transition: transform .25s ease-in, opacity .25s ease-in; }
+.is-dragging .wardrobe:has(.folded.lifting) .wd-cabinet { box-shadow: 0 0 0 2px color-mix(in srgb, var(--cta) 45%, transparent), inset 0 0 0 1px rgba(0, 0, 0, .06), 0 50px 70px -40px rgba(40, 30, 20, .55); }
+.wardrobe.rail-over .wd-cabinet { box-shadow: var(--ring), 0 0 0 2.5px var(--cta), inset 0 0 0 1px rgba(0, 0, 0, .06), 0 50px 70px -40px rgba(40, 30, 20, .55) !important; }
+.wd-cabinet { transition: box-shadow .2s; }
+.wd-folded .folded { touch-action: none; }
+.wd-interior::after { content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: 2px; box-shadow: inset 0 0 0 3px var(--cta), inset 0 0 40px -10px var(--cta-glow); opacity: 0; transition: opacity .2s; }
+.wardrobe.rail-over .wd-interior::after { opacity: 1; }
+
+/* ---------- The fitting room (try-on stage) ----------
+   Curtains tied back on a brass rail, a pendant lamp, and six backdrops you cycle by pressing the sign
+   (public/decor.js). No data-room = the original studio backdrop. Decorations ignore the pointer. */
+.model-drop { --cw: clamp(20px, 7%, 34px); --curtain: #8f8a84; }
+.model-drop[data-room="blush"] { --curtain: #d98ba0; }
+.model-drop[data-room="garden"] { --curtain: #6f8f5e; }
+.model-drop[data-room="arch"] { --curtain: #7f3f27; }
+.model-drop[data-room="night"] { --curtain: #5b4a8a; }
+.model-drop[data-room="seaside"] { --curtain: #d6ccbb; }
+.deco-curtain, .deco-tie, .deco-rail, .deco-lamp { position: absolute; z-index: 1; pointer-events: none; }
+.deco-curtain { top: 8px; bottom: 0; width: var(--cw); color: var(--curtain); transition: color .4s; filter: drop-shadow(2px 0 4px rgba(40, 25, 15, .25)); }
+.deco-curtain.l { left: 0; }
+.deco-curtain.r { right: 0; transform: scaleX(-1); }
+.deco-curtain svg { display: block; width: 100%; height: 100%; }
+.deco-curtain.l svg { border-top-left-radius: calc(var(--radius-lg) - 8px); }
+.deco-tie { top: calc(8px + (100% - 8px) * .625 - 7px); width: 24px; }
+.deco-tie.l { left: calc(var(--cw) * .55 - 12px); }
+.deco-tie.r { right: calc(var(--cw) * .55 - 12px); }
+.deco-tie svg { display: block; width: 100%; height: auto; }
+.deco-rail { top: 5px; left: 3px; right: 3px; height: 5px; border-radius: 3px; background: linear-gradient(180deg, #efd9a6, #b8914c 60%, #8c6a2e); box-shadow: 0 2px 3px rgba(0, 0, 0, .2); }
+.deco-rail::before, .deco-rail::after { content: ""; position: absolute; top: -2.5px; width: 10px; height: 10px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #f6e6bf, #b8914c 60%, #8c6a2e); }
+.deco-rail::before { left: -2px; } .deco-rail::after { right: -2px; }
+.deco-lamp { top: 0; right: calc(var(--cw) + 9%); width: 30px; }
+.deco-lamp svg { display: block; width: 100%; height: auto; }
+.deco-lamp .glow { position: absolute; left: 50%; top: 62%; width: 90px; height: 70px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 226, 160, .55), transparent); animation: wd-twinkle 4s ease-in-out infinite; }
+.model-drop .deco-stage-plant { right: calc(var(--cw) + 6px); }
+
+/* The sign is a button: an orange swap badge, a little spin and the backdrop's name when pressed. */
+.deco-sign .board { display: inline-flex; align-items: center; gap: 2px; transition: transform .2s; }
+.deco-sign .swap { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 50%; background: var(--cta); color: var(--on-cta); box-shadow: 0 2px 5px -1px var(--cta-glow); }
+.deco-sign .swap svg { width: 11px; height: 11px; }
+.deco-sign:hover .board { transform: translateY(1px) scale(1.04); }
+.deco-sign:focus-visible { outline: none; }
+.deco-sign:focus-visible .board { box-shadow: var(--ring), inset 0 0 0 1px rgba(90, 60, 30, .25); }
+.deco-sign.flip .board { animation: sign-flip .6s cubic-bezier(.3, .75, .2, 1); }
+.deco-sign .room-name {
+  position: absolute; left: 50%; top: calc(100% + 6px); transform: translate(-50%, -4px); opacity: 0; pointer-events: none; white-space: nowrap;
+  padding: 3px 9px; border-radius: 999px; background: var(--ink); color: var(--bg); font: 600 11px/1.4 var(--font-ui); transition: opacity .25s, transform .25s;
+}
+.deco-sign.flip .room-name { opacity: 1; transform: translate(-50%, 0); }
+@keyframes sign-flip { 0% { transform: rotateY(0); } 100% { transform: rotateY(360deg); } }
+
+/* Backdrops */
+.model-drop[data-room="blush"] .stage {
+  background:
+    radial-gradient(60% 40% at 50% 30%, rgba(255, 255, 255, .5), transparent 72%),
+    linear-gradient(180deg, transparent 70%, #e3a9a3 70%, #e3a9a3 71%, #f5d7d0 71%, #f0cbc3 100%),
+    radial-gradient(circle, rgba(255, 255, 255, .7) 0 2.2px, transparent 2.8px) 0 0 / 22px 22px,
+    radial-gradient(circle, rgba(255, 255, 255, .7) 0 2.2px, transparent 2.8px) 11px 11px / 22px 22px,
+    linear-gradient(180deg, #f6d6d6, #f0c4c8);
+}
+.model-drop[data-room="garden"] .stage {
+  background:
+    radial-gradient(60% 40% at 50% 30%, rgba(255, 255, 255, .45), transparent 72%),
+    linear-gradient(180deg, transparent 80%, #c49a6c 80%, #b58a5c 100%),
+    radial-gradient(circle, #f3e3cf 0 2px, #e8918a 2.2px 3px, transparent 3.4px) 0 0 / 26px 26px,
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .22) 0 1.2px, transparent 1.2px 18.4px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, .22) 0 1.2px, transparent 1.2px 18.4px),
+    linear-gradient(180deg, #cfdcc3, #b7caa9);
+}
+.model-drop[data-room="arch"] .stage {
+  background:
+    radial-gradient(60% 34% at 50% 30%, rgba(255, 250, 240, .55), transparent 72%),
+    linear-gradient(180deg, transparent 86%, #c98566 86%, #c98566 86.6%, transparent 86.6%),
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(120, 60, 35, .18) 38px 39px) 0 100% / 100% 14% no-repeat,
+    linear-gradient(180deg, #d99a7c, #cf8a6c) 0 100% / 100% 14% no-repeat,
+    radial-gradient(ellipse 33% 19% at 50% 31%, #f5e6d4 99%, transparent 100%),
+    linear-gradient(#f5e6d4, #efdcc6) 50% 100% / 66% 70% no-repeat,
+    radial-gradient(ellipse 36% 21% at 50% 31%, #c47a5c 99%, transparent 100%),
+    linear-gradient(#c47a5c, #c47a5c) 50% 100% / 72% 70% no-repeat,
+    linear-gradient(180deg, #e3a98c, #d99a7c);
+}
+.model-drop[data-room="night"] .stage {
+  background:
+    radial-gradient(circle at 76.5% 15%, #2b2d5c 0 5.2%, transparent 5.5%),
+    radial-gradient(circle at 79% 16.5%, #fff3cf 0 6%, rgba(255, 243, 207, .25) 6.5%, transparent 12%),
+    radial-gradient(circle, #fff 0 1px, transparent 1.6px) 0 0 / 37px 43px,
+    radial-gradient(circle, rgba(255, 255, 255, .6) 0 .8px, transparent 1.4px) 17px 21px / 53px 47px,
+    radial-gradient(60% 18% at 50% 100%, rgba(150, 130, 220, .35), transparent 70%),
+    linear-gradient(180deg, #1c2046 0%, #2c2a5a 55%, #463a6e 100%);
+}
+.model-drop[data-room="seaside"] .stage {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 220'%3E%3Cpath d='M112 220 C104 160 92 100 64 52' fill='none' stroke='%23a97c50' stroke-width='9' stroke-linecap='round'/%3E%3Cpath d='M110 205 l-10 -3 M106 180 l-10 -3 M101 155 l-10 -3 M95 130 l-10 -3 M88 106 l-10 -3 M80 82 l-9 -3' stroke='%238a6238' stroke-width='2'/%3E%3Cpath d='M64 52 C44 34 22 36 4 52 C24 42 44 44 64 52Z' fill='%233f8f4a'/%3E%3Cpath d='M64 52 C48 22 30 12 10 14 C30 22 48 34 64 52Z' fill='%235aa85a'/%3E%3Cpath d='M64 52 C66 24 80 8 100 4 C84 18 72 32 64 52Z' fill='%234a9a50'/%3E%3Cpath d='M64 52 C88 36 110 38 126 52 C106 46 86 46 64 52Z' fill='%233f8f4a'/%3E%3Cpath d='M64 52 C78 60 90 78 92 98 C84 80 74 66 64 52Z' fill='%235aa85a'/%3E%3Cpath d='M64 52 C50 62 40 80 38 98 C46 80 54 66 64 52Z' fill='%234a9a50'/%3E%3Ccircle cx='60' cy='58' r='4.5' fill='%237a5230'/%3E%3Ccircle cx='68' cy='60' r='4.5' fill='%236b4628'/%3E%3C/svg%3E") right -34px bottom 10% / auto 58% no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 46'%3E%3Crect x='0' y='29' width='160' height='3' fill='%238a6a4a'/%3E%3Cpath d='M12 32v11M36 32v11' stroke='%236f5238' stroke-width='2'/%3E%3Crect x='10' y='17' width='28' height='12' fill='%23f6ecd9'/%3E%3Crect x='20' y='20' width='8' height='9' fill='%237a5a3a' opacity='.55'/%3E%3Cpath d='M5 18 L24 4 L43 18 Z' fill='%23c79a5e'/%3E%3Cpath d='M10 15 L24 6 M38 15 L24 6' stroke='%23a97c46' stroke-width='1'/%3E%3Cpath d='M66 32v11M90 32v11' stroke='%236f5238' stroke-width='2'/%3E%3Crect x='64' y='17' width='28' height='12' fill='%23f6ecd9'/%3E%3Crect x='74' y='20' width='8' height='9' fill='%237a5a3a' opacity='.55'/%3E%3Cpath d='M59 18 L78 4 L97 18 Z' fill='%23c79a5e'/%3E%3Cpath d='M64 15 L78 6 M92 15 L78 6' stroke='%23a97c46' stroke-width='1'/%3E%3Cpath d='M120 32v11M144 32v11' stroke='%236f5238' stroke-width='2'/%3E%3Crect x='118' y='17' width='28' height='12' fill='%23f6ecd9'/%3E%3Crect x='128' y='20' width='8' height='9' fill='%237a5a3a' opacity='.55'/%3E%3Cpath d='M113 18 L132 4 L151 18 Z' fill='%23c79a5e'/%3E%3Cpath d='M118 15 L132 6 M146 15 L132 6' stroke='%23a97c46' stroke-width='1'/%3E%3Cpath d='M0 45h160' stroke='%23fff' stroke-width='1' opacity='.35'/%3E%3C/svg%3E") left 5% top calc(50% - 30px) / 150px auto no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 46'%3E%3Crect x='0' y='29' width='160' height='3' fill='%238a6a4a'/%3E%3Cpath d='M12 32v11M36 32v11' stroke='%236f5238' stroke-width='2'/%3E%3Crect x='10' y='17' width='28' height='12' fill='%23f6ecd9'/%3E%3Crect x='20' y='20' width='8' height='9' fill='%237a5a3a' opacity='.55'/%3E%3Cpath d='M5 18 L24 4 L43 18 Z' fill='%23c79a5e'/%3E%3Cpath d='M10 15 L24 6 M38 15 L24 6' stroke='%23a97c46' stroke-width='1'/%3E%3Cpath d='M66 32v11M90 32v11' stroke='%236f5238' stroke-width='2'/%3E%3Crect x='64' y='17' width='28' height='12' fill='%23f6ecd9'/%3E%3Crect x='74' y='20' width='8' height='9' fill='%237a5a3a' opacity='.55'/%3E%3Cpath d='M59 18 L78 4 L97 18 Z' fill='%23c79a5e'/%3E%3Cpath d='M64 15 L78 6 M92 15 L78 6' stroke='%23a97c46' stroke-width='1'/%3E%3Cpath d='M120 32v11M144 32v11' stroke='%236f5238' stroke-width='2'/%3E%3Crect x='118' y='17' width='28' height='12' fill='%23f6ecd9'/%3E%3Crect x='128' y='20' width='8' height='9' fill='%237a5a3a' opacity='.55'/%3E%3Cpath d='M113 18 L132 4 L151 18 Z' fill='%23c79a5e'/%3E%3Cpath d='M118 15 L132 6 M146 15 L132 6' stroke='%23a97c46' stroke-width='1'/%3E%3Cpath d='M0 45h160' stroke='%23fff' stroke-width='1' opacity='.35'/%3E%3C/svg%3E") right 16% top calc(50% - 17px) / 82px auto no-repeat,
+    radial-gradient(16% 4% at 22% 16%, rgba(255, 255, 255, .95), transparent 70%),
+    radial-gradient(12% 3.5% at 30% 19%, rgba(255, 255, 255, .85), transparent 70%),
+    radial-gradient(14% 3.5% at 72% 26%, rgba(255, 255, 255, .8), transparent 70%),
+    linear-gradient(180deg, transparent 73.2%, rgba(255, 255, 255, .95) 73.2%, rgba(255, 255, 255, .95) 74%, rgba(255, 255, 255, .45) 74%, transparent 75.2%),
+    linear-gradient(180deg, #5fb6ea 0%, #a9dcf4 30%, #e2f5fc 50%, #1a86c0 50%, #1fb0cf 58%, #3fd3d6 65%, #9ff0e2 73.5%, #fdf8ec 73.5%, #f6ecd4 100%);
+}
+.model-drop[data-room="seaside"] .deco-lamp { display: none; }
+@media (max-width: 480px) {
+  .deco-lamp { width: 24px; }
+  .deco-tie { width: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .deco-lamp .glow, .deco-sign.flip .board { animation: none; } }

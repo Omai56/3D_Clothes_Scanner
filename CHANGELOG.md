@@ -597,3 +597,27 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Clear wording:** the × on a hanger is now a ↓ arrow (orange outline, filled on hover); after using it, a note above the drawer says "Folded into the drawer below." with a **Show me** button that opens it (hides after 5 s); the drawer front has an orange ↓ arrow (points up when open); inside, a plain sentence "Clothes you took off the rail. **Tap one to hang it back up.**"; empty, it says "**Nothing in here yet.** Tap **↓** on a piece in the wardrobe and it's folded in here, so you can hang it back later."
 **Verified:** headless Chrome at 390 and 1280px: empty drawer, badge after removing pieces, open drawer with folded pieces, hang back (drawer and rail counts correct); no page errors; 24 tests pass.
 **Files:** `public/app.js`, `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Drag a piece onto the drawer to fold it away
+**By:** Claude (Opus 5.5)
+**What:** As well as the ↓ button, a piece can be dragged from the rail and dropped on the drawer (the same drag that puts pieces on the model: straight away with a mouse, press and hold on touch). While a piece is held, the drawer gets an orange outline and its arrow bobs; over the drawer it opens a crack and lights up; on release the piece shrinks into it and is folded in, exactly as with the ↓ button (which now shares the same step). Dropping on the model, or anywhere else, works as before.
+**Verified:** headless Chrome, real mouse drags: onto the drawer (rail 6 → 5, drawer 0 → 1), onto the model (puts it on), a stray drop (nothing changes), then the ↓ button (still folds); no page errors; 24 tests pass.
+**Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Drag folded pieces from the drawer back onto the wardrobe
+**By:** Claude (Opus 5.5)
+**What:** With the drawer open, a folded piece can be picked up (mouse: drag; touch: press and hold) and dropped anywhere on the wardrobe to hang it back on the rail, as well as tapping it. While it's held, the piece in the drawer fades and a folded copy follows the pointer; over the wardrobe, its inside gets an orange frame. On release it's hung back exactly as when tapped (the rail page resets, the wardrobe opens, the hangers swing); dropped anywhere else it goes back into the drawer. Tapping and dragging from the rail to the drawer or the model work as before.
+**Verified:** headless Chrome, real mouse drags: drawer → wardrobe (drawer 3 → 2, rail 3 → 4), a stray drop (nothing changes), a tap (still hangs back), then rail → drawer (still folds); no page errors; 24 tests pass.
+**Files:** `public/shop.html`, `public/styles.css`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — The fitting room: curtains, a lamp, and backdrops you change with the sign
+**By:** Claude (Opus 5.5)
+**What:** The model's stage on the try-on page is decorated as a fitting room: velvet curtains on both sides, tied back with brass tassels and hung from a brass rail across the top, and a small pendant lamp with a warm glow (the plant stays). The wooden "Fitting Room ♡" sign is now a button (orange swap badge): each press gives it a little spin, shows the backdrop's name, and moves to the next backdrop: **Studio** (the original, always the one you start with), **Blush wallpaper** (pink polka dots, panelled wall), **Garden trellis** (sage trellis, wooden floor), **Terracotta arch** (a cream arch in a clay wall, tiled floor), **Starry night** (moon and stars), **Maldives beach** (turquoise lagoon, white sand, overwater bungalows, a palm; no lamp, linen curtains), then back to Studio. The curtains change colour to match (soft grey on Studio). The choice isn't remembered, so each visit starts on Studio. Decorations ignore the pointer, so dragging pieces onto the model and turning it work as before; the sign has a screen-reader label naming the current backdrop.
+**Verified:** headless Chrome at 1280 and 390px, every backdrop in turn and back to Studio; no page errors; 24 tests pass.
+**Files:** `public/decor.js`, `public/styles.css`, `CHANGELOG.md`

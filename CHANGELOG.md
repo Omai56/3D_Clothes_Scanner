@@ -590,3 +590,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **What:** the 3-step scan → item → fit app (Look/Fit views, saved bodies) is `public/index.html` again (a copy of `public/app.html`, which stays for existing links). Samuel's measurements form is now `public/measure.html`; his try-on page `shop.html` and its "Edit" link point to it. Nothing of the new UI is removed — it lives at `/measure.html` → `/shop.html`.
 **Why:** after the merge the root URL showed the measurements form, with no way to pick the saved "Daniel" body or reach the Look view.
 **Files:** `public/index.html`, `public/measure.html`, `public/shop.html`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Trousers hang straight from the widest point above; hug the body only where the garment is smaller
+**By:** Claude (Fable 5.1)
+**What (`public/js/viewer.js` `_dressBottoms`):** seat and legs are built round fixed vertical axes (hip centre; each thigh's centre) with the body outline sampled densely (720 rays) and empty directions interpolated (jagged rings were crumpling the lower legs). Per row: where the garment's circumference is smaller than the body's (+1 cm) the cloth hugs the body and the running maximum restarts there; otherwise the ring is the running maximum of everything above (the legs also inherit the seat's outer/front/back extents), shrunk uniformly so its perimeter never exceeds the fabric's circumference and never inside the body. Result: size 29 hugs Daniel's upper thigh (garment 51 cm round vs thigh 60) then falls straight; 34 falls straight from the seat. Rest circumference per row = that ring's perimeter.
+**Verified:** jeans 29 side/back/front/below, 34 front/side — straight down the back of the calf, no crumple, crotch closed; 24 tests pass.
+**Files:** `public/js/viewer.js`, `CHANGELOG.md`

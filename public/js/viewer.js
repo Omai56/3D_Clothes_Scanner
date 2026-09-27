@@ -988,39 +988,125 @@ export class FitViewer {
     const dy = 0.015;
     const tubes = [];
 
-    // ---- seat tube: waistband (pinned) -> crotch, pinched front/back at the bottom ----
+    // ---- seat tube: waistband (pinned) -> crotch ----
+    // Loose cloth hangs straight down from the widest point above it. The seat is built round
+    // ONE vertical axis (the hip ring's centre): per row, the scaled body outline is projected
+    // onto that axis's directions and each direction keeps the largest distance seen so far
+    // from the waistband down. A tight seat (little ease at the hips) follows the body instead.
     const cols = 48;
+    const NSMP = 720;
     const srows = Math.max(3, Math.ceil((topY - legTop) / dy) + 1);
     const seat = new Tube(srows, cols);
-    const seatColMax = new Float32Array(cols);
     const seatRowY = (r) => Math.max(legTop, topY - r * dy);
+    const bodyCAt = (map, Y) => {
+      const ring = ringAt(map, Y);
+      return ring ? ringCircumference(ring) + TWO_PI * gap : 0;
+    };
+    const hipC = sampleRing(this.rings.torso, Math.max(hipY, splitY), 0) ?? { cx: 0, cz: -0.05 };
+    const binOf = (a2, n) => ((Math.round(((a2 + Math.PI) / TWO_PI) * n) % n) + n) % n;
+    // bins the sampled outline missed (the axis is off-centre) are interpolated between their
+    // nearest filled neighbours round the ring
+    const fillBins = (acc, n, floor) => {
+      for (let c = 0; c < n; c++) {
+        if (acc[c] >= 0) continue;
+        let a = -1;
+        let b = -1;
+        let da = 0;
+        let db = 0;
+        for (let d = 1; d < n; d++) if (acc[(c + n - d) % n] >= 0) { a = acc[(c + n - d) % n]; da = d; break; }
+        for (let d = 1; d < n; d++) if (acc[(c + d) % n] >= 0) { b = acc[(c + d) % n]; db = d; break; }
+        if (a < 0 && b < 0) acc[c] = floor;
+        else if (a < 0) acc[c] = b;
+        else if (b < 0) acc[c] = a;
+        else acc[c] = (a * db + b * da) / (da + db);
+      }
+    };
+    // Where the garment is genuinely smaller than the body (stretch denim on a thigh), the cloth
+    // follows the body; everywhere else it hangs straight from the widest point above.
+    const tightAt = (C, bodyC) => C < bodyC + 0.01;
+    const perimOf = (ring, n, ox, oz) => {
+      let per = 0;
+      let x0 = 0;
+      let z0 = 0;
+      for (let c = 0; c <= n; c++) {
+        const cc = c % n;
+        const th = (cc / n) * TWO_PI - Math.PI;
+        const x = ox + ring[cc] * Math.cos(th);
+        const z = oz + ring[cc] * Math.sin(th);
+        if (c > 0) per += Math.hypot(x - x0, z - z0);
+        x0 = x;
+        z0 = z;
+      }
+      return per;
+    };
+    // One row of hanging cloth: `acc` = the body's (scaled) outline at this height, `colMax` = the
+    // running maximum from the last point where the fabric hugged the body. Where the garment is
+    // smaller than the body it hugs (and the running maximum restarts); otherwise it hangs
+    // straight from the widest point above, shrunk uniformly so its perimeter never exceeds the
+    // fabric's circumference, and never inside the body.
+    const hangRow = (acc, colMax, n, C, bodyC, out) => {
+      if (tightAt(C, bodyC)) {
+        for (let c = 0; c < n; c++) {
+          colMax[c] = acc[c];
+          out[c] = acc[c];
+        }
+        return true;
+      }
+      for (let c = 0; c < n; c++) if (acc[c] > colMax[c]) colMax[c] = acc[c];
+      const per = perimOf(colMax, n, 0, 0);
+      const f = Math.min(1, Math.max(C, bodyC) / Math.max(1e-6, per));
+      for (let c = 0; c < n; c++) out[c] = Math.max(acc[c], colMax[c] * f);
+      return false;
+    };
+    const seatDist = new Float32Array(srows * cols);
+    const seatColMax = new Float32Array(cols);
     for (let r = 0; r < srows; r++) {
       const Y = seatRowY(r);
       const Yc = Math.max(Y, splitY);
       const C = r === 0 ? waistC : circHip(Y);
       const base = ringAt(this.rings.torso, Yc);
-      const s = base ? C / ringCircumference(base) : 1;
-      for (let c = 0; c < cols; c++) {
-        const th = (c / cols) * TWO_PI - Math.PI;
-        const smp = sampleRing(this.rings.torso, Yc, th) ?? { r: 0.15, cx: 0, cz: 0 };
-        // cloth hangs straight down from the widest point above (hip bones / seat), it does not
-        // balloon out again around every bulge of the body
-        const rr0 = Math.max(smp.r + gap, smp.r * s);
-        if (rr0 > seatColMax[c]) seatColMax[c] = rr0;
-        const rr = seatColMax[c];
-        seat.set(r, c, smp.cx + rr * Math.cos(th), Y, smp.cz + rr * Math.sin(th));
+      const sc = base ? C / ringCircumference(base) : 1;
+      const acc = new Float32Array(cols).fill(-1);
+      for (let j = 0; j < NSMP; j++) {
+        const th = (j / NSMP) * TWO_PI - Math.PI;
+        const smp = sampleRing(this.rings.torso, Yc, th) ?? { r: 0.15, cx: hipC.cx, cz: hipC.cz };
+        const rr0 = Math.max(smp.r + gap, smp.r * sc);
+        const px = smp.cx + rr0 * Math.cos(th) - hipC.cx;
+        const pz = smp.cz + rr0 * Math.sin(th) - hipC.cz;
+        const bin = binOf(Math.atan2(pz, px), cols);
+        const d = Math.hypot(px, pz);
+        if (d > acc[bin]) acc[bin] = d;
       }
+      fillBins(acc, cols, 0.08);
+      const rowOut = seatDist.subarray(r * cols, (r + 1) * cols);
+      if (r === 0) {
+        for (let c = 0; c < cols; c++) {
+          seatColMax[c] = acc[c];
+          rowOut[c] = acc[c];
+        }
+      } else hangRow(acc, seatColMax, cols, C, bodyCAt(this.rings.torso, Yc), rowOut);
     }
-    const bodyCAt = (map, Y) => {
-      const ring = ringAt(map, Y);
-      return ring ? ringCircumference(ring) + TWO_PI * gap : 0;
-    };
-    // fabric never smaller than the body it wraps
-    seat.setRest((r) => Math.max(r === 0 ? waistC : circHip(seatRowY(r)), bodyCAt(this.rings.torso, Math.max(seatRowY(r), splitY))), (r) => Math.max(0.002, seatRowY(r) - seatRowY(r + 1)));
+    const seatRest = new Float32Array(srows);
+    for (let r = 0; r < srows; r++) {
+      const Y = seatRowY(r);
+      let per = 0;
+      let px0 = 0;
+      let pz0 = 0;
+      for (let c = 0; c <= cols; c++) {
+        const cc = c % cols;
+        const th = (cc / cols) * TWO_PI - Math.PI;
+        const d = seatDist[r * cols + cc];
+        const px = hipC.cx + d * Math.cos(th);
+        const pz = hipC.cz + d * Math.sin(th);
+        if (c < cols) seat.set(r, cc, px, Y, pz);
+        if (c > 0) per += Math.hypot(px - px0, pz - pz0);
+        px0 = px;
+        pz0 = pz;
+      }
+      seatRest[r] = Math.max(per, r === 0 ? waistC : circHip(Y), bodyCAt(this.rings.torso, Math.max(Y, splitY)));
+    }
+    seat.setRest((r) => seatRest[r], (r) => Math.max(0.002, seatRowY(r) - seatRowY(r + 1)));
     for (let c = 0; c < cols; c++) seat.pin(0, c);
-    // No crotch pinch: the bottom of the seat is a free loop round both thighs at the crotch
-    // height (pinning its front/back centre to the body funnelled the fly into a notch); the
-    // crotch itself is the blend between this loop and the two leg tubes in the glue below.
     tubes.push(seat);
 
     // ---- legs: crotch (pinned) -> hem ----
@@ -1035,44 +1121,58 @@ export class FitViewer {
       // Baggy legs hang straight down from the widest part of the leg (thigh); only a leg cut
       // close to the body follows the knee and calf. 8 cm of ease at the thigh = fully straight.
       const thighY = legTop - 0.04;
-      // A leg that is not tight hangs straight: one vertical tube whose radius in every
-      // direction is the largest the leg needs anywhere along it (measured from one fixed
-      // front-to-back axis, so the calf sitting further back than the thigh is inside the
-      // cloth, not wrapped by it). Under ~1 cm of thigh ease the cloth follows the leg; from
-      // 2.5 cm it is fully straight.
-      const straight = clamp((circLeg(side, thighY) - bodyCAt(legMap, legYc(thighY)) - 0.01) / 0.015, 0, 1);
+      // A leg that is not tight hangs as a straight VERTICAL tube round one fixed axis (the
+      // thigh's centre): in every direction its radius is the largest the leg needs anywhere
+      // along it, and it also covers the seat above it (the buttocks and belly), so the cloth
+      // falls straight from the seat instead of stepping in under it. Under ~1 cm of thigh ease
+      // the cloth follows the leg; from 2.5 cm it is fully straight.
       const thighC = sampleRing(legMap, legYc(thighY), 0) ?? { cx: sgn * 0.09, cz: -0.06, r: 0.09 };
-      const NSMP = 96;
+      const ax = thighC.cx;
+      const az = thighC.cz;
       const distRow = new Float32Array(lrows * lcols); // scaled body distance from the axis per row/column
-      const axisX = new Float32Array(lrows);
-      const colAll = new Float32Array(lcols);
+      const tightRow = new Uint8Array(lrows);
+      const colAll = new Float32Array(lcols); // running maximum from the seat down
+      // the seat's bottom ring on this side: its outer, front and back extents carry on down
+      // the leg (not the inner side, which is the inseam hanging from the crotch)
+      {
+        const rS = srows - 1;
+        const cR0 = sampleRing(this.rings.right, legYc(legTop), 0);
+        const cL0 = sampleRing(this.rings.left, legYc(legTop), 0);
+        const cMid = ((cR0?.cx ?? 0.1) + (cL0?.cx ?? -0.1)) / 2;
+        const inner = sgn > 0 ? Math.PI : 0;
+        for (let c = 0; c < cols; c++) {
+          const q = seat.get(rS, c);
+          if ((q[0] - cMid) * sgn < -0.005) continue;
+          const px = q[0] - ax;
+          const pz = q[2] - az;
+          const a2 = Math.atan2(pz, px);
+          const da = Math.abs(Math.atan2(Math.sin(a2 - inner), Math.cos(a2 - inner)));
+          if (da < (50 * Math.PI) / 180) continue;
+          const bin = binOf(a2, lcols);
+          const d = Math.hypot(px, pz);
+          for (const bb of [bin, (bin + 1) % lcols, (bin + lcols - 1) % lcols]) if (d > colAll[bb]) colAll[bb] = d;
+        }
+      }
       for (let r = 0; r < lrows; r++) {
         const Y = legRowY(r);
         const Yc = legYc(Y);
         const C = circLeg(side, Y);
         const base = ringAt(legMap, Yc);
-        const s = base ? C / ringCircumference(base) : 1;
-        const cc = sampleRing(legMap, Yc, 0) ?? thighC;
-        axisX[r] = cc.cx;
-        const ax = cc.cx;
-        const az = thighC.cz;
+        const sc = base ? C / ringCircumference(base) : 1;
+        const cc0 = sampleRing(legMap, Yc, 0) ?? thighC;
         const acc = new Float32Array(lcols).fill(-1);
         for (let j = 0; j < NSMP; j++) {
           const th = (j / NSMP) * TWO_PI - Math.PI;
-          const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: cc.cx, cz: cc.cz };
-          const rr0 = Math.max(smp.r + gap, smp.r * s);
+          const smp = sampleRing(legMap, Yc, th) ?? { r: 0.08, cx: cc0.cx, cz: cc0.cz };
+          const rr0 = Math.max(smp.r + gap, smp.r * sc);
           const px = smp.cx + rr0 * Math.cos(th) - ax;
           const pz = smp.cz + rr0 * Math.sin(th) - az;
-          const a2 = Math.atan2(pz, px);
-          const bin = ((Math.round(((a2 + Math.PI) / TWO_PI) * lcols) % lcols) + lcols) % lcols;
+          const bin = binOf(Math.atan2(pz, px), lcols);
           const d = Math.hypot(px, pz);
           if (d > acc[bin]) acc[bin] = d;
         }
-        for (let c = 0; c < lcols; c++) {
-          if (acc[c] < 0) acc[c] = Math.max(acc[(c + 1) % lcols], acc[(c + lcols - 1) % lcols], 0.05);
-          distRow[r * lcols + c] = acc[c];
-          if (acc[c] > colAll[c]) colAll[c] = acc[c];
-        }
+        fillBins(acc, lcols, 0.05);
+        tightRow[r] = hangRow(acc, colAll, lcols, C, bodyCAt(legMap, Yc), distRow.subarray(r * lcols, (r + 1) * lcols)) ? 1 : 0;
       }
       const restRow = new Float32Array(lrows);
       for (let r = 0; r < lrows; r++) {
@@ -1083,10 +1183,9 @@ export class FitViewer {
         for (let c = 0; c <= lcols; c++) {
           const cc = c % lcols;
           const th = (cc / lcols) * TWO_PI - Math.PI;
-          const d0 = distRow[r * lcols + cc];
-          const d = d0 + straight * (colAll[cc] - d0);
-          const px = axisX[r] + d * Math.cos(th);
-          const pz = thighC.cz + d * Math.sin(th);
+          const d = distRow[r * lcols + cc];
+          const px = ax + d * Math.cos(th);
+          const pz = az + d * Math.sin(th);
           if (c < lcols) tube.set(r, cc, px, Y, pz);
           if (c > 0) per += Math.hypot(px - px0, pz - pz0);
           px0 = px;

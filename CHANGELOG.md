@@ -658,3 +658,14 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 **Result:** black tee — no deltoid wrinkles, clean back at S and XL; brown tee — sleeves no longer stick out, clean front (back holes are in the mesh file); jeans — straight from front, side and back at 29 and 34, no clinging.
 **Verified:** headless renders of all three items from front/back/side; 24 tests pass.
 **Files:** `public/js/viewer.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-27 — Wear a top and a bottom together; slim tee hugs the body
+**By:** Claude (Fable 5.1)
+**What:**
+- `public/js/viewer.js` — the viewer keeps one garment slot per category (`slots.top`, `slots.bottom`), each with its own mesh, caches and materials; `clearGarmentModel('top'|'bottom')` takes one off. A bottom worn under a top is clipped (renderer clipping plane) 1.2 cm above the top's hem, so the tee's hem lies cleanly over the jeans instead of the jeans printing through it.
+- Tops are now measured against the torso below the armpits (not the shoulders), and a garment with no slack round the body hugs it: depth and width grow with the slack between the chart circumference and the body's, so the slim tee at S sits close and L is visibly looser; the heavyweight tee still stands off.
+- `public/js/app.js`, `public/index.html`, `public/css/style.css` — worn state is per slot; the side panel shows **Top / Bottom** tabs when both are on, sizes and the waistband slider act on the selected one, Take off / drag-to-closet removes only that item; the closet marks every worn item.
+**Verified:** slim S/L, heavyweight S/XL alone; tee + jeans from front, back and side (both tees); 24 tests pass.
+**Files:** `public/js/viewer.js`, `public/js/app.js`, `public/index.html`, `public/css/style.css`, `CHANGELOG.md`

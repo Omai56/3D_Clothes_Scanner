@@ -21,6 +21,7 @@ export class FitViewer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.localClippingEnabled = true; // a bottom is clipped above the hem of a top worn over it
     container.appendChild(this.renderer.domElement);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -50,7 +51,8 @@ export class FitViewer {
 
     this.bodyGroup = new THREE.Group();
     this.garmentGroup = new THREE.Group();
-    this.meshyGroup = new THREE.Group();
+    this.meshyGroup = new THREE.Group(); // worn garment meshes: one child group per slot (top / bottom)
+    this.slots = {}; // category -> { group, url, gltf, size, box, bands, slices, top, materials }
     this.scene.add(this.bodyGroup, this.garmentGroup, this.meshyGroup);
 
     this.resize();
@@ -178,9 +180,18 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     this._frame(garment.category);
   }
 
-  clearGarmentModel() {
-    this.meshyGroup.clear();
-    this.setMode(this.mode ?? 'look'); // no mesh -> shell visible again
+  /** Take off one category ('top' / 'bottom'), or everything. */
+  clearGarmentModel(category) {
+    if (category) {
+      const slot = this.slots[category];
+      if (slot) this.meshyGroup.remove(slot.group);
+      delete this.slots[category];
+    } else {
+      this.meshyGroup.clear();
+      this.slots = {};
+    }
+    this._updateLayering();
+    this.setMode(this.mode ?? 'look');
   }
 
   /**
@@ -190,27 +201,40 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
    * measured shell is shown in "fit" mode (see setMode).
    */
   async loadGarmentModel(url, garment, sizeEval) {
-    this.meshyGroup.clear();
     if (!this.body) return;
-
-    if (this._gltfUrl !== url) {
+    const category = garment.category === 'top' ? 'top' : 'bottom';
+    // one slot per category: a top and a bottom can be worn together
+    let slot = this.slots[category];
+    if (slot && slot.url !== url) {
+      this.meshyGroup.remove(slot.group);
+      slot = null;
+    }
+    if (!slot) {
       const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-      this._gltf = await new Promise((resolve, reject) => new GLTFLoader().load(url, resolve, undefined, reject));
-      this._gltfUrl = url;
-      bakeToWorld(this._gltf.scene); // positions in scene units, float32, node transforms reset
+      const gltf = await new Promise((resolve, reject) => new GLTFLoader().load(url, resolve, undefined, reject));
+      bakeToWorld(gltf.scene); // positions in scene units, float32, node transforms reset
       // Measure the raw mesh once: bounding box + the width of its bottom and top bands
       // (a tee's hem / a pair of trousers' waistband — the parts with no sleeves in them).
-      const box = new THREE.Box3().setFromObject(this._gltf.scene);
-      this._gltfSize = box.getSize(new THREE.Vector3());
-      this._gltfBox = box;
-      this._gltfBands = measureBands(this._gltf.scene, box);
-      this._gltfSlices = null;
-      this._gltfTop = null;
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const group = new THREE.Group();
+      group.name = category;
+      group.add(gltf.scene);
+      slot = { group, url, gltf, size: box.getSize(new THREE.Vector3()), box, bands: measureBands(gltf.scene, box), slices: null, top: null, materials: [] };
+      this.slots[category] = slot;
+      this.meshyGroup.add(group);
     }
-    const model = this._gltf.scene;
-    const size = this._gltfSize;
-    const box = this._gltfBox;
-    const bands = this._gltfBands;
+    // the placement code reads the current garment's caches from these fields
+    this._gltf = slot.gltf;
+    this._gltfUrl = slot.url;
+    this._gltfSize = slot.size;
+    this._gltfBox = slot.box;
+    this._gltfBands = slot.bands;
+    this._gltfSlices = slot.slices;
+    this._gltfTop = slot.top;
+    const model = slot.gltf.scene;
+    const size = slot.size;
+    const box = slot.box;
+    const bands = slot.bands;
 
     const b = this.body;
     const R = sizeEval.regions;
@@ -219,7 +243,8 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     this._garmentName = `${garment.name ?? ''} ${garment.description ?? ''}`;
 
     // Fabric, not plastic: AI exports tend to come out glossy.
-    this._meshMaterials = [];
+    slot.materials = [];
+    const mats0 = slot.materials;
     model.traverse((o) => {
       if (!o.isMesh) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -234,7 +259,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
         if ('transmission' in m) m.transmission = 0;
         if ('clearcoat' in m) m.clearcoat = 0;
         m.envMapIntensity = 0.3;
-        this._meshMaterials.push(m);
+        mats0.push(m);
       }
     });
 
@@ -254,8 +279,27 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
       if (isTop) this._deformTop(model, box, R, chart, garment);
       else this._deformBottoms(model, box, R, chart);
     }
-    this.meshyGroup.add(model);
+    slot.slices = this._gltfSlices;
+    slot.top = this._gltfTop;
+    this._updateLayering();
     this.setMode(this.mode ?? 'look');
+  }
+
+  /** A top over a bottom: the bottom is not drawn above the top's hem (it is under the top there). */
+  _updateLayering() {
+    const top = this.slots.top;
+    const bottom = this.slots.bottom;
+    if (!bottom) return;
+    const planes = top?.fit ? [new THREE.Plane(new THREE.Vector3(0, -1, 0), top.fit.hemY + 0.012)] : [];
+    for (const m of bottom.materials) {
+      m.clippingPlanes = planes;
+      m.clipShadows = true;
+      m.needsUpdate = true;
+    }
+  }
+
+  get _meshMaterials() {
+    return Object.values(this.slots).flatMap((s) => s.materials);
   }
 
   /**
@@ -292,7 +336,7 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     if (isTop) {
       topY = neckY - 0.005;
       hemY = (R.length?.height_cm ?? R.hem?.height_cm ?? b.hipHeight) / 100;
-      ext = this._bodyExtent([this.rings.torso], Math.max(hemY, armpitY - 0.25), neckY - 0.06);
+      ext = this._bodyExtent([this.rings.torso], Math.max(hemY, armpitY - 0.25), armpitY - 0.01);
       flatCm = chart.chest ?? chart.hem ?? null;
       easeCm = R.chest?.ease_cm ?? 6;
       bandW = bands.bottom.width;
@@ -314,15 +358,15 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     const bodyCz = (ext.zmin + ext.zmax) / 2;
     const easeR = Math.max(MIN_GAP, cmEaseToRadius(easeCm));
 
-    // depth: the body's front-to-back extent plus the ease once, plus clearance
-    const depthM = bodyD + easeR + (isTop ? 0.05 : 0.035);
+    // How much slack the garment has round the body: none = it hugs (slim fit, stretch), a lot =
+    // it stands off the chest/back by the ease plus room for folds.
+    const bodyC = TWO_PI * Math.sqrt(((bodyW / 2) ** 2 + (bodyD / 2) ** 2) / 2);
+    const C = flatCm ? (2 * flatCm) / 100 : bodyC + 2 * TWO_PI * easeR;
+    const slack = clamp((C - bodyC) / 0.12, 0, 1);
+    const depthM = bodyD + 0.02 + slack * (easeR + (isTop ? 0.03 : 0.015));
     // width: what the chart's circumference allows at that depth, never narrower than the body
-    let wornWidth = bodyW + 2 * easeR + 0.02;
-    if (flatCm) {
-      const C = (2 * flatCm) / 100;
-      const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - (depthM / 2) ** 2));
-      wornWidth = clamp(2 * aHalf, bodyW + 0.02, bodyW + 2 * easeR + 0.06);
-    }
+    const aHalf = Math.sqrt(Math.max(0, 2 * (C / TWO_PI) ** 2 - (depthM / 2) ** 2));
+    const wornWidth = clamp(2 * aHalf, bodyW + 0.02, bodyW + 2 * easeR + 0.06);
     const heightM = Math.max(0.25, topY - hemY);
     const sy = heightM / (size.y || 1);
     const sx = bandW > 0.05 ? wornWidth / bandW : sy;
@@ -333,7 +377,9 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
     const py = topY - box.max.y * sy;
     const pz = bodyCz - cz * sz;
     this.lastSimpleFit = { wornWidth, depthM, heightM, sx, sy, sz, bodyW, bodyD };
-
+    const slotSelf = this.slots[isTop ? 'top' : 'bottom'];
+    if (slotSelf) slotSelf.fit = { topY, hemY };
+    if (slotSelf && !isTop) slotSelf.hull = null; // rebuilt below from the placed mesh
     // Trousers: the flat-lay legs splay outward and are thin pillows. Each mesh leg keeps its
     // shape but slides sideways/forwards so it hangs on the body's own leg line (thigh to
     // ankle), and is widened/deepened just enough to enclose the leg. Fades out at the crotch.
@@ -365,8 +411,6 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
           const lcx = ls.cx * sx + px;
           const lcz = ls.cz * sz + pz;
           const need = rMax[side] + gap + 0.012;
-          // the generated legs are wider than the real ones: narrow them a little (never
-          // tighter than the leg inside), and deepen the thin pillow to enclose the calf
           // hem half-width: from the chart if it has one, else a loose leg = ~44 % of the hip
           // measurement (flat), a regular one ~38 %
           const hemFlat = chart.hem ?? (chart.hip ? chart.hip * (/loose|wide|baggy|relaxed/i.test(`${this._garmentName ?? ''}`) ? 0.44 : 0.38) : null);
@@ -380,6 +424,28 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
         };
       }
     }
+
+    // a top over a bottom: below the bottom's waistband the top stays outside the bottom's
+    // actual placed geometry (its hull, recorded per height and direction when it was placed)
+    const hull = isTop && window.__underPush ? this.slots.bottom?.hull : null; // off: the bottom is clipped instead (see _updateLayering)
+    const clearUnder = hull
+      ? (P0, i) => {
+          const k = i * 3;
+          const Y = P0[k + 1];
+          if (Y > hull.yMax || Y < hull.yMin) return;
+          const c = sampleRing(this.rings.torso, Math.max(Y, this.rings.crotchSplitY ?? legTop), 0);
+          if (!c) return;
+          const dx = P0[k] - c.cx;
+          const dz = P0[k + 2] - c.cz;
+          const rb = hull.at(Y, Math.atan2(dz, dx)) + 0.012;
+          const d = Math.hypot(dx, dz);
+          if (d < rb) {
+            const f = rb / Math.max(d, 1e-6);
+            P0[k] = c.cx + dx * f;
+            P0[k + 2] = c.cz + dz * f;
+          }
+        }
+      : null;
 
     // bake the scale into the vertices, then push what is inside the body out (smoothed)
     const Cs = this._bodyColliders({ gap, legTop, neckY, armpitY, torsoLo: this.rings.crotchSplitY ?? legTop });
@@ -397,10 +463,13 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
       const adj = (o.userData.adj ??= buildAdjacency(o.geometry));
       const D = new Float32Array(W.length);
       const T = new Float32Array(W.length);
-      const collide = () => {
+      // the clearance over a worn bottom is applied only through the smoothed passes (a raw
+      // final push prints the bottom's shape through the top)
+      const collide = (withUnder = true) => {
         for (let i = 0; i < n; i++) {
-          if (T[i * 3 + 1] < hemY - 0.01) continue;
+          if (T[i * 3 + 1] < hemY - (isTop ? 0.08 : 0.01)) continue;
           for (let pass = 0; pass < 2; pass++) for (const col of cols) col(T, i);
+          if (withUnder && clearUnder) clearUnder(T, i);
         }
       };
       for (let it = 0; it < 4; it++) {
@@ -435,7 +504,81 @@ uniform float uTopHip, uLegEnd, uHipHalf, uCx;`)
         D.set(T);
       }
       for (let k = 0; k < W.length; k++) T[k] = W[k] + D[k];
-      collide();
+      collide(false);
+      if (!isTop) {
+        // hull of the placed seat (waistband down to just under the crotch): max distance from
+        // the torso ring centre per 1 cm of height and 24 directions, for a top worn over it
+        const yMin = legTop - 0.03;
+        const yMax = topY + 0.02;
+        const NY = Math.max(2, Math.ceil((yMax - yMin) / 0.01) + 1);
+        const NA = 24;
+        const H = slotSelf.hull?.data ?? new Float32Array(NY * NA);
+        for (let i = 0; i < n; i++) {
+          const Y = T[i * 3 + 1];
+          if (Y < yMin || Y > yMax) continue;
+          const c = sampleRing(this.rings.torso, Math.max(Y, this.rings.crotchSplitY ?? legTop), 0);
+          if (!c) continue;
+          const dx = T[i * 3] - c.cx;
+          const dz = T[i * 3 + 2] - c.cz;
+          const iy = Math.min(NY - 1, Math.floor((Y - yMin) / 0.01));
+          const ia = ((Math.round(((Math.atan2(dz, dx) + Math.PI) / TWO_PI) * NA) % NA) + NA) % NA;
+          const d = Math.hypot(dx, dz);
+          if (d > H[iy * NA + ia]) H[iy * NA + ia] = d;
+        }
+        // fill empty cells from their neighbours round the ring
+        for (let iy = 0; iy < NY; iy++) {
+          for (let ia = 0; ia < NA; ia++) {
+            if (H[iy * NA + ia] > 0) continue;
+            let best = 0;
+            for (let d = 1; d < NA / 2; d++) {
+              best = Math.max(H[iy * NA + ((ia + d) % NA)], H[iy * NA + ((ia + NA - d) % NA)]);
+              if (best > 0) break;
+            }
+            H[iy * NA + ia] = best;
+          }
+        }
+        // smooth the hull (pockets, the fly and folds must not print through the top) and
+        // sample it bilinearly
+        let Hs = H;
+        // widen first (the widest points must survive), then soften
+        for (let it = 0; it < 4; it++) {
+          const useMax = it < 1;
+          const N2 = new Float32Array(NY * NA);
+          for (let iy = 0; iy < NY; iy++) {
+            const y0 = Math.max(0, iy - 1);
+            const y1 = Math.min(NY - 1, iy + 1);
+            for (let ia = 0; ia < NA; ia++) {
+              let sum = 0;
+              let cnt = 0;
+              let mx = 0;
+              for (let yy = y0; yy <= y1; yy++) for (let da = -1; da <= 1; da++) {
+                const v = Hs[yy * NA + ((ia + da + NA) % NA)];
+                sum += v;
+                cnt++;
+                if (v > mx) mx = v;
+              }
+              N2[iy * NA + ia] = useMax ? mx : sum / cnt;
+            }
+          }
+          Hs = N2;
+        }
+        const Hf = Hs;
+        slotSelf.hull = {
+          data: H,
+          yMin,
+          yMax,
+          at: (Y, th) => {
+            const fy = Math.max(0, Math.min(NY - 1.001, (Y - yMin) / 0.01));
+            const iy = Math.floor(fy);
+            const ty = fy - iy;
+            const fa = ((th + Math.PI) / TWO_PI) * NA;
+            const ia = ((Math.floor(fa) % NA) + NA) % NA;
+            const ta = fa - Math.floor(fa);
+            const v = (yy) => Hf[yy * NA + ia] * (1 - ta) + Hf[yy * NA + ((ia + 1) % NA)] * ta;
+            return v(iy) * (1 - ty) + v(Math.min(NY - 1, iy + 1)) * ty;
+          },
+        };
+      }
       const attr = o.geometry.attributes.position;
       attr.array.set(T);
       attr.needsUpdate = true;

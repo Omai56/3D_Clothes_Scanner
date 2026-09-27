@@ -1,14 +1,16 @@
 const $ = (s) => document.querySelector(s);
 const state = {
   scan: null, // { name, measurements_cm, landmarks_cm, objUrl }
-  garment: null,
   garments: [],
-  report: null,
-  size: null,
-  meshyUrl: null,
-  waistOffset: 0,
+  // what is on the body: one slot per category, each { garment, report, size, meshyUrl, waistOffset }
+  worn: { top: null, bottom: null },
+  active: null, // 'top' | 'bottom': the slot shown in the side panel
   step: 'body',
 };
+const slotOf = (g) => (g?.category === 'top' ? 'top' : 'bottom');
+const cur = () => (state.active ? state.worn[state.active] : null);
+const wornList = () => ['top', 'bottom'].map((k) => state.worn[k]).filter(Boolean);
+const isWorn = (id) => wornList().some((w) => w.garment.id === id);
 let viewer = null;
 let pollTimer = null;
 let meshyTimer = null;
@@ -58,7 +60,7 @@ async function selectScan(name, btn, enter = false) {
   if (enter) {
     show('room');
     await ensureBody();
-    if (changed && state.garment) await selectGarment(state.garment); // re-fit on the new body
+    if (changed) for (const w of wornList()) await selectGarment(w.garment); // re-fit on the new body
   }
 }
 
@@ -144,7 +146,7 @@ function renderCloset() {
   el.innerHTML = '';
   for (const g of state.garments) {
     const btn = document.createElement('button');
-    btn.className = 'card' + (state.garment?.id === g.id ? ' worn' : '');
+    btn.className = 'card' + (isWorn(g.id) ? ' worn' : '');
     btn.dataset.id = g.id;
     btn.innerHTML = `<img src="${esc(g.images?.[0] ?? '')}" alt="" /><span class="card-title">${esc(g.name)}</span><span class="card-sub">${esc(g.brand)}</span>`;
     attachDrag(btn, { garment: g, kind: 'closet' });
@@ -201,24 +203,26 @@ $('#import-form').addEventListener('submit', async (e) => {
 });
 
 // ---------- wearing an item ----------
-async function fetchFit(g) {
+async function fetchFit(w) {
   return fetch('/api/fit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scan: state.scan.name, garment_id: g.id, waist_offset_cm: state.waistOffset ?? 0 }),
+    body: JSON.stringify({ scan: state.scan.name, garment_id: w.garment.id, waist_offset_cm: w.waistOffset ?? 0 }),
   });
 }
 
+// Put a garment on: it takes the slot of its category (a top and a bottom can be worn together).
 async function selectGarment(g) {
   if (!state.scan?.name) return show('body');
-  state.garment = g;
-  state.meshyUrl = null;
-  state.waistOffset = 0;
+  const slot = slotOf(g);
+  const w = { garment: g, report: null, size: null, meshyUrl: null, waistOffset: 0 };
+  state.worn[slot] = w;
+  state.active = slot;
   clearInterval(meshyTimer);
   openCloset(false);
   await ensureBody();
-  viewer.clearGarmentModel();
-  const r = await fetchFit(g);
+  viewer.clearGarmentModel(slot);
+  const r = await fetchFit(w);
   const data = await r.json();
   if (r.status === 404 && data.error?.includes('body')) {
     state.scan = null;
@@ -228,33 +232,56 @@ async function selectGarment(g) {
     return alert('That saved body is no longer available. Please pick a body again.');
   }
   if (!r.ok) return alert(data.error);
-  state.report = data.report;
-  state.size = data.report.recommended;
+  w.report = data.report;
+  w.size = data.report.recommended;
   renderCloset();
   await renderItem();
   setPanel(true);
-  if (g.model?.glb) await applyModel(g.model.glb, g);
-  else if (g.images?.[0]) kickOffMeshy(g);
+  if (g.model?.glb) await applyModel(g.model.glb, w);
+  else if (g.images?.[0]) kickOffMeshy(w);
 }
 
-function takeOff() {
+function takeOff(slot = state.active) {
+  if (!slot || !state.worn[slot]) return;
   clearInterval(meshyTimer);
-  state.garment = null;
-  state.report = null;
-  state.meshyUrl = null;
-  if (viewer) viewer.clearGarmentModel();
-  $('#panel-item').hidden = true;
-  $('#panel-empty').hidden = false;
+  state.worn[slot] = null;
+  if (viewer) viewer.clearGarmentModel(slot);
+  const rest = wornList();
+  state.active = rest.length ? slotOf(rest[0].garment) : null;
   renderCloset();
-  setPanel(false);
+  if (state.active) renderItem();
+  else {
+    $('#panel-item').hidden = true;
+    $('#panel-empty').hidden = false;
+    setPanel(false);
+  }
 }
-$('#btn-takeoff').addEventListener('click', takeOff);
+$('#btn-takeoff').addEventListener('click', () => takeOff());
+
+// tabs for the worn items (shown when more than one is on)
+function renderWornTabs() {
+  const el = $('#worn-tabs');
+  const list = wornList();
+  el.hidden = list.length < 2;
+  el.innerHTML = list
+    .map((w) => `<button type="button" data-slot="${slotOf(w.garment)}" class="${slotOf(w.garment) === state.active ? 'active' : ''}"><img src="${esc(w.garment.images?.[0] ?? '')}" alt="" />${esc(w.garment.category === 'top' ? 'Top' : 'Bottom')}</button>`)
+    .join('');
+}
+$('#worn-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-slot]');
+  if (!b) return;
+  state.active = b.dataset.slot;
+  renderItem();
+});
 
 async function renderItem() {
-  const g = state.garment;
-  const rep = state.report;
+  const w = cur();
+  if (!w) return;
+  const g = w.garment;
+  const rep = w.report;
   $('#panel-empty').hidden = true;
   $('#panel-item').hidden = false;
+  renderWornTabs();
   $('#fit-img').src = g.images?.[0] ?? '';
   $('#wearing-img').src = g.images?.[0] ?? '';
   $('#fit-brand').textContent = g.brand;
@@ -265,42 +292,43 @@ async function renderItem() {
   sizesEl.innerHTML = '';
   for (const s of rep.size_order) {
     const btn = document.createElement('button');
-    btn.className = 'size' + (s === state.size ? ' active' : '');
+    btn.className = 'size' + (s === w.size ? ' active' : '');
     btn.innerHTML = `${esc(s)}${s === rep.recommended ? '<span class="rec">BEST</span>' : ''}`;
     btn.addEventListener('click', async () => {
-      state.size = s;
+      w.size = s;
       await renderItem();
-      if (state.meshyUrl) await drape(state.meshyUrl, g, rep.sizes[s]);
+      if (w.meshyUrl) await drape(w.meshyUrl, g, rep.sizes[s]);
     });
     sizesEl.appendChild(btn);
   }
-  const ev = rep.sizes[state.size];
+  const ev = rep.sizes[w.size];
   $('#fit-summary').textContent = ev.summary;
 
   const wc = $('#waist-control');
   wc.hidden = g.category !== 'bottom';
   if (g.category === 'bottom') {
-    $('#waist-slider').value = String(state.waistOffset ?? 0);
-    const off = state.waistOffset ?? 0;
+    $('#waist-slider').value = String(w.waistOffset ?? 0);
+    const off = w.waistOffset ?? 0;
     const style = rep.rise_style ? `${rep.rise_style}-rise` : '';
     $('#waist-label').textContent = off === 0 ? `${style} default` : off < 0 ? `${Math.abs(off)} cm lower` : `${off} cm higher`;
   }
-  $('#add-model').hidden = !!(g.model?.glb || state.meshyUrl);
+  $('#add-model').hidden = !!(g.model?.glb || w.meshyUrl);
 }
 
 // Attach a .glb (made on tripo3d.ai from the product photo) to the current item, then show it.
 $('#model-file').addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   const st = $('#add-model-status');
-  if (!file || !state.garment) return;
+  const w = cur();
+  if (!file || !w) return;
   st.textContent = `Uploading ${file.name} (${(file.size / 1e6).toFixed(1)} MB)…`;
   try {
-    const r = await fetch(`/api/garments/${encodeURIComponent(state.garment.id)}/model`, { method: 'POST', headers: { 'Content-Type': 'model/gltf-binary' }, body: file });
+    const r = await fetch(`/api/garments/${encodeURIComponent(w.garment.id)}/model`, { method: 'POST', headers: { 'Content-Type': 'model/gltf-binary' }, body: file });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'upload failed');
-    state.garment = data.garment;
+    w.garment = data.garment;
     st.textContent = 'Added. Draping…';
-    await applyModel(data.garment.model.glb, data.garment);
+    await applyModel(data.garment.model.glb, w);
     $('#add-model').hidden = true;
     loadGarments();
   } catch (err) {
@@ -321,29 +349,30 @@ async function drape(url, garment, ev) {
   }
 }
 
-async function applyModel(url, garment) {
+async function applyModel(url, w) {
   setStatus('');
-  state.meshyUrl = url;
-  if (!viewer || !state.report) return;
-  await drape(url, garment, state.report.sizes[state.size]);
+  w.meshyUrl = url;
+  if (!viewer || !w.report) return;
+  await drape(url, w.garment, w.report.sizes[w.size]);
 }
 
 // ---------- meshy image-to-3D (Samuel's pipeline; no-op without a key) ----------
-async function kickOffMeshy(garment) {
+async function kickOffMeshy(w) {
   clearInterval(meshyTimer);
+  const garment = w.garment;
   const imageUrl = garment.images?.[0];
   if (!imageUrl) return;
   try {
     const r = await fetch('/api/meshy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ garment_id: garment.id, image_url: imageUrl }) });
     const data = await r.json();
     if (!r.ok) return;
-    if (data.cached) return applyModel(data.modelUrl, garment);
+    if (data.cached) return applyModel(data.modelUrl, w);
     setStatus('Generating 3D model…');
     meshyTimer = setInterval(async () => {
       try {
         const pr = await fetch(`/api/meshy/${data.taskId}?garment_id=${encodeURIComponent(garment.id)}`);
         const pd = await pr.json();
-        if (pd.status === 'SUCCEEDED') { clearInterval(meshyTimer); await applyModel(pd.modelUrl, garment); }
+        if (pd.status === 'SUCCEEDED') { clearInterval(meshyTimer); await applyModel(pd.modelUrl, w); }
         else if (pd.status === 'FAILED') { clearInterval(meshyTimer); setStatus(''); }
         else setStatus(`Generating 3D model… ${pd.progress ?? 0}%`);
       } catch { /* keep polling */ }
@@ -360,19 +389,20 @@ function setStatus(msg) {
 // Waistband slider: re-run the fit at the new height and re-drape (the crotch and hem move too).
 let waistTimer = null;
 $('#waist-slider').addEventListener('input', (e) => {
-  state.waistOffset = Number(e.target.value);
-  const off = state.waistOffset;
-  $('#waist-label').textContent = off === 0 ? `${state.report?.rise_style ?? ''}-rise default` : off < 0 ? `${Math.abs(off)} cm lower` : `${off} cm higher`;
+  const w = cur();
+  if (!w) return;
+  w.waistOffset = Number(e.target.value);
+  const off = w.waistOffset;
+  $('#waist-label').textContent = off === 0 ? `${w.report?.rise_style ?? ''}-rise default` : off < 0 ? `${Math.abs(off)} cm lower` : `${off} cm higher`;
   clearTimeout(waistTimer);
   waistTimer = setTimeout(async () => {
-    if (!state.garment) return;
-    const r = await fetchFit(state.garment);
+    const r = await fetchFit(w);
     const data = await r.json();
     if (!r.ok) return;
-    state.report = data.report;
-    if (!state.report.sizes[state.size]) state.size = state.report.recommended;
+    w.report = data.report;
+    if (!w.report.sizes[w.size]) w.size = w.report.recommended;
     await renderItem();
-    if (state.meshyUrl) await drape(state.meshyUrl, state.garment, state.report.sizes[state.size]);
+    if (w.meshyUrl) await drape(w.meshyUrl, w.garment, w.report.sizes[w.size]);
   }, 200);
 });
 
@@ -454,7 +484,7 @@ function attachDrag(el, payload) {
   el.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 // the worn chip in the panel can be dragged back to the closet
-attachDrag($('#wearing-chip'), { get garment() { return state.garment ?? {}; }, kind: 'worn' });
+attachDrag($('#wearing-chip'), { get garment() { return cur()?.garment ?? {}; }, kind: 'worn' });
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

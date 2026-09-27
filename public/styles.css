@@ -4,8 +4,8 @@
   --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  --bg: #f6f3ee;
-  --bg-deep: #efeae3;
+  --bg: #fbf8f4;
+  --bg-deep: #f3eee8;
   --surface: #ffffff;
   --surface-2: #faf8f5;
   --ink: #161513;
@@ -14,13 +14,25 @@
   --line: #e8e2d9;
   --line-strong: #d6cec3;
 
-  --accent: #161513;
-  --accent-2: #161513;
+  --accent: #5b3df5;
+  --accent-2: #ff4f9a;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(22, 21, 19, .06);
-  --clay: #a9582f;
+  --accent-soft: rgba(91, 61, 245, .09);
+  --clay: #e0407f;
   --gold: var(--clay);
-  --gold-soft: #f4ebe2;
+  --gold-soft: #fff4cf;
+  --brand-grad: linear-gradient(120deg, #5b3df5 0%, #a13df0 55%, #ff4f9a 100%);
+  /* Pastel washes, mixed into the surface so dark mode gets dark versions for free. */
+  --lilac: #8b6cff;
+  --peach: #ff9a6b;
+  --butter: #ffd23f;
+  --mint: #3ccf95;
+  --pink: #ff5fa8;
+  --tint-lilac: color-mix(in srgb, var(--lilac) 12%, var(--surface));
+  --tint-peach: color-mix(in srgb, var(--peach) 13%, var(--surface));
+  --tint-butter: color-mix(in srgb, var(--butter) 18%, var(--surface));
+  --tint-mint: color-mix(in srgb, var(--mint) 12%, var(--surface));
+  --tint-pink: color-mix(in srgb, var(--pink) 11%, var(--surface));
 
   /* Fit colours, the same as the 3D view (shared/fit.js VERDICT_COLOR). */
   --good: #30a46c;
@@ -45,8 +57,8 @@
   --shadow-sm: 0 1px 2px rgba(22, 21, 19, .05);
   --shadow: 0 1px 2px rgba(22, 21, 19, .04), 0 12px 32px -18px rgba(22, 21, 19, .18);
   --shadow-lift: 0 2px 6px rgba(22, 21, 19, .06), 0 24px 48px -20px rgba(22, 21, 19, .28);
-  --ring: 0 0 0 3px rgba(22, 21, 19, .16);
-  --glass: rgba(246, 243, 238, .82);
+  --ring: 0 0 0 3px rgba(91, 61, 245, .22);
+  --glass: rgba(251, 248, 244, .78);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -60,12 +72,13 @@
     --muted: #9b948a;
     --line: #2c2926;
     --line-strong: #3b3733;
-    --accent: #f2eee8;
-    --accent-2: #f2eee8;
-    --accent-ink: #11100e;
-    --accent-soft: rgba(242, 238, 232, .08);
-    --clay: #e0976c;
-    --gold-soft: rgba(224, 151, 108, .12);
+    --accent: #a08cff;
+    --accent-2: #ff7ab8;
+    --accent-ink: #ffffff;
+    --accent-soft: rgba(160, 140, 255, .14);
+    --clay: #ff7ab8;
+    --gold-soft: rgba(255, 210, 63, .12);
+    --brand-grad: linear-gradient(120deg, #6d52ff 0%, #a64cf0 55%, #ff5fa8 100%);
     --good: #3dbb7e;
     --warn: #f0b429;
     --bad: #f0686c;
@@ -82,7 +95,7 @@
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 16px 36px -18px rgba(0, 0, 0, .7);
     --shadow-lift: 0 2px 6px rgba(0, 0, 0, .35), 0 28px 56px -20px rgba(0, 0, 0, .8);
-    --ring: 0 0 0 3px rgba(242, 238, 232, .22);
+    --ring: 0 0 0 3px rgba(160, 140, 255, .35);
     --glass: rgba(17, 16, 14, .8);
     color-scheme: dark;
   }
@@ -728,3 +741,102 @@ html, body { overflow-x: clip; }
 .wd-pager button.on { width: 18px; background: #1d1b18; }
 .wd-pager span { font-size: 11px; font-weight: 600; color: #5f564c; margin-left: 2px; font-variant-numeric: tabular-nums; }
 .wardrobe[data-open="false"] .wd-arrow, .wardrobe[data-open="false"] .wd-pager { opacity: 0; pointer-events: none; }
+
+/* ---------- Colour ----------
+   Brand: violet → pink. Pastel washes behind the page and in a few cards.
+   Fit colours (red / amber / green / blue) stay reserved for fit. */
+body { background: transparent; }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(42vmax 32vmax at 92% -6%, color-mix(in srgb, var(--lilac) 26%, transparent), transparent 70%),
+    radial-gradient(38vmax 30vmax at -8% 22%, color-mix(in srgb, var(--peach) 22%, transparent), transparent 70%),
+    radial-gradient(40vmax 30vmax at 70% 108%, color-mix(in srgb, var(--pink) 16%, transparent), transparent 70%),
+    radial-gradient(30vmax 24vmax at 8% 100%, color-mix(in srgb, var(--mint) 14%, transparent), transparent 70%),
+    var(--bg);
+}
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+.logo-mark rect { fill: url(#lg); }
+.logo-mark svg stop:first-child { stop-color: #5b3df5; }
+.logo-mark svg stop:last-child { stop-color: #ff4f9a; }
+.logo-mark path:first-of-type { fill: #fff; }
+.logo-mark path + path { stroke: var(--butter); }
+.logo em { background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: .05em; }
+
+.steps li.current .dot { background: var(--brand-grad); border-color: transparent; color: #fff; box-shadow: 0 6px 14px -6px rgba(91, 61, 245, .6); }
+.steps li.done .dot { color: var(--accent); border-color: var(--accent); }
+
+.eyebrow { background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block; }
+h1 em, .accent-word { font-style: italic; background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--brand-grad); border-color: transparent; color: #fff; box-shadow: 0 10px 24px -12px rgba(91, 61, 245, .7); }
+.btn.primary:hover { background: var(--brand-grad); filter: saturate(1.15) brightness(1.04); box-shadow: 0 14px 28px -12px rgba(255, 79, 154, .7); }
+.btn.ghost:hover { background: var(--tint-lilac); }
+
+.notice { background: var(--tint-butter); border-color: color-mix(in srgb, var(--butter) 45%, transparent); }
+.store-link { color: var(--accent); }
+.store-link:hover { color: var(--accent-2); }
+.back:hover { color: var(--accent); }
+
+/* Studio backdrops: soft lilac → peach cyclorama */
+.stage {
+  background:
+    radial-gradient(60% 45% at 50% 34%, #ffffff, transparent 72%),
+    radial-gradient(55% 12% at 50% 95%, rgba(91, 61, 245, .10), transparent 70%),
+    linear-gradient(170deg, #efe9ff 0%, #fbe9f1 55%, #ffeede 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .stage { background: radial-gradient(60% 45% at 50% 34%, rgba(255, 255, 255, .08), transparent 72%), linear-gradient(170deg, #221d38 0%, #2a1c2a 60%, #2a2019 100%); }
+}
+
+/* Measure page */
+.figure-wrap[data-active] .region.active rect { fill: var(--accent); opacity: .18; }
+.progress-bar { background: color-mix(in srgb, var(--accent) 10%, var(--line)); height: 3px; }
+.progress-bar i { background: linear-gradient(90deg, #5b3df5, #ff4f9a, #ff9a6b); }
+.unit-toggle button[aria-pressed="true"] { background: var(--brand-grad); color: #fff; }
+.field.active { background: var(--tint-lilac); border-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+.field.active .num { background: var(--brand-grad); border-color: transparent; color: #fff; }
+.field input:focus { border-color: var(--accent); }
+.field input:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong)); }
+.figure-panel { background: linear-gradient(160deg, var(--surface) 40%, var(--tint-lilac)); }
+
+/* Wardrobe page */
+.measure-chip { background: var(--tint-butter); border-color: color-mix(in srgb, var(--butter) 40%, var(--line)); }
+.measure-chip span:first-child:not(:has(b)) { color: var(--ink); background: var(--butter); padding: 3px 9px; border-radius: 999px; }
+.measure-chip a { color: var(--accent); }
+.link-panel {
+  background:
+    radial-gradient(60% 90% at 100% 0%, color-mix(in srgb, var(--pink) 16%, transparent), transparent 70%),
+    radial-gradient(50% 80% at 0% 100%, color-mix(in srgb, var(--lilac) 14%, transparent), transparent 70%),
+    var(--surface);
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--line));
+}
+.link-icon { background: var(--brand-grad); color: #fff; box-shadow: 0 8px 18px -8px rgba(91, 61, 245, .7); }
+.link-input input { background: var(--surface); }
+.link-input input:focus { border-color: var(--accent); }
+.paste-btn:hover { border-color: var(--accent); color: var(--accent); }
+.link-detect { background: var(--tint-lilac); border-color: color-mix(in srgb, var(--accent) 20%, transparent); }
+.detect-store { background: var(--accent); color: #fff; }
+
+/* Wardrobe: lilac lacquer doors and drawer, brass pulls */
+.wardrobe { --lacquer-1: #efe9ff; --lacquer-2: #ddd3ff; --linen-1: #fdf6ff; --linen-2: #f3e8f7; }
+@media (prefers-color-scheme: dark) { .wardrobe { --lacquer-1: #3a3257; --lacquer-2: #2e2847; --linen-1: #2f2838; --linen-2: #27212f; } }
+.wd-plaque { color: #fff; background: var(--brand-grad); padding: 3px 12px; border-radius: 999px; letter-spacing: .2em; box-shadow: 0 4px 10px -4px rgba(91, 61, 245, .6); }
+.wd-lamp { background: #fff3fb; box-shadow: 0 0 16px 6px rgba(255, 170, 215, .55); }
+.wd-pager button.on { background: var(--accent); }
+
+/* Result page */
+.result-hero { border-color: color-mix(in srgb, var(--accent) 14%, var(--line)); }
+.result-hero .img { background: linear-gradient(160deg, var(--tint-lilac), var(--tint-peach)); }
+.result-hero .brand { color: var(--accent); }
+.fitmap { background: linear-gradient(180deg, var(--surface) 60%, var(--tint-lilac)); }
+.size-tabs { background: var(--tint-lilac); border-color: color-mix(in srgb, var(--accent) 16%, var(--line)); }
+.size-tab:hover { color: var(--accent); }
+.size-tab[aria-pressed="true"] { background: var(--brand-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(91, 61, 245, .6); }
+.size-tab[aria-pressed="true"] .rec { background: #fff; }
+.region-row[aria-pressed="true"] { background: var(--tint-lilac); }
+.body-picker select:hover { border-color: var(--accent); }
+.why { background: linear-gradient(135deg, var(--tint-peach), var(--tint-pink)); border-color: color-mix(in srgb, var(--peach) 30%, var(--line)); }
+.why li::before { background: var(--brand-grad); height: 2px; border-radius: 2px; }

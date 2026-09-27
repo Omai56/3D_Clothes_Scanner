@@ -329,3 +329,11 @@ Every change made by Claude (AI assistant) is logged here: when, what, why, and 
 - Result page: bigger product hero, pill size tabs, fit rows coloured like the 3D view (relaxed = blue, snug = amber, tight = red); numeric sizes read "Recommended: Size 32".
 **Verified:** before/after screenshots of all three pages at desktop and phone width, active-field, open-wardrobe, link-detected and dark-mode states; tests pass.
 **Files:** `public/styles.css`, `public/index.html`, `public/shop.html`, `public/result.html`, `public/fit-main.js`, `CHANGELOG.md`
+
+---
+
+## 2026-09-26 — FitCheck pages: more colour
+**By:** Claude (Opus 5.5)
+**What:** Colour layer on top of the redesign (`public/styles.css`, end of file): violet → pink brand gradient (logo, current step, primary buttons, size tabs, unit toggle, progress bar, one italic accent word per page heading), pastel washes behind the page, tinted cards (butter measurements bar and notices, lilac link box, peach/pink "Why this size"), lilac-to-peach backdrops behind the mannequin and 3D body, lilac wardrobe doors and drawer. Fit colours (red/amber/green/blue) unchanged and still only used for fit. Dark mode has matching dark tints.
+**Verified:** screenshots of all pages at desktop and phone width, open wardrobe, active field, dark mode; tests pass.
+**Files:** `public/styles.css`, `public/index.html`, `public/shop.html`, `CHANGELOG.md`
